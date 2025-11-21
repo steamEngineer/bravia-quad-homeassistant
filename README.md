@@ -1,3 +1,5 @@
+**The hard work was reverse-engineering the sony bravia quad commands. This was all vibe-coded in cursor. USE AT YOUR OWN RISK**
+
 # Bravia Quad Home Assistant Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
