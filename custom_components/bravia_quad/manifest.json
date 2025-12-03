@@ -1,7 +1,9 @@
 {
   "domain": "bravia_quad",
   "name": "Bravia Quad",
-  "codeowners": ["@steamEngineer"],
+  "codeowners": [
+    "@steamEngineer"
+  ],
   "config_flow": true,
   "dependencies": [],
   "documentation": "https://github.com/steamEngineer/bravia-quad-homeassistant",
@@ -9,6 +11,5 @@
   "integration_type": "device",
   "iot_class": "local_push",
   "requirements": [],
-  "version": "1.0.0"
+  "version": "1.0.1"
 }
-
