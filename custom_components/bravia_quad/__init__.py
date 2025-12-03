@@ -52,11 +52,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Give the connection a moment to stabilize
     await asyncio.sleep(0.2)
     
+    # Start listening for notifications before fetching state so responses are captured
+    await client.async_listen_for_notifications()
+    
     # Fetch all initial states from the device
     await client.async_fetch_all_states()
-    
-    # Start listening for notifications after initial sync
-    asyncio.create_task(client.async_listen_for_notifications())
     
     # Forward entry setup to platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

@@ -57,6 +57,8 @@ class BraviaQuadClient:
         self._night_mode = NIGHT_MODE_OFF
         self._command_id_counter = 10  # Start from 10 to avoid conflicts
         self._command_lock = asyncio.Lock()
+        self._pending_responses: dict[int, asyncio.Future] = {}
+        self._listener_task: asyncio.Task | None = None
 
     async def async_connect(self) -> None:
         """Connect to the Bravia Quad device."""
@@ -80,6 +82,13 @@ class BraviaQuadClient:
     async def async_disconnect(self) -> None:
         """Disconnect from the Bravia Quad device."""
         self._listening = False
+        if self._listener_task:
+            self._listener_task.cancel()
+            try:
+                await self._listener_task
+            except asyncio.CancelledError:
+                pass
+            self._listener_task = None
         if self._writer:
             self._writer.close()
             try:
@@ -89,6 +98,13 @@ class BraviaQuadClient:
         self._reader = None
         self._writer = None
         self._connected = False
+
+        # Fail any pending command futures
+        for future in self._pending_responses.values():
+            if not future.done():
+                future.set_exception(ConnectionError("Disconnected"))
+        self._pending_responses.clear()
+
         _LOGGER.info("Disconnected from Bravia Quad")
 
     async def async_test_connection(self) -> bool:
@@ -123,45 +139,44 @@ class BraviaQuadClient:
         if not self._writer or not self._reader:
             raise ConnectionError("Not connected to device")
 
+        if not self._listener_task or self._listener_task.done():
+            await self.async_listen_for_notifications()
+
+        response_future: asyncio.Future | None = None
+
         async with self._command_lock:
             try:
-                # Send command
+                # Always assign a unique command id
+                command = dict(command)
+                command_id = self._get_next_command_id()
+                command["id"] = command_id
+
+                loop = asyncio.get_running_loop()
+                response_future = loop.create_future()
+                self._pending_responses[command_id] = response_future
+
                 command_json = json.dumps(command) + "\n"
                 _LOGGER.debug("Sending command: %s", command_json.strip())
                 self._writer.write(command_json.encode())
                 await self._writer.drain()
-                _LOGGER.debug("Command sent, waiting for response...")
-
-                try:
-                    data = await asyncio.wait_for(
-                        self._reader.read(1024), timeout=timeout
-                    )
-                except asyncio.TimeoutError:
-                    _LOGGER.error("Timeout waiting for response (timeout=%s)", timeout)
-                    return None
-
-                if not data:
-                    _LOGGER.warning("Received empty response")
-                    return None
-
-                response_str = data.decode("utf-8", errors="replace").strip()
-                _LOGGER.debug("Received response buffer: %s", response_str)
-
-                messages = self._decode_json_stream(response_str)
-                if not messages:
-                    return None
-
-                # Process all messages to keep the internal state in sync.
-                for message in messages:
-                    await self._process_incoming_message(message)
-
-                return messages[0]
-            except asyncio.TimeoutError:
-                _LOGGER.error("Timeout waiting for response to command: %s", command)
-                return None
             except Exception as err:
+                if command_id in self._pending_responses:
+                    self._pending_responses.pop(command_id, None)
                 _LOGGER.error("Error sending command: %s", err)
                 return None
+
+        try:
+            response = await asyncio.wait_for(
+                response_future, timeout=timeout
+            )
+            return response
+        except asyncio.TimeoutError:
+            if response_future and not response_future.done():
+                response_future.cancel()
+            _LOGGER.error("Timeout waiting for response to command: %s", command)
+            return None
+        finally:
+            self._pending_responses.pop(command_id, None)
 
     async def async_set_power(self, state: str) -> bool:
         """Set power state (on/off)."""
@@ -444,49 +459,57 @@ class BraviaQuadClient:
         self._notification_callbacks[feature].append(callback)
 
     async def async_listen_for_notifications(self) -> None:
-        """Listen for real-time notifications from the device."""
-        if self._listening:
+        """Ensure the notification listener is running."""
+        if self._listener_task and not self._listener_task.done():
             return
 
         if not self._connected:
             await self.async_connect()
 
+        self._listener_task = asyncio.create_task(self._notification_loop())
+
+    async def _notification_loop(self) -> None:
+        """Listen for real-time notifications from the device."""
         self._listening = True
         _LOGGER.info("Starting notification listener")
 
-        while self._listening and self._connected:
-            try:
-                if not self._reader:
-                    break
-
-                # Read data - device may send JSON with or without newline
-                data = await asyncio.wait_for(
-                    self._reader.read(1024), timeout=1.0
-                )
-                
-                if not data:
-                    await asyncio.sleep(0.1)
-                    continue
-
+        try:
+            while self._listening and self._connected:
                 try:
+                    if not self._reader:
+                        break
+
+                    data = await asyncio.wait_for(
+                        self._reader.read(1024), timeout=1.0
+                    )
+
+                    if not data:
+                        await asyncio.sleep(0.1)
+                        continue
+
                     response_str = data.decode("utf-8", errors="replace").strip()
+                    if not response_str:
+                        continue
+
                     messages = self._decode_json_stream(response_str)
                     if not messages:
                         continue
 
                     for message in messages:
                         await self._process_incoming_message(message)
+                except asyncio.TimeoutError:
+                    continue
+                except asyncio.CancelledError:
+                    raise
                 except Exception as err:
-                    _LOGGER.error("Error processing notification buffer: %s", err)
-
-            except asyncio.TimeoutError:
-                # Timeout is expected, continue listening
-                continue
-            except Exception as err:
-                _LOGGER.error("Error in notification listener: %s", err)
-                await asyncio.sleep(1.0)
-
-        _LOGGER.info("Notification listener stopped")
+                    _LOGGER.error("Error in notification listener: %s", err)
+                    await asyncio.sleep(1.0)
+        except asyncio.CancelledError:
+            _LOGGER.info("Notification listener cancelled")
+            raise
+        finally:
+            self._listening = False
+            _LOGGER.info("Notification listener stopped")
 
     @property
     def is_connected(self) -> bool:
@@ -568,6 +591,13 @@ class BraviaQuadClient:
             self._night_mode,
         )
 
+    def _get_next_command_id(self) -> int:
+        """Return a unique command id."""
+        self._command_id_counter += 1
+        if self._command_id_counter > 1_000_000:
+            self._command_id_counter = 10
+        return self._command_id_counter
+
     def _decode_json_stream(self, data: str) -> list[dict[str, Any]]:
         """Decode one or more JSON objects from a buffer string."""
         messages: list[dict[str, Any]] = []
@@ -616,6 +646,9 @@ class BraviaQuadClient:
             value,
         )
 
+        if msg_type == "result":
+            self._resolve_pending_response(message)
+
         self._update_internal_state(feature, value)
 
         if msg_type == "notify":
@@ -624,6 +657,9 @@ class BraviaQuadClient:
     def _update_internal_state(self, feature: str | None, value: Any) -> None:
         """Update cached state based on feature and value."""
         if not feature:
+            return
+
+        if isinstance(value, str) and value.upper() == "ACK":
             return
 
         try:
@@ -669,4 +705,14 @@ class BraviaQuadClient:
                     callback(value)
             except Exception as err:
                 _LOGGER.error("Error in notification callback: %s", err)
+
+    def _resolve_pending_response(self, message: dict[str, Any]) -> None:
+        """Resolve the future waiting for a command response."""
+        command_id = message.get("id")
+        if command_id is None:
+            return
+
+        future = self._pending_responses.get(command_id)
+        if future and not future.done():
+            future.set_result(message)
 
