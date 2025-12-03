@@ -12,11 +12,23 @@ from .const import (
     CMD_ID_POWER,
     CMD_ID_VOLUME,
     CMD_ID_INPUT,
+    CMD_ID_AUDIO,
     FEATURE_POWER,
     FEATURE_VOLUME,
     FEATURE_INPUT,
+    FEATURE_REAR_LEVEL,
+    FEATURE_BASS_LEVEL,
+    FEATURE_VOICE_ENHANCER,
+    FEATURE_SOUND_FIELD,
+    FEATURE_NIGHT_MODE,
     POWER_ON,
     POWER_OFF,
+    VOICE_ENHANCER_ON,
+    VOICE_ENHANCER_OFF,
+    SOUND_FIELD_ON,
+    SOUND_FIELD_OFF,
+    NIGHT_MODE_ON,
+    NIGHT_MODE_OFF,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,7 +50,13 @@ class BraviaQuadClient:
         self._power_state = POWER_OFF
         self._volume = 0
         self._input = "tv"  # Default input
+        self._rear_level = 0
+        self._bass_level = 1  # Default to MID
+        self._voice_enhancer = VOICE_ENHANCER_OFF
+        self._sound_field = SOUND_FIELD_OFF
+        self._night_mode = NIGHT_MODE_OFF
         self._command_id_counter = 10  # Start from 10 to avoid conflicts
+        self._command_lock = asyncio.Lock()
 
     async def async_connect(self) -> None:
         """Connect to the Bravia Quad device."""
@@ -105,46 +123,45 @@ class BraviaQuadClient:
         if not self._writer or not self._reader:
             raise ConnectionError("Not connected to device")
 
-        try:
-            # Send command
-            command_json = json.dumps(command) + "\n"
-            _LOGGER.debug("Sending command: %s", command_json.strip())
-            self._writer.write(command_json.encode())
-            await self._writer.drain()
-            _LOGGER.debug("Command sent, waiting for response...")
-
-            # Wait for response - device sends JSON without newline, so read bytes directly
-            # Read with timeout - device typically responds quickly
+        async with self._command_lock:
             try:
-                data = await asyncio.wait_for(
-                    self._reader.read(1024), timeout=timeout
-                )
-                
-                if data:
-                    # Device may send JSON with or without newline
-                    response_str = data.decode("utf-8", errors="replace").strip()
-                    _LOGGER.debug("Received response: %s", response_str)
-                    
-                    if response_str:
-                        try:
-                            response = json.loads(response_str)
-                            _LOGGER.debug("Successfully parsed response")
-                            return response
-                        except json.JSONDecodeError as e:
-                            _LOGGER.warning("Failed to parse JSON response: %s (data: %s)", e, response_str)
-                            return None
-                else:
+                # Send command
+                command_json = json.dumps(command) + "\n"
+                _LOGGER.debug("Sending command: %s", command_json.strip())
+                self._writer.write(command_json.encode())
+                await self._writer.drain()
+                _LOGGER.debug("Command sent, waiting for response...")
+
+                try:
+                    data = await asyncio.wait_for(
+                        self._reader.read(1024), timeout=timeout
+                    )
+                except asyncio.TimeoutError:
+                    _LOGGER.error("Timeout waiting for response (timeout=%s)", timeout)
+                    return None
+
+                if not data:
                     _LOGGER.warning("Received empty response")
                     return None
+
+                response_str = data.decode("utf-8", errors="replace").strip()
+                _LOGGER.debug("Received response buffer: %s", response_str)
+
+                messages = self._decode_json_stream(response_str)
+                if not messages:
+                    return None
+
+                # Process all messages to keep the internal state in sync.
+                for message in messages:
+                    await self._process_incoming_message(message)
+
+                return messages[0]
             except asyncio.TimeoutError:
-                _LOGGER.error("Timeout waiting for response (timeout=%s)", timeout)
+                _LOGGER.error("Timeout waiting for response to command: %s", command)
                 return None
-        except asyncio.TimeoutError:
-            _LOGGER.error("Timeout waiting for response to command: %s", command)
-            return None
-        except Exception as err:
-            _LOGGER.error("Error sending command: %s", err)
-            return None
+            except Exception as err:
+                _LOGGER.error("Error sending command: %s", err)
+                return None
 
     async def async_set_power(self, state: str) -> bool:
         """Set power state (on/off)."""
@@ -247,6 +264,177 @@ class BraviaQuadClient:
                 return self._input
         return self._input
 
+    async def async_set_voice_enhancer(self, state: str) -> bool:
+        """Set voice enhancer state (upon/upoff)."""
+        command = {
+            "id": CMD_ID_AUDIO,
+            "type": "set",
+            "feature": FEATURE_VOICE_ENHANCER,
+            "value": state,
+        }
+        response = await self.async_send_command(command)
+        
+        if response and response.get("type") == "result":
+            if response.get("value") == "ACK":
+                self._voice_enhancer = state
+                return True
+        return False
+
+    async def async_get_voice_enhancer(self) -> str:
+        """Get current voice enhancer state."""
+        command = {
+            "id": CMD_ID_AUDIO,
+            "type": "get",
+            "feature": FEATURE_VOICE_ENHANCER,
+        }
+        response = await self.async_send_command(command)
+        
+        if response and response.get("type") == "result":
+            if response.get("feature") == FEATURE_VOICE_ENHANCER:
+                self._voice_enhancer = response.get("value", VOICE_ENHANCER_OFF)
+                return self._voice_enhancer
+        return self._voice_enhancer
+
+    async def async_set_sound_field(self, state: str) -> bool:
+        """Set sound field state (on/off)."""
+        command = {
+            "id": CMD_ID_AUDIO,
+            "type": "set",
+            "feature": FEATURE_SOUND_FIELD,
+            "value": state,
+        }
+        response = await self.async_send_command(command)
+        
+        if response and response.get("type") == "result":
+            if response.get("value") == "ACK":
+                self._sound_field = state
+                return True
+        return False
+
+    async def async_get_sound_field(self) -> str:
+        """Get current sound field state."""
+        command = {
+            "id": CMD_ID_AUDIO,
+            "type": "get",
+            "feature": FEATURE_SOUND_FIELD,
+        }
+        response = await self.async_send_command(command)
+        
+        if response and response.get("type") == "result":
+            if response.get("feature") == FEATURE_SOUND_FIELD:
+                self._sound_field = response.get("value", SOUND_FIELD_OFF)
+                return self._sound_field
+        return self._sound_field
+
+    async def async_set_night_mode(self, state: str) -> bool:
+        """Set night mode state (on/off)."""
+        command = {
+            "id": CMD_ID_AUDIO,
+            "type": "set",
+            "feature": FEATURE_NIGHT_MODE,
+            "value": state,
+        }
+        response = await self.async_send_command(command)
+        
+        if response and response.get("type") == "result":
+            if response.get("value") == "ACK":
+                self._night_mode = state
+                return True
+        return False
+
+    async def async_get_night_mode(self) -> str:
+        """Get current night mode state."""
+        command = {
+            "id": CMD_ID_AUDIO,
+            "type": "get",
+            "feature": FEATURE_NIGHT_MODE,
+        }
+        response = await self.async_send_command(command)
+        
+        if response and response.get("type") == "result":
+            if response.get("feature") == FEATURE_NIGHT_MODE:
+                self._night_mode = response.get("value", NIGHT_MODE_OFF)
+                return self._night_mode
+        return self._night_mode
+
+    async def async_set_rear_level(self, level: int) -> bool:
+        """Set rear level (0-10)."""
+        if level < 0 or level > 10:
+            raise ValueError("Rear level must be between 0 and 10")
+        
+        command = {
+            "id": CMD_ID_VOLUME,
+            "type": "set",
+            "feature": FEATURE_REAR_LEVEL,
+            "value": level,
+        }
+        response = await self.async_send_command(command)
+        
+        if response and response.get("type") == "result":
+            if response.get("value") == "ACK":
+                self._rear_level = level
+                return True
+        return False
+
+    async def async_get_rear_level(self) -> int:
+        """Get current rear level."""
+        command = {
+            "id": CMD_ID_VOLUME,
+            "type": "get",
+            "feature": FEATURE_REAR_LEVEL,
+        }
+        response = await self.async_send_command(command)
+        
+        if response and response.get("type") == "result":
+            if response.get("feature") == FEATURE_REAR_LEVEL:
+                try:
+                    rear_level = int(response.get("value", 0))
+                    if 0 <= rear_level <= 10:
+                        self._rear_level = rear_level
+                        return self._rear_level
+                except (ValueError, TypeError):
+                    pass
+        return self._rear_level
+
+    async def async_set_bass_level(self, level: int) -> bool:
+        """Set bass level (0-2)."""
+        if level < 0 or level > 2:
+            raise ValueError("Bass level must be between 0 and 2")
+        
+        command = {
+            "id": CMD_ID_VOLUME,
+            "type": "set",
+            "feature": FEATURE_BASS_LEVEL,
+            "value": level,
+        }
+        response = await self.async_send_command(command)
+        
+        if response and response.get("type") == "result":
+            if response.get("value") == "ACK":
+                self._bass_level = level
+                return True
+        return False
+
+    async def async_get_bass_level(self) -> int:
+        """Get current bass level."""
+        command = {
+            "id": CMD_ID_VOLUME,
+            "type": "get",
+            "feature": FEATURE_BASS_LEVEL,
+        }
+        response = await self.async_send_command(command)
+        
+        if response and response.get("type") == "result":
+            if response.get("feature") == FEATURE_BASS_LEVEL:
+                try:
+                    bass_level = int(response.get("value", 1))
+                    if 0 <= bass_level <= 2:
+                        self._bass_level = bass_level
+                        return self._bass_level
+                except (ValueError, TypeError):
+                    pass
+        return self._bass_level
+
     def register_notification_callback(
         self, feature: str, callback: Callable
     ) -> None:
@@ -281,51 +469,15 @@ class BraviaQuadClient:
                     continue
 
                 try:
-                    # Handle responses that may or may not have newlines
                     response_str = data.decode("utf-8", errors="replace").strip()
-                    # If there's a newline, take the first line
-                    if "\n" in response_str:
-                        response_str = response_str.split("\n", 1)[0].strip()
-                    
-                    notification = json.loads(response_str)
-                    
-                    if notification.get("type") == "notify":
-                        feature = notification.get("feature")
-                        value = notification.get("value")
-                        
-                        _LOGGER.debug(
-                            "Received notification: feature=%s, value=%s",
-                            feature,
-                            value,
-                        )
-                        
-                        # Update internal state
-                        if feature == FEATURE_POWER:
-                            self._power_state = value
-                        elif feature == FEATURE_VOLUME:
-                            try:
-                                self._volume = int(value)
-                            except (ValueError, TypeError):
-                                pass
-                        elif feature == FEATURE_INPUT:
-                            self._input = value
-                        
-                        # Call registered callbacks
-                        if feature in self._notification_callbacks:
-                            for callback in self._notification_callbacks[feature]:
-                                try:
-                                    if asyncio.iscoroutinefunction(callback):
-                                        await callback(value)
-                                    else:
-                                        callback(value)
-                                except Exception as err:
-                                    _LOGGER.error(
-                                        "Error in notification callback: %s", err
-                                    )
-                except json.JSONDecodeError:
-                    _LOGGER.warning("Failed to parse notification: %s", data)
+                    messages = self._decode_json_stream(response_str)
+                    if not messages:
+                        continue
+
+                    for message in messages:
+                        await self._process_incoming_message(message)
                 except Exception as err:
-                    _LOGGER.error("Error processing notification: %s", err)
+                    _LOGGER.error("Error processing notification buffer: %s", err)
 
             except asyncio.TimeoutError:
                 # Timeout is expected, continue listening
@@ -355,4 +507,166 @@ class BraviaQuadClient:
     def input(self) -> str:
         """Return current input."""
         return self._input
+
+    @property
+    def voice_enhancer(self) -> str:
+        """Return current voice enhancer state."""
+        return self._voice_enhancer
+
+    @property
+    def sound_field(self) -> str:
+        """Return current sound field state."""
+        return self._sound_field
+
+    @property
+    def night_mode(self) -> str:
+        """Return current night mode state."""
+        return self._night_mode
+
+    @property
+    def rear_level(self) -> int:
+        """Return current rear level."""
+        return self._rear_level
+
+    @property
+    def bass_level(self) -> int:
+        """Return current bass level."""
+        return self._bass_level
+
+    async def async_fetch_all_states(self) -> None:
+        """Fetch all current states from the device."""
+        _LOGGER.debug("Fetching all device states")
+
+        fetchers = [
+            self.async_get_power,
+            self.async_get_volume,
+            self.async_get_input,
+            self.async_get_rear_level,
+            self.async_get_bass_level,
+            self.async_get_voice_enhancer,
+            self.async_get_sound_field,
+            self.async_get_night_mode,
+        ]
+
+        for fetch in fetchers:
+            try:
+                await fetch()
+            except Exception as err:  # pragma: no cover - log and continue
+                _LOGGER.warning("Failed to fetch state via %s: %s", fetch.__name__, err)
+
+        _LOGGER.debug(
+            "State fetch complete - Power: %s, Volume: %d, Input: %s, "
+            "Rear Level: %d, Bass Level: %d, Voice Enhancer: %s, "
+            "Sound Field: %s, Night Mode: %s",
+            self._power_state,
+            self._volume,
+            self._input,
+            self._rear_level,
+            self._bass_level,
+            self._voice_enhancer,
+            self._sound_field,
+            self._night_mode,
+        )
+
+    def _decode_json_stream(self, data: str) -> list[dict[str, Any]]:
+        """Decode one or more JSON objects from a buffer string."""
+        messages: list[dict[str, Any]] = []
+        if not data:
+            return messages
+
+        decoder = json.JSONDecoder()
+        idx = 0
+        length = len(data)
+
+        while idx < length:
+            # Skip whitespace between JSON objects
+            while idx < length and data[idx].isspace():
+                idx += 1
+
+            if idx >= length:
+                break
+
+            try:
+                message, end = decoder.raw_decode(data, idx)
+                messages.append(message)
+                idx = end
+            except json.JSONDecodeError as err:
+                _LOGGER.warning(
+                    "Failed to decode JSON chunk: %s (remaining=%s)",
+                    err,
+                    data[idx:],
+                )
+                break
+
+        return messages
+
+    async def _process_incoming_message(self, message: dict[str, Any]) -> None:
+        """Process a single incoming message from the device."""
+        if not message:
+            return
+
+        msg_type = message.get("type")
+        feature = message.get("feature")
+        value = message.get("value")
+
+        _LOGGER.debug(
+            "Processing message type=%s feature=%s value=%s",
+            msg_type,
+            feature,
+            value,
+        )
+
+        self._update_internal_state(feature, value)
+
+        if msg_type == "notify":
+            await self._dispatch_notification_callbacks(feature, value)
+
+    def _update_internal_state(self, feature: str | None, value: Any) -> None:
+        """Update cached state based on feature and value."""
+        if not feature:
+            return
+
+        try:
+            if feature == FEATURE_POWER:
+                self._power_state = value
+            elif feature == FEATURE_VOLUME:
+                self._volume = int(value)
+            elif feature == FEATURE_INPUT:
+                self._input = value
+            elif feature == FEATURE_REAR_LEVEL:
+                rear_level = int(value)
+                if 0 <= rear_level <= 10:
+                    self._rear_level = rear_level
+            elif feature == FEATURE_BASS_LEVEL:
+                bass_level = int(value)
+                if 0 <= bass_level <= 2:
+                    self._bass_level = bass_level
+            elif feature == FEATURE_VOICE_ENHANCER:
+                self._voice_enhancer = value
+            elif feature == FEATURE_SOUND_FIELD:
+                self._sound_field = value
+            elif feature == FEATURE_NIGHT_MODE:
+                self._night_mode = value
+        except (ValueError, TypeError):
+            _LOGGER.debug("Invalid value %s for feature %s", value, feature)
+
+    async def _dispatch_notification_callbacks(
+        self, feature: str | None, value: Any
+    ) -> None:
+        """Invoke registered callbacks for a feature."""
+        if not feature:
+            return
+
+        callbacks = self._notification_callbacks.get(feature)
+        if not callbacks:
+            return
+
+        for callback in callbacks:
+            try:
+                if asyncio.iscoroutinefunction(callback):
+                    await callback(value)
+                else:
+                    callback(value)
+            except Exception as err:
+                _LOGGER.error("Error in notification callback: %s", err)
 
