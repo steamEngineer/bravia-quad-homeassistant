@@ -1,7 +1,6 @@
 """Switch platform for Bravia Quad controls."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
@@ -46,15 +45,13 @@ async def async_setup_entry(
         BraviaQuadNightModeSwitch(client, entry),
     ]
     
-    # Fetch initial states
-    for entity in entities:
-        await entity.async_update()
-    
     async_add_entities(entities)
 
 
 class BraviaQuadPowerSwitch(SwitchEntity):
     """Representation of a Bravia Quad power switch."""
+
+    _attr_should_poll = False
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the switch."""
@@ -107,13 +104,14 @@ class BraviaQuadPowerSwitch(SwitchEntity):
         try:
             power_state = await self._client.async_get_power()
             self._attr_is_on = power_state == POWER_ON
-            self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Failed to update power state: %s", err)
 
 
 class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
     """Representation of a Bravia Quad voice enhancer switch."""
+
+    _attr_should_poll = False
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the voice enhancer switch."""
@@ -167,13 +165,14 @@ class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
         try:
             voice_enhancer_state = await self._client.async_get_voice_enhancer()
             self._attr_is_on = voice_enhancer_state == VOICE_ENHANCER_ON
-            self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Failed to update voice enhancer state: %s", err)
 
 
 class BraviaQuadSoundFieldSwitch(SwitchEntity):
     """Representation of a Bravia Quad sound field switch."""
+
+    _attr_should_poll = False
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the sound field switch."""
@@ -227,13 +226,14 @@ class BraviaQuadSoundFieldSwitch(SwitchEntity):
         try:
             sound_field_state = await self._client.async_get_sound_field()
             self._attr_is_on = sound_field_state == SOUND_FIELD_ON
-            self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Failed to update sound field state: %s", err)
 
 
 class BraviaQuadNightModeSwitch(SwitchEntity):
     """Representation of a Bravia Quad night mode switch."""
+
+    _attr_should_poll = False
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the night mode switch."""
@@ -287,7 +287,5 @@ class BraviaQuadNightModeSwitch(SwitchEntity):
         try:
             night_mode_state = await self._client.async_get_night_mode()
             self._attr_is_on = night_mode_state == NIGHT_MODE_ON
-            self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Failed to update night mode state: %s", err)
-

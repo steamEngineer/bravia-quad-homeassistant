@@ -1,11 +1,10 @@
 """Number platform for Bravia Quad controls."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
-from homeassistant.components.number import NumberEntity
+from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import DeviceInfo, EntityCategory
@@ -31,15 +30,13 @@ async def async_setup_entry(
         BraviaQuadRearLevelNumber(client, entry),
     ]
     
-    # Fetch initial states
-    for entity in entities:
-        await entity.async_update()
-    
     async_add_entities(entities)
 
 
 class BraviaQuadVolumeNumber(NumberEntity):
     """Representation of a Bravia Quad volume control."""
+
+    _attr_should_poll = False
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the volume number entity."""
@@ -53,7 +50,7 @@ class BraviaQuadVolumeNumber(NumberEntity):
         self._attr_native_step = 1
         # Initialize from client's current state
         self._attr_native_value = client.volume
-        self._attr_mode = "slider"
+        self._attr_mode = NumberMode.SLIDER
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.data.get("name", "Bravia Quad"),
@@ -93,13 +90,14 @@ class BraviaQuadVolumeNumber(NumberEntity):
         try:
             volume = await self._client.async_get_volume()
             self._attr_native_value = volume
-            self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Failed to update volume: %s", err)
 
 
 class BraviaQuadRearLevelNumber(NumberEntity):
     """Representation of a Bravia Quad rear level control."""
+
+    _attr_should_poll = False
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the rear level number entity."""
@@ -114,7 +112,7 @@ class BraviaQuadRearLevelNumber(NumberEntity):
         # Initialize from client's current state
         self._attr_native_value = client.rear_level
         self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_mode = "slider"
+        self._attr_mode = NumberMode.SLIDER
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.data.get("name", "Bravia Quad"),
@@ -154,7 +152,5 @@ class BraviaQuadRearLevelNumber(NumberEntity):
         try:
             rear_level = await self._client.async_get_rear_level()
             self._attr_native_value = rear_level
-            self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Failed to update rear level: %s", err)
-

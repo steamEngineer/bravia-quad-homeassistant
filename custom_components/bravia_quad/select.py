@@ -1,7 +1,6 @@
 """Select platform for Bravia Quad controls."""
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
@@ -37,15 +36,13 @@ async def async_setup_entry(
         BraviaQuadBassLevelSelect(client, entry),
     ]
     
-    # Fetch initial states
-    for entity in entities:
-        await entity.async_update()
-    
     async_add_entities(entities)
 
 
 class BraviaQuadInputSelect(SelectEntity):
     """Representation of a Bravia Quad input selector."""
+
+    _attr_should_poll = False
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the input select entity."""
@@ -105,7 +102,6 @@ class BraviaQuadInputSelect(SelectEntity):
             option = INPUT_VALUES_TO_OPTIONS.get(input_value)
             if option:
                 self._attr_current_option = option
-                self.async_write_ha_state()
             else:
                 _LOGGER.warning("Unknown input value: %s", input_value)
         except Exception as err:
@@ -114,6 +110,8 @@ class BraviaQuadInputSelect(SelectEntity):
 
 class BraviaQuadBassLevelSelect(SelectEntity):
     """Representation of a Bravia Quad bass level selector."""
+
+    _attr_should_poll = False
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the bass level select entity."""
@@ -178,9 +176,7 @@ class BraviaQuadBassLevelSelect(SelectEntity):
             option = BASS_LEVEL_VALUES_TO_OPTIONS.get(bass_level_value)
             if option:
                 self._attr_current_option = option
-                self.async_write_ha_state()
             else:
                 _LOGGER.warning("Unknown bass level value: %s", bass_level_value)
         except Exception as err:
             _LOGGER.error("Failed to update bass level: %s", err)
-
