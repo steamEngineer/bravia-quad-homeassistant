@@ -1,4 +1,5 @@
 """Config flow for Bravia Quad integration."""
+
 from __future__ import annotations
 
 import asyncio
@@ -7,10 +8,9 @@ from typing import Any
 
 import voluptuous as vol
 
-from homeassistant import config_entries
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_NAME
 from homeassistant.core import HomeAssistant
-from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 
 from .const import DOMAIN
@@ -29,26 +29,28 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     """Validate the user input allows us to connect."""
     host = data[CONF_HOST]
-    
+
     # Create a temporary client to test connection
     client = BraviaQuadClient(host, data.get(CONF_NAME, "Bravia Quad"))
-    
+
     try:
         _LOGGER.info("Attempting to connect to Bravia Quad at %s", host)
         await client.async_connect()
         _LOGGER.info("Connection established, testing with power status request")
-        
+
         # Give connection a moment to stabilize
         await asyncio.sleep(0.2)
-        
+
         result = await client.async_test_connection()
         _LOGGER.info("Test connection result: %s", result)
-        
+
         await client.async_disconnect()
-        
+
         if not result:
-            raise CannotConnect("No response from device. Please verify IP control is enabled.")
-        
+            raise CannotConnect(
+                "No response from device. Please verify IP control is enabled."
+            )
+
         return {"title": data.get(CONF_NAME, "Bravia Quad")}
     except Exception as err:
         if isinstance(err, CannotConnect):
@@ -57,17 +59,17 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
         raise CannotConnect(f"Error connecting to device: {err}") from err
 
 
-class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
+class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Bravia Quad."""
 
     VERSION = 1
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the initial step."""
         errors: dict[str, str] = {}
-        
+
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
@@ -88,4 +90,3 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
 class CannotConnect(HomeAssistantError):
     """Error to indicate we cannot connect."""
-
