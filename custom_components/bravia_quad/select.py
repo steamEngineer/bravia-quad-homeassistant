@@ -3,23 +3,26 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING
 
 from homeassistant.components.select import SelectEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
+    BASS_LEVEL_OPTIONS,
+    BASS_LEVEL_VALUES_TO_OPTIONS,
     DOMAIN,
     INPUT_OPTIONS,
     INPUT_VALUES_TO_OPTIONS,
-    BASS_LEVEL_OPTIONS,
-    BASS_LEVEL_VALUES_TO_OPTIONS,
 )
-from .bravia_quad_client import BraviaQuadClient
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,7 +60,7 @@ class BraviaQuadInputSelect(SelectEntity):
         # Initialize current option from client's current input
         current_input_value = client.input
         self._attr_current_option = INPUT_VALUES_TO_OPTIONS.get(
-            current_input_value, list(INPUT_OPTIONS.keys())[0]
+            current_input_value, next(iter(INPUT_OPTIONS.keys()))
         )
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
@@ -107,8 +110,8 @@ class BraviaQuadInputSelect(SelectEntity):
                 self._attr_current_option = option
             else:
                 _LOGGER.warning("Unknown input value: %s", input_value)
-        except Exception as err:
-            _LOGGER.error("Failed to update input: %s", err)
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update input")
 
 
 class BraviaQuadBassLevelSelect(SelectEntity):
@@ -182,5 +185,5 @@ class BraviaQuadBassLevelSelect(SelectEntity):
                 self._attr_current_option = option
             else:
                 _LOGGER.warning("Unknown bass level value: %s", bass_level_value)
-        except Exception as err:
-            _LOGGER.error("Failed to update bass level: %s", err)
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update bass level")

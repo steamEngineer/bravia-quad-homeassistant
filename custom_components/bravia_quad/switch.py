@@ -3,30 +3,33 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import (
     DOMAIN,
-    POWER_ON,
-    POWER_OFF,
-    FEATURE_VOICE_ENHANCER,
-    FEATURE_SOUND_FIELD,
     FEATURE_NIGHT_MODE,
-    VOICE_ENHANCER_ON,
-    VOICE_ENHANCER_OFF,
-    SOUND_FIELD_ON,
-    SOUND_FIELD_OFF,
-    NIGHT_MODE_ON,
+    FEATURE_SOUND_FIELD,
+    FEATURE_VOICE_ENHANCER,
     NIGHT_MODE_OFF,
+    NIGHT_MODE_ON,
+    POWER_OFF,
+    POWER_ON,
+    SOUND_FIELD_OFF,
+    SOUND_FIELD_ON,
+    VOICE_ENHANCER_OFF,
+    VOICE_ENHANCER_ON,
 )
-from .bravia_quad_client import BraviaQuadClient
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -82,7 +85,7 @@ class BraviaQuadPowerSwitch(SwitchEntity):
         self._attr_is_on = value == POWER_ON
         self.async_write_ha_state()
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    async def async_turn_on(self, **_kwargs: Any) -> None:
         """Turn the device on."""
         success = await self._client.async_set_power(POWER_ON)
         if success:
@@ -91,7 +94,7 @@ class BraviaQuadPowerSwitch(SwitchEntity):
         else:
             _LOGGER.error("Failed to turn on Bravia Quad")
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **_kwargs: Any) -> None:
         """Turn the device off."""
         success = await self._client.async_set_power(POWER_OFF)
         if success:
@@ -105,8 +108,8 @@ class BraviaQuadPowerSwitch(SwitchEntity):
         try:
             power_state = await self._client.async_get_power()
             self._attr_is_on = power_state == POWER_ON
-        except Exception as err:
-            _LOGGER.error("Failed to update power state: %s", err)
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update power state")
 
 
 class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
@@ -142,7 +145,7 @@ class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
         self._attr_is_on = value == VOICE_ENHANCER_ON
         self.async_write_ha_state()
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    async def async_turn_on(self, **_kwargs: Any) -> None:
         """Turn voice enhancer on."""
         success = await self._client.async_set_voice_enhancer(VOICE_ENHANCER_ON)
         if success:
@@ -151,7 +154,7 @@ class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
         else:
             _LOGGER.error("Failed to turn on voice enhancer")
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **_kwargs: Any) -> None:
         """Turn voice enhancer off."""
         success = await self._client.async_set_voice_enhancer(VOICE_ENHANCER_OFF)
         if success:
@@ -165,8 +168,8 @@ class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
         try:
             voice_enhancer_state = await self._client.async_get_voice_enhancer()
             self._attr_is_on = voice_enhancer_state == VOICE_ENHANCER_ON
-        except Exception as err:
-            _LOGGER.error("Failed to update voice enhancer state: %s", err)
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update voice enhancer state")
 
 
 class BraviaQuadSoundFieldSwitch(SwitchEntity):
@@ -202,7 +205,7 @@ class BraviaQuadSoundFieldSwitch(SwitchEntity):
         self._attr_is_on = value == SOUND_FIELD_ON
         self.async_write_ha_state()
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    async def async_turn_on(self, **_kwargs: Any) -> None:
         """Turn sound field on."""
         success = await self._client.async_set_sound_field(SOUND_FIELD_ON)
         if success:
@@ -211,7 +214,7 @@ class BraviaQuadSoundFieldSwitch(SwitchEntity):
         else:
             _LOGGER.error("Failed to turn on sound field")
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **_kwargs: Any) -> None:
         """Turn sound field off."""
         success = await self._client.async_set_sound_field(SOUND_FIELD_OFF)
         if success:
@@ -225,8 +228,8 @@ class BraviaQuadSoundFieldSwitch(SwitchEntity):
         try:
             sound_field_state = await self._client.async_get_sound_field()
             self._attr_is_on = sound_field_state == SOUND_FIELD_ON
-        except Exception as err:
-            _LOGGER.error("Failed to update sound field state: %s", err)
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update sound field state")
 
 
 class BraviaQuadNightModeSwitch(SwitchEntity):
@@ -262,7 +265,7 @@ class BraviaQuadNightModeSwitch(SwitchEntity):
         self._attr_is_on = value == NIGHT_MODE_ON
         self.async_write_ha_state()
 
-    async def async_turn_on(self, **kwargs: Any) -> None:
+    async def async_turn_on(self, **_kwargs: Any) -> None:
         """Turn night mode on."""
         success = await self._client.async_set_night_mode(NIGHT_MODE_ON)
         if success:
@@ -271,7 +274,7 @@ class BraviaQuadNightModeSwitch(SwitchEntity):
         else:
             _LOGGER.error("Failed to turn on night mode")
 
-    async def async_turn_off(self, **kwargs: Any) -> None:
+    async def async_turn_off(self, **_kwargs: Any) -> None:
         """Turn night mode off."""
         success = await self._client.async_set_night_mode(NIGHT_MODE_OFF)
         if success:
@@ -285,5 +288,5 @@ class BraviaQuadNightModeSwitch(SwitchEntity):
         try:
             night_mode_state = await self._client.async_get_night_mode()
             self._attr_is_on = night_mode_state == NIGHT_MODE_ON
-        except Exception as err:
-            _LOGGER.error("Failed to update night mode state: %s", err)
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update night mode state")

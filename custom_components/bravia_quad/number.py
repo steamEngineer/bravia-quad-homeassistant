@@ -3,19 +3,26 @@
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.number import NumberEntity, NumberMode
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
-from homeassistant.core import HomeAssistant
 from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
-from .bravia_quad_client import BraviaQuadClient
+
+if TYPE_CHECKING:
+    from homeassistant.config_entries import ConfigEntry
+    from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity_platform import AddEntitiesCallback
+
+    from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
+
+# Constants for validation ranges
+MAX_VOLUME = 100
+MAX_REAR_LEVEL = 10
 
 
 async def async_setup_entry(
@@ -48,7 +55,7 @@ class BraviaQuadVolumeNumber(NumberEntity):
         self._attr_name = "Volume"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_volume"
         self._attr_native_min_value = 0
-        self._attr_native_max_value = 100
+        self._attr_native_max_value = MAX_VOLUME
         self._attr_native_step = 1
         # Initialize from client's current state
         self._attr_native_value = client.volume
@@ -70,7 +77,7 @@ class BraviaQuadVolumeNumber(NumberEntity):
         """Handle volume notification."""
         try:
             volume = int(value)
-            if 0 <= volume <= 100:
+            if 0 <= volume <= MAX_VOLUME:
                 self._attr_native_value = volume
                 self.async_write_ha_state()
         except (ValueError, TypeError):
@@ -91,8 +98,8 @@ class BraviaQuadVolumeNumber(NumberEntity):
         try:
             volume = await self._client.async_get_volume()
             self._attr_native_value = volume
-        except Exception as err:
-            _LOGGER.error("Failed to update volume: %s", err)
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update volume")
 
 
 class BraviaQuadRearLevelNumber(NumberEntity):
@@ -108,7 +115,7 @@ class BraviaQuadRearLevelNumber(NumberEntity):
         self._attr_name = "Rear Level"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_rear_level"
         self._attr_native_min_value = 0
-        self._attr_native_max_value = 10
+        self._attr_native_max_value = MAX_REAR_LEVEL
         self._attr_native_step = 1
         # Initialize from client's current state
         self._attr_native_value = client.rear_level
@@ -131,7 +138,7 @@ class BraviaQuadRearLevelNumber(NumberEntity):
         """Handle rear level notification."""
         try:
             rear_level = int(value)
-            if 0 <= rear_level <= 10:
+            if 0 <= rear_level <= MAX_REAR_LEVEL:
                 self._attr_native_value = rear_level
                 self.async_write_ha_state()
         except (ValueError, TypeError):
@@ -152,5 +159,5 @@ class BraviaQuadRearLevelNumber(NumberEntity):
         try:
             rear_level = await self._client.async_get_rear_level()
             self._attr_native_value = rear_level
-        except Exception as err:
-            _LOGGER.error("Failed to update rear level: %s", err)
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update rear level")
