@@ -1,14 +1,15 @@
 """Number platform for Bravia Quad controls."""
+
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
 
-from homeassistant.components.number import NumberEntity
+from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.entity import DeviceInfo, EntityCategory
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN
@@ -24,22 +25,20 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bravia Quad number entities from a config entry."""
     client: BraviaQuadClient = hass.data[DOMAIN][entry.entry_id]
-    
+
     # Create all number entities
     entities = [
         BraviaQuadVolumeNumber(client, entry),
         BraviaQuadRearLevelNumber(client, entry),
     ]
-    
-    # Fetch initial states
-    for entity in entities:
-        await entity.async_update()
-    
+
     async_add_entities(entities)
 
 
 class BraviaQuadVolumeNumber(NumberEntity):
     """Representation of a Bravia Quad volume control."""
+
+    _attr_should_poll = False
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the volume number entity."""
@@ -53,7 +52,7 @@ class BraviaQuadVolumeNumber(NumberEntity):
         self._attr_native_step = 1
         # Initialize from client's current state
         self._attr_native_value = client.volume
-        self._attr_mode = "slider"
+        self._attr_mode = NumberMode.SLIDER
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.data.get("name", "Bravia Quad"),
@@ -61,11 +60,10 @@ class BraviaQuadVolumeNumber(NumberEntity):
             model="Bravia Quad",
             configuration_url=f"http://{entry.data['host']}",
         )
-        
+
         # Register for volume notifications
         self._client.register_notification_callback(
-            "main.volumestep",
-            self._on_volume_notification
+            "main.volumestep", self._on_volume_notification
         )
 
     async def _on_volume_notification(self, value: Any) -> None:
@@ -93,13 +91,14 @@ class BraviaQuadVolumeNumber(NumberEntity):
         try:
             volume = await self._client.async_get_volume()
             self._attr_native_value = volume
-            self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Failed to update volume: %s", err)
 
 
 class BraviaQuadRearLevelNumber(NumberEntity):
     """Representation of a Bravia Quad rear level control."""
+
+    _attr_should_poll = False
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the rear level number entity."""
@@ -114,7 +113,7 @@ class BraviaQuadRearLevelNumber(NumberEntity):
         # Initialize from client's current state
         self._attr_native_value = client.rear_level
         self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_mode = "slider"
+        self._attr_mode = NumberMode.SLIDER
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry.entry_id)},
             name=entry.data.get("name", "Bravia Quad"),
@@ -122,11 +121,10 @@ class BraviaQuadRearLevelNumber(NumberEntity):
             model="Bravia Quad",
             configuration_url=f"http://{entry.data['host']}",
         )
-        
+
         # Register for rear level notifications
         self._client.register_notification_callback(
-            "main.rearvolumestep",
-            self._on_rear_level_notification
+            "main.rearvolumestep", self._on_rear_level_notification
         )
 
     async def _on_rear_level_notification(self, value: Any) -> None:
@@ -154,7 +152,5 @@ class BraviaQuadRearLevelNumber(NumberEntity):
         try:
             rear_level = await self._client.async_get_rear_level()
             self._attr_native_value = rear_level
-            self.async_write_ha_state()
         except Exception as err:
             _LOGGER.error("Failed to update rear level: %s", err)
-
