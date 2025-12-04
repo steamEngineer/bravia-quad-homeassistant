@@ -1,41 +1,20 @@
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
+# artifacts
+__pycache__
+.pytest*
+*.egg-info
+*/build/*
+*/dist/*
 
-# Virtual environments
-venv/
-env/
-ENV/
+# misc
+.coverage
+.vscode
+coverage.xml
+.ruff_cache
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
+# Home Assistant configuration
+config/*
+!config/configuration.yaml
 
 # OS
 .DS_Store
 Thumbs.db
-
-# Home Assistant
-.homeassistant/
-

@@ -154,6 +154,24 @@ If you encounter connection problems:
 
 ## Development
 
+### Using the DevContainer
+
+The easiest way to develop and test this integration is using the included DevContainer configuration with Visual Studio Code.
+
+1. Make sure you have [Visual Studio Code](https://code.visualstudio.com/) and the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers) installed.
+2. Clone this repository.
+3. Open the repository in VS Code and click "Reopen in Container" when prompted (or use the command palette: `Dev Containers: Reopen in Container`).
+4. Once the container is ready, run `scripts/develop` to start Home Assistant with the integration loaded.
+5. Access Home Assistant at [http://localhost:8123](http://localhost:8123).
+
+### Available Scripts
+
+| Script | Description |
+|--------|-------------|
+| `scripts/setup` | Installs Python dependencies from `requirements.txt` |
+| `scripts/develop` | Starts Home Assistant with the integration in debug mode |
+| `scripts/lint` | Runs Ruff to format and lint the code |
+
 ### Project Structure
 
 ```
