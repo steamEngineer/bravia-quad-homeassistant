@@ -10,9 +10,14 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 ## Features
 
 - **Power Control**: Turn your Bravia Quad system on and off
-- **Volume Control**: Adjust volume from 0-100 via a number entity
+- **Volume Control**: Adjust main volume from 0-100 via a number entity
+- **Rear Level Control**: Adjust rear speaker level from 0-10 via a number entity
 - **Source Selection**: Switch between inputs (TV/eARC, HDMI In, Spotify)
-- **Real-time Updates**: Automatically receives and processes notifications from the device for power, volume, and source changes
+- **Bass Level Control**: Select bass level (MIN, MID, MAX) via a select entity
+- **Voice Enhancer**: Toggle voice enhancer on/off
+- **Sound Field**: Toggle sound field processing on/off
+- **Night Mode**: Toggle night mode on/off
+- **Real-time Updates**: Automatically receives and processes notifications from the device for all state changes
 - **Device Integration**: All entities are properly nested under a single device in Home Assistant
 
 ## Installation
@@ -57,11 +62,16 @@ The integration will automatically test the connection by sending a power status
 
 The integration creates the following entities under your Bravia Quad device:
 
-| Entity | Type | Description |
-|--------|------|-------------|
-| `switch.bravia_quad_*_power` | Switch | Control power on/off |
-| `number.bravia_quad_*_volume` | Number | Control volume (0-100) |
-| `select.bravia_quad_*_source` | Select | Select input source (TV/eARC, HDMI In, Spotify) |
+| Entity | Type | Description | Range/Options |
+|--------|------|-------------|---------------|
+| `switch.bravia_quad_*_power` | Switch | Control power on/off | on/off |
+| `number.bravia_quad_*_volume` | Number | Control main volume | 0-100 |
+| `number.bravia_quad_*_rear_level` | Number | Control rear speaker level | 0-10 |
+| `select.bravia_quad_*_source` | Select | Select input source | TV (eARC), HDMI In, Spotify |
+| `select.bravia_quad_*_bass_level` | Select | Select bass level | MIN, MID, MAX |
+| `switch.bravia_quad_*_voice_enhancer` | Switch | Toggle voice enhancer | on/off |
+| `switch.bravia_quad_*_sound_field` | Switch | Toggle sound field processing | on/off |
+| `switch.bravia_quad_*_night_mode` | Switch | Toggle night mode | on/off |
 
 *Note: `*` represents your device's unique entry ID*
 
@@ -93,12 +103,17 @@ The integration communicates with the Bravia Quad device via TCP on port **33336
 
 ### Notifications
 
-When maintaining an open connection, the device sends real-time notifications:
+When maintaining an open connection, the device sends real-time notifications for all state changes:
 
 ```json
 {"feature": "main.power", "type": "notify", "value": "on"}
 {"feature": "main.volumestep", "type": "notify", "value": "21"}
 {"feature": "main.input", "type": "notify", "value": "spotify"}
+{"feature": "main.rearvolumestep", "type": "notify", "value": "5"}
+{"feature": "main.bassstep", "type": "notify", "value": "1"}
+{"feature": "audio.voiceenhancer", "type": "notify", "value": "upon"}
+{"feature": "audio.soundfield", "type": "notify", "value": "on"}
+{"feature": "audio.nightmode", "type": "notify", "value": "off"}
 ```
 
 ## Supported Commands
@@ -114,6 +129,11 @@ When maintaining an open connection, the device sends real-time notifications:
 - **Get Volume**: `{"id": 2, "type": "get", "feature": "main.volumestep"}`
 - **Set Volume**: `{"id": 2, "type": "set", "feature": "main.volumestep", "value": 50}` (0-100)
 
+### Rear Level Control
+
+- **Get Rear Level**: `{"id": 2, "type": "get", "feature": "main.rearvolumestep"}`
+- **Set Rear Level**: `{"id": 2, "type": "set", "feature": "main.rearvolumestep", "value": 5}` (0-10)
+
 ### Source Selection
 
 - **Get Source**: `{"id": 2, "type": "get", "feature": "main.input"}`
@@ -123,6 +143,29 @@ When maintaining an open connection, the device sends real-time notifications:
 - `tv` - TV (eARC)
 - `hdmi1` - HDMI In
 - `spotify` - Spotify
+
+### Bass Level Control
+
+- **Get Bass Level**: `{"id": 2, "type": "get", "feature": "main.bassstep"}`
+- **Set Bass Level**: `{"id": 2, "type": "set", "feature": "main.bassstep", "value": 1}` (0=MIN, 1=MID, 2=MAX)
+
+### Voice Enhancer
+
+- **Get Voice Enhancer**: `{"id": 1, "type": "get", "feature": "audio.voiceenhancer"}`
+- **Set Voice Enhancer On**: `{"id": 1, "type": "set", "feature": "audio.voiceenhancer", "value": "upon"}`
+- **Set Voice Enhancer Off**: `{"id": 1, "type": "set", "feature": "audio.voiceenhancer", "value": "upoff"}`
+
+### Sound Field
+
+- **Get Sound Field**: `{"id": 1, "type": "get", "feature": "audio.soundfield"}`
+- **Set Sound Field On**: `{"id": 1, "type": "set", "feature": "audio.soundfield", "value": "on"}`
+- **Set Sound Field Off**: `{"id": 1, "type": "set", "feature": "audio.soundfield", "value": "off"}`
+
+### Night Mode
+
+- **Get Night Mode**: `{"id": 1, "type": "get", "feature": "audio.nightmode"}`
+- **Set Night Mode On**: `{"id": 1, "type": "set", "feature": "audio.nightmode", "value": "on"}`
+- **Set Night Mode Off**: `{"id": 1, "type": "set", "feature": "audio.nightmode", "value": "off"}`
 
 ## Troubleshooting
 
@@ -177,6 +220,7 @@ The easiest way to develop and test this integration is using the included DevCo
 ```
 custom_components/bravia_quad/
 ├── __init__.py              # Integration setup
+├── __version__.py           # Version information
 ├── manifest.json            # Integration metadata
 ├── config_flow.py           # Configuration flow
 ├── bravia_quad_client.py    # TCP client for device communication
@@ -186,6 +230,36 @@ custom_components/bravia_quad/
 ├── const.py                 # Constants
 └── strings.json             # UI strings
 ```
+
+### Code Quality
+
+This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and code formatting. The configuration follows Home Assistant's coding standards:
+
+- **Linting**: Automated linting runs on all pull requests via GitHub Actions
+- **Formatting**: Code is automatically formatted using Ruff
+- **Python Version**: Targets Python 3.13
+
+Run linting locally:
+```bash
+scripts/lint
+```
+
+### CI/CD
+
+This project uses GitHub Actions for continuous integration and deployment:
+
+- **Hassfest**: Validates the integration manifest and ensures compliance with Home Assistant standards
+- **Lint**: Runs Ruff to check code quality and formatting on all pull requests
+- **Release**: Automated release workflow that:
+  - Validates version format
+  - Updates version in `manifest.json` and `__version__.py`
+  - Creates Git tags
+  - Generates GitHub releases
+
+Dependencies are automatically kept up to date via [Dependabot](https://github.com/dependabot) for:
+- GitHub Actions
+- Python packages (pip)
+- DevContainer configuration
 
 ### Testing
 
@@ -206,6 +280,16 @@ s.close()
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+### Development Guidelines
+
+1. **Code Style**: Follow the existing code style and use Ruff for formatting
+2. **Testing**: Test your changes thoroughly before submitting
+3. **Pull Requests**:
+   - Ensure all CI checks pass (Hassfest, Lint)
+   - Update documentation if needed
+   - Follow conventional commit messages when possible
+4. **Issues**: If you find a bug or have a feature request, please open an issue first to discuss
 
 ## License
 
