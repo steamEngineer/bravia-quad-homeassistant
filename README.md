@@ -9,7 +9,7 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 
 - **Power Control**: Turn your Bravia Quad system on and off
 - **Volume Control**: Adjust main volume from 0-100 via a number entity
-- **Rear Level Control**: Adjust rear speaker level from 0-10 via a number entity
+- **Rear Level Control**: Adjust rear speaker level from -10-10 via a number entity
 - **Source Selection**: Switch between inputs (TV/eARC, HDMI In, Spotify)
 - **Bass Level Control**: Select bass level (MIN, MID, MAX) via a select entity
 - **Voice Enhancer**: Toggle voice enhancer on/off
