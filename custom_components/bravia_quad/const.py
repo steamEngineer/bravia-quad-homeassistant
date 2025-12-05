@@ -4,6 +4,9 @@ from __future__ import annotations
 
 DOMAIN = "bravia_quad"
 
+# Configuration keys
+CONF_HAS_SUBWOOFER = "has_subwoofer"
+
 # Default port for Bravia Quad TCP communication
 DEFAULT_PORT = 33336
 
@@ -26,6 +29,10 @@ MIN_REAR_LEVEL = -10
 # Bass level valid range is 0-2 (see bravia_quad_client.py line 470)
 MAX_BASS_LEVEL = 2
 MIN_BASS_LEVEL = 0
+
+# Bass level limits for non-subwoofer mode (select: MIN/MID/MAX)
+MAX_BASS_LEVEL_NO_SUB = 2
+MIN_BASS_LEVEL_NO_SUB = 0
 
 # Command ID limits (to prevent overflow)
 CMD_ID_INITIAL = 10
@@ -76,3 +83,13 @@ INPUT_OPTIONS = {
 
 # Reverse mapping (value -> display name)
 INPUT_VALUES_TO_OPTIONS = {v: k for k, v in INPUT_OPTIONS.items()}
+
+# Bass Level options mapping for non-subwoofer mode (display name -> value)
+BASS_LEVEL_OPTIONS = {
+    "MIN": 0,
+    "MID": 1,
+    "MAX": 2,
+}
+
+# Reverse mapping (value -> display name)
+BASS_LEVEL_VALUES_TO_OPTIONS = {v: k for k, v in BASS_LEVEL_OPTIONS.items()}
