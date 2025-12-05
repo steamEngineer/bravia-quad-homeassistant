@@ -10,7 +10,7 @@ from homeassistant.const import Platform
 from homeassistant.helpers import device_registry as dr
 
 from .bravia_quad_client import BraviaQuadClient
-from .const import DOMAIN
+from .const import CONF_HAS_SUBWOOFER, DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -18,7 +18,12 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-PLATFORMS: list[Platform] = [Platform.SWITCH, Platform.NUMBER, Platform.SELECT]
+PLATFORMS: list[Platform] = [
+    Platform.BUTTON,
+    Platform.NUMBER,
+    Platform.SELECT,
+    Platform.SWITCH,
+]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
@@ -58,6 +63,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Fetch all initial states from the device
     await client.async_fetch_all_states()
+
+    # Detect subwoofer if not already detected (for existing entries without this data)
+    if CONF_HAS_SUBWOOFER not in entry.data:
+        _LOGGER.info("Detecting subwoofer for existing entry...")
+        try:
+            has_subwoofer = await client.async_detect_subwoofer()
+        except (OSError, TimeoutError):
+            _LOGGER.warning(
+                "Subwoofer detection failed due to connection error, "
+                "defaulting to False"
+            )
+            has_subwoofer = False
+        # Update entry data with detection result
+        new_data = {**entry.data, CONF_HAS_SUBWOOFER: has_subwoofer}
+        hass.config_entries.async_update_entry(entry, data=new_data)
+        _LOGGER.info("Subwoofer detection complete: %s", has_subwoofer)
 
     # Forward entry setup to platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)

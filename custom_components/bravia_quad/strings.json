@@ -17,6 +17,14 @@
     "abort": {
       "already_configured": "Device is already configured"
     }
+  },
+  "exceptions": {
+    "reload_failed": {
+      "message": "Integration reload failed. Please reload manually via Settings > Devices & Services > Bravia Quad > Reload"
+    },
+    "detection_failed": {
+      "message": "Failed to detect subwoofer due to a connection error. Please try again."
+    }
   }
 }
 

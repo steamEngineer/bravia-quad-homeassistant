@@ -31,9 +31,11 @@ from .const import (
     FEATURE_VOLUME,
     HDMI_CEC_OFF,
     MAX_BASS_LEVEL,
+    MAX_BASS_LEVEL_NO_SUB,
     MAX_REAR_LEVEL,
     MAX_VOLUME,
     MIN_BASS_LEVEL,
+    MIN_BASS_LEVEL_NO_SUB,
     MIN_REAR_LEVEL,
     MIN_VOLUME,
     NIGHT_MODE_OFF,
@@ -550,7 +552,7 @@ class BraviaQuadClient:
         return self._rear_level
 
     async def async_set_bass_level(self, level: int) -> bool:
-        """Set bass level (0 to 2)."""
+        """Set bass level (-10 to 10)."""
         if level < MIN_BASS_LEVEL or level > MAX_BASS_LEVEL:
             msg = f"Bass level must be between {MIN_BASS_LEVEL} and {MAX_BASS_LEVEL}"
             raise ValueError(msg)
@@ -594,6 +596,63 @@ class BraviaQuadClient:
             except (ValueError, TypeError):
                 pass  # Invalid response value, return cached state
         return self._bass_level
+
+    async def async_detect_subwoofer(self) -> bool:
+        """
+        Detect if subwoofer is connected by testing bass level range.
+
+        Returns True if subwoofer is detected (supports -10 to 10 range).
+        Returns False if no subwoofer (only supports 0-2 select mode).
+        """
+        # Get current bass level
+        current_level = await self.async_get_bass_level()
+
+        # If already outside 0-2 range, definitely has subwoofer
+        if (
+            current_level < MIN_BASS_LEVEL_NO_SUB
+            or current_level > MAX_BASS_LEVEL_NO_SUB
+        ):
+            _LOGGER.info(
+                "Subwoofer detected: bass level %d is outside 0-2 range",
+                current_level,
+            )
+            return True
+
+        # Try setting to -1 (invalid without subwoofer)
+        test_value = -1
+        command = {
+            "id": CMD_ID_VOLUME,
+            "type": "set",
+            "feature": FEATURE_BASS_LEVEL,
+            "value": test_value,
+        }
+        response = await self.async_send_command(command)
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            # Successfully set to -1, subwoofer is connected
+            _LOGGER.info(
+                "Subwoofer detected: device accepted bass level %d", test_value
+            )
+            # Revert to original value. Note: there's a brief window where user
+            # bass level changes could be overwritten, but this is acceptable
+            # given detection is rare and the window is very short.
+            revert_command = {
+                "id": CMD_ID_VOLUME,
+                "type": "set",
+                "feature": FEATURE_BASS_LEVEL,
+                "value": current_level,
+            }
+            await self.async_send_command(revert_command)
+            self._bass_level = current_level
+            return True
+
+        # Device rejected -1, no subwoofer connected
+        _LOGGER.info("No subwoofer detected: device rejected bass level %d", test_value)
+        return False
 
     def register_notification_callback(self, feature: str, callback: Callable) -> None:
         """Register a callback for notifications."""

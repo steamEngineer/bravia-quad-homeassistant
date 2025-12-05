@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
@@ -12,10 +12,7 @@ from homeassistant.const import CONF_HOST, CONF_NAME
 from homeassistant.exceptions import HomeAssistantError
 
 from .bravia_quad_client import BraviaQuadClient
-from .const import DOMAIN
-
-if TYPE_CHECKING:
-    from homeassistant.core import HomeAssistant
+from .const import CONF_HAS_SUBWOOFER, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,8 +24,8 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:  # noqa: ARG001
-    """Validate the user input allows us to connect."""
+async def validate_input(data: dict[str, Any]) -> dict[str, Any]:
+    """Validate the user input allows us to connect and detect subwoofer."""
     host = data[CONF_HOST]
 
     # Create a temporary client to test connection
@@ -44,6 +41,16 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
         result = await client.async_test_connection()
         _LOGGER.info("Test connection result: %s", result)
+
+        if not result:
+            msg = "No response from device. Please verify IP control is enabled."
+            raise CannotConnectError(msg)
+
+        # Detect subwoofer presence
+        _LOGGER.info("Detecting subwoofer presence...")
+        has_subwoofer = await client.async_detect_subwoofer()
+        _LOGGER.info("Subwoofer detection result: %s", has_subwoofer)
+
     except (OSError, TimeoutError) as err:
         _LOGGER.exception("Connection error")
         msg = f"Error connecting to device: {err}"
@@ -51,11 +58,10 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
     finally:
         await client.async_disconnect()
 
-    if not result:
-        msg = "No response from device. Please verify IP control is enabled."
-        raise CannotConnectError(msg)
-
-    return {"title": data.get(CONF_NAME, "Bravia Quad")}
+    return {
+        "title": data.get(CONF_NAME, "Bravia Quad"),
+        CONF_HAS_SUBWOOFER: has_subwoofer,
+    }
 
 
 class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -71,7 +77,7 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
 
         if user_input is not None:
             try:
-                info = await validate_input(self.hass, user_input)
+                info = await validate_input(user_input)
             except CannotConnectError:
                 errors["base"] = "cannot_connect"
             except Exception:
@@ -80,7 +86,12 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
             else:
                 await self.async_set_unique_id(user_input[CONF_HOST])
                 self._abort_if_unique_id_configured()
-                return self.async_create_entry(title=info["title"], data=user_input)
+                # Add subwoofer detection result to entry data
+                entry_data = {
+                    **user_input,
+                    CONF_HAS_SUBWOOFER: info[CONF_HAS_SUBWOOFER],
+                }
+                return self.async_create_entry(title=info["title"], data=entry_data)
 
         return self.async_show_form(
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors

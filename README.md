@@ -11,7 +11,10 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 - **Volume Control**: Adjust main volume from 0-100 via a number entity
 - **Rear Level Control**: Adjust rear speaker level from -10-10 via a number entity
 - **Source Selection**: Switch between inputs (TV/eARC, HDMI In, Spotify)
-- **Bass Level Control**: Select bass level (MIN, MID, MAX) via a select entity
+- **Bass Level Control**: Automatically adapts based on subwoofer presence:
+  - With subwoofer: Slider from -10 to +10
+  - Without subwoofer: Select between MIN, MID, MAX
+- **Subwoofer Auto-Detection**: Automatically detects if a subwoofer is connected and adjusts bass level controls accordingly
 - **Voice Enhancer**: Toggle voice enhancer on/off
 - **Sound Field**: Toggle sound field processing on/off
 - **Night Mode**: Toggle night mode on/off
@@ -67,15 +70,19 @@ The integration creates the following entities under your Bravia Quad device:
 | `switch.bravia_quad_*_power` | Switch | Control power on/off | on/off |
 | `number.bravia_quad_*_volume` | Number | Control main volume | 0-100 |
 | `number.bravia_quad_*_rear_level` | Number | Control rear speaker level | -10-10 |
-| `select.bravia_quad_*_bass_level` | Number | Control bass level | 0-2 (MIN, MID, MAX) |
+| `number.bravia_quad_*_bass_level` | Number | Control bass level (with subwoofer) | -10-10 |
+| `select.bravia_quad_*_bass_level` | Select | Control bass level (without subwoofer) | MIN, MID, MAX |
 | `select.bravia_quad_*_source` | Select | Select input source | TV (eARC), HDMI In, Spotify |
 | `switch.bravia_quad_*_voice_enhancer` | Switch | Toggle voice enhancer | on/off |
 | `switch.bravia_quad_*_sound_field` | Switch | Toggle sound field processing | on/off |
 | `switch.bravia_quad_*_night_mode` | Switch | Toggle night mode | on/off |
 | `switch.bravia_quad_*_hdmi_cec` | Switch | Toggle HDMI CEC | on/off |
 | `switch.bravia_quad_*_auto_standby` | Switch | Toggle auto standby | on/off |
+| `button.bravia_quad_*_detect_subwoofer` | Button | Re-detect subwoofer (diagnostic) | - |
 
 *Note: `*` represents your device's unique entry ID*
+
+*Note: Only one bass level entity will be created based on whether a subwoofer is detected.*
 
 ## Protocol Details
 
@@ -136,7 +143,7 @@ When maintaining an open connection, the device sends real-time notifications fo
 ### Rear Level Control
 
 - **Get Rear Level**: `{"id": 2, "type": "get", "feature": "main.rearvolumestep"}`
-- **Set Rear Level**: `{"id": 2, "type": "set", "feature": "main.rearvolumestep", "value": 5}` (0-10)
+- **Set Rear Level**: `{"id": 2, "type": "set", "feature": "main.rearvolumestep", "value": 5}` (-10 to 10)
 
 ### Source Selection
 
@@ -150,6 +157,13 @@ When maintaining an open connection, the device sends real-time notifications fo
 
 ### Bass Level Control
 
+The bass level range depends on whether a subwoofer is connected:
+
+**With Subwoofer:**
+- **Get Bass Level**: `{"id": 2, "type": "get", "feature": "main.bassstep"}`
+- **Set Bass Level**: `{"id": 2, "type": "set", "feature": "main.bassstep", "value": 5}` (-10 to 10)
+
+**Without Subwoofer:**
 - **Get Bass Level**: `{"id": 2, "type": "get", "feature": "main.bassstep"}`
 - **Set Bass Level**: `{"id": 2, "type": "set", "feature": "main.bassstep", "value": 1}` (0=MIN, 1=MID, 2=MAX)
 
