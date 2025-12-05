@@ -21,8 +21,9 @@ MAX_VOLUME = 100
 MIN_VOLUME = 0
 MAX_REAR_LEVEL = 10
 MIN_REAR_LEVEL = -10
-MAX_BASS_LEVEL = 10
-MIN_BASS_LEVEL = -10
+# Bass level valid range is 0-2 (see bravia_quad_client.py line 470)
+MAX_BASS_LEVEL = 2
+MIN_BASS_LEVEL = 0
 
 # Command ID limits (to prevent overflow)
 CMD_ID_INITIAL = 10
