@@ -1,37 +1,49 @@
 """Client for communicating with Bravia Quad device."""
+
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import logging
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any
 
 from .const import (
-    DEFAULT_PORT,
-    TCP_TIMEOUT,
+    CMD_ID_AUDIO,
+    CMD_ID_INITIAL,
+    CMD_ID_INPUT,
+    CMD_ID_MAX,
     CMD_ID_POWER,
     CMD_ID_VOLUME,
-    CMD_ID_INPUT,
-    CMD_ID_AUDIO,
-    FEATURE_POWER,
-    FEATURE_VOLUME,
-    FEATURE_INPUT,
-    FEATURE_REAR_LEVEL,
+    DEFAULT_PORT,
     FEATURE_BASS_LEVEL,
-    FEATURE_VOICE_ENHANCER,
-    FEATURE_SOUND_FIELD,
+    FEATURE_INPUT,
     FEATURE_NIGHT_MODE,
-    POWER_ON,
-    POWER_OFF,
-    VOICE_ENHANCER_ON,
-    VOICE_ENHANCER_OFF,
-    SOUND_FIELD_ON,
-    SOUND_FIELD_OFF,
-    NIGHT_MODE_ON,
+    FEATURE_POWER,
+    FEATURE_REAR_LEVEL,
+    FEATURE_SOUND_FIELD,
+    FEATURE_VOICE_ENHANCER,
+    FEATURE_VOLUME,
+    MAX_BASS_LEVEL,
+    MAX_REAR_LEVEL,
+    MAX_VOLUME,
+    MIN_BASS_LEVEL,
+    MIN_REAR_LEVEL,
+    MIN_VOLUME,
     NIGHT_MODE_OFF,
+    POWER_OFF,
+    SOUND_FIELD_OFF,
+    TCP_TIMEOUT,
+    VOICE_ENHANCER_OFF,
 )
 
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
 _LOGGER = logging.getLogger(__name__)
+
+# Default bass level (MID)
+DEFAULT_BASS_LEVEL = 1
 
 
 class BraviaQuadClient:
@@ -51,11 +63,11 @@ class BraviaQuadClient:
         self._volume = 0
         self._input = "tv"  # Default input
         self._rear_level = 0
-        self._bass_level = 1  # Default to MID
+        self._bass_level = DEFAULT_BASS_LEVEL
         self._voice_enhancer = VOICE_ENHANCER_OFF
         self._sound_field = SOUND_FIELD_OFF
         self._night_mode = NIGHT_MODE_OFF
-        self._command_id_counter = 10  # Start from 10 to avoid conflicts
+        self._command_id_counter = CMD_ID_INITIAL
         self._command_lock = asyncio.Lock()
         self._pending_responses: dict[int, asyncio.Future] = {}
         self._listener_task: asyncio.Task | None = None
@@ -74,27 +86,23 @@ class BraviaQuadClient:
             await asyncio.sleep(0.1)
             self._connected = True
             _LOGGER.info("Connected to Bravia Quad at %s:%s", self.host, self.port)
-        except Exception as err:
+        except OSError as err:
             self._connected = False
-            _LOGGER.error("Failed to connect to Bravia Quad: %s", err)
-            raise
+            _LOGGER.exception("Failed to connect to Bravia Quad")
+            raise ConnectionError(str(err)) from err
 
     async def async_disconnect(self) -> None:
         """Disconnect from the Bravia Quad device."""
         self._listening = False
         if self._listener_task:
             self._listener_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError):
                 await self._listener_task
-            except asyncio.CancelledError:
-                pass
             self._listener_task = None
         if self._writer:
             self._writer.close()
-            try:
+            with contextlib.suppress(OSError):
                 await self._writer.wait_closed()
-            except Exception:
-                pass
         self._reader = None
         self._writer = None
         self._connected = False
@@ -119,30 +127,34 @@ class BraviaQuadClient:
                 "feature": FEATURE_POWER,
             }
             response = await self.async_send_command(command)
-            
-            if response and response.get("type") == "result":
-                if response.get("feature") == FEATURE_POWER:
-                    self._power_state = response.get("value", POWER_OFF)
-                    return True
-            return False
-        except Exception as err:
-            _LOGGER.error("Test connection failed: %s", err)
-            return False
+
+            if (
+                response
+                and response.get("type") == "result"
+                and response.get("feature") == FEATURE_POWER
+            ):
+                self._power_state = response.get("value", POWER_OFF)
+                return True
+        except (OSError, ConnectionError):
+            _LOGGER.exception("Test connection failed")
+        return False
 
     async def async_send_command(
-        self, command: dict[str, Any], timeout: float = TCP_TIMEOUT
+        self, command: dict[str, Any]
     ) -> dict[str, Any] | None:
         """Send a command and wait for response."""
         if not self._connected:
             await self.async_connect()
 
         if not self._writer or not self._reader:
-            raise ConnectionError("Not connected to device")
+            msg = "Not connected to device"
+            raise ConnectionError(msg)
 
         if not self._listener_task or self._listener_task.done():
             await self.async_listen_for_notifications()
 
         response_future: asyncio.Future | None = None
+        command_id: int | None = None
 
         async with self._command_lock:
             try:
@@ -159,24 +171,24 @@ class BraviaQuadClient:
                 _LOGGER.debug("Sending command: %s", command_json.strip())
                 self._writer.write(command_json.encode())
                 await self._writer.drain()
-            except Exception as err:
-                if command_id in self._pending_responses:
+            except OSError as err:
+                if command_id is not None and command_id in self._pending_responses:
                     self._pending_responses.pop(command_id, None)
-                _LOGGER.error("Error sending command: %s", err)
-                return None
+                _LOGGER.exception("Error sending command")
+                raise ConnectionError(str(err)) from err
 
         try:
-            response = await asyncio.wait_for(
-                response_future, timeout=timeout
-            )
-            return response
-        except asyncio.TimeoutError:
+            response = await asyncio.wait_for(response_future, timeout=TCP_TIMEOUT)
+        except TimeoutError:
             if response_future and not response_future.done():
                 response_future.cancel()
-            _LOGGER.error("Timeout waiting for response to command: %s", command)
+            _LOGGER.warning("Timeout waiting for response to command: %s", command)
             return None
+        else:
+            return response
         finally:
-            self._pending_responses.pop(command_id, None)
+            if command_id is not None:
+                self._pending_responses.pop(command_id, None)
 
     async def async_set_power(self, state: str) -> bool:
         """Set power state (on/off)."""
@@ -187,18 +199,22 @@ class BraviaQuadClient:
             "value": state,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("value") == "ACK":
-                self._power_state = state
-                return True
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._power_state = state
+            return True
         return False
 
     async def async_set_volume(self, volume: int) -> bool:
         """Set volume (0-100)."""
-        if volume < 0 or volume > 100:
-            raise ValueError("Volume must be between 0 and 100")
-        
+        if volume < MIN_VOLUME or volume > MAX_VOLUME:
+            msg = f"Volume must be between {MIN_VOLUME} and {MAX_VOLUME}"
+            raise ValueError(msg)
+
         command = {
             "id": CMD_ID_VOLUME,
             "type": "set",
@@ -206,11 +222,14 @@ class BraviaQuadClient:
             "value": volume,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("value") == "ACK":
-                self._volume = volume
-                return True
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._volume = volume
+            return True
         return False
 
     async def async_get_power(self) -> str:
@@ -221,11 +240,14 @@ class BraviaQuadClient:
             "feature": FEATURE_POWER,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("feature") == FEATURE_POWER:
-                self._power_state = response.get("value", POWER_OFF)
-                return self._power_state
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_POWER
+        ):
+            self._power_state = response.get("value", POWER_OFF)
+            return self._power_state
         return self._power_state
 
     async def async_get_volume(self) -> int:
@@ -236,16 +258,19 @@ class BraviaQuadClient:
             "feature": FEATURE_VOLUME,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("feature") == FEATURE_VOLUME:
-                try:
-                    volume = int(response.get("value", 0))
-                    if 0 <= volume <= 100:
-                        self._volume = volume
-                        return self._volume
-                except (ValueError, TypeError):
-                    pass
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_VOLUME
+        ):
+            try:
+                volume = int(response.get("value", 0))
+                if MIN_VOLUME <= volume <= MAX_VOLUME:
+                    self._volume = volume
+                    return self._volume
+            except (ValueError, TypeError):
+                pass  # Invalid response value, return cached state
         return self._volume
 
     async def async_set_input(self, input_value: str) -> bool:
@@ -257,11 +282,14 @@ class BraviaQuadClient:
             "value": input_value,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("value") == "ACK":
-                self._input = input_value
-                return True
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._input = input_value
+            return True
         return False
 
     async def async_get_input(self) -> str:
@@ -272,11 +300,14 @@ class BraviaQuadClient:
             "feature": FEATURE_INPUT,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("feature") == FEATURE_INPUT:
-                self._input = response.get("value", "tv")
-                return self._input
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_INPUT
+        ):
+            self._input = response.get("value", "tv")
+            return self._input
         return self._input
 
     async def async_set_voice_enhancer(self, state: str) -> bool:
@@ -288,11 +319,14 @@ class BraviaQuadClient:
             "value": state,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("value") == "ACK":
-                self._voice_enhancer = state
-                return True
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._voice_enhancer = state
+            return True
         return False
 
     async def async_get_voice_enhancer(self) -> str:
@@ -303,11 +337,14 @@ class BraviaQuadClient:
             "feature": FEATURE_VOICE_ENHANCER,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("feature") == FEATURE_VOICE_ENHANCER:
-                self._voice_enhancer = response.get("value", VOICE_ENHANCER_OFF)
-                return self._voice_enhancer
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_VOICE_ENHANCER
+        ):
+            self._voice_enhancer = response.get("value", VOICE_ENHANCER_OFF)
+            return self._voice_enhancer
         return self._voice_enhancer
 
     async def async_set_sound_field(self, state: str) -> bool:
@@ -319,11 +356,14 @@ class BraviaQuadClient:
             "value": state,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("value") == "ACK":
-                self._sound_field = state
-                return True
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._sound_field = state
+            return True
         return False
 
     async def async_get_sound_field(self) -> str:
@@ -334,11 +374,14 @@ class BraviaQuadClient:
             "feature": FEATURE_SOUND_FIELD,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("feature") == FEATURE_SOUND_FIELD:
-                self._sound_field = response.get("value", SOUND_FIELD_OFF)
-                return self._sound_field
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_SOUND_FIELD
+        ):
+            self._sound_field = response.get("value", SOUND_FIELD_OFF)
+            return self._sound_field
         return self._sound_field
 
     async def async_set_night_mode(self, state: str) -> bool:
@@ -350,11 +393,14 @@ class BraviaQuadClient:
             "value": state,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("value") == "ACK":
-                self._night_mode = state
-                return True
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._night_mode = state
+            return True
         return False
 
     async def async_get_night_mode(self) -> str:
@@ -365,18 +411,22 @@ class BraviaQuadClient:
             "feature": FEATURE_NIGHT_MODE,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("feature") == FEATURE_NIGHT_MODE:
-                self._night_mode = response.get("value", NIGHT_MODE_OFF)
-                return self._night_mode
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_NIGHT_MODE
+        ):
+            self._night_mode = response.get("value", NIGHT_MODE_OFF)
+            return self._night_mode
         return self._night_mode
 
     async def async_set_rear_level(self, level: int) -> bool:
-        """Set rear level (0-10)."""
-        if level < 0 or level > 10:
-            raise ValueError("Rear level must be between 0 and 10")
-        
+        """Set rear level (-10 to 10)."""
+        if level < MIN_REAR_LEVEL or level > MAX_REAR_LEVEL:
+            msg = f"Rear level must be between {MIN_REAR_LEVEL} and {MAX_REAR_LEVEL}"
+            raise ValueError(msg)
+
         command = {
             "id": CMD_ID_VOLUME,
             "type": "set",
@@ -384,11 +434,14 @@ class BraviaQuadClient:
             "value": level,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("value") == "ACK":
-                self._rear_level = level
-                return True
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._rear_level = level
+            return True
         return False
 
     async def async_get_rear_level(self) -> int:
@@ -399,23 +452,27 @@ class BraviaQuadClient:
             "feature": FEATURE_REAR_LEVEL,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("feature") == FEATURE_REAR_LEVEL:
-                try:
-                    rear_level = int(response.get("value", 0))
-                    if 0 <= rear_level <= 10:
-                        self._rear_level = rear_level
-                        return self._rear_level
-                except (ValueError, TypeError):
-                    pass
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_REAR_LEVEL
+        ):
+            try:
+                rear_level = int(response.get("value", 0))
+                if MIN_REAR_LEVEL <= rear_level <= MAX_REAR_LEVEL:
+                    self._rear_level = rear_level
+                    return self._rear_level
+            except (ValueError, TypeError):
+                pass  # Invalid response value, return cached state
         return self._rear_level
 
     async def async_set_bass_level(self, level: int) -> bool:
-        """Set bass level (0-2)."""
-        if level < 0 or level > 2:
-            raise ValueError("Bass level must be between 0 and 2")
-        
+        """Set bass level (0 to 2)."""
+        if level < MIN_BASS_LEVEL or level > MAX_BASS_LEVEL:
+            msg = f"Bass level must be between {MIN_BASS_LEVEL} and {MAX_BASS_LEVEL}"
+            raise ValueError(msg)
+
         command = {
             "id": CMD_ID_VOLUME,
             "type": "set",
@@ -423,11 +480,14 @@ class BraviaQuadClient:
             "value": level,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("value") == "ACK":
-                self._bass_level = level
-                return True
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._bass_level = level
+            return True
         return False
 
     async def async_get_bass_level(self) -> int:
@@ -438,21 +498,22 @@ class BraviaQuadClient:
             "feature": FEATURE_BASS_LEVEL,
         }
         response = await self.async_send_command(command)
-        
-        if response and response.get("type") == "result":
-            if response.get("feature") == FEATURE_BASS_LEVEL:
-                try:
-                    bass_level = int(response.get("value", 1))
-                    if 0 <= bass_level <= 2:
-                        self._bass_level = bass_level
-                        return self._bass_level
-                except (ValueError, TypeError):
-                    pass
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_BASS_LEVEL
+        ):
+            try:
+                bass_level = int(response.get("value", DEFAULT_BASS_LEVEL))
+                if MIN_BASS_LEVEL <= bass_level <= MAX_BASS_LEVEL:
+                    self._bass_level = bass_level
+                    return self._bass_level
+            except (ValueError, TypeError):
+                pass  # Invalid response value, return cached state
         return self._bass_level
 
-    def register_notification_callback(
-        self, feature: str, callback: Callable
-    ) -> None:
+    def register_notification_callback(self, feature: str, callback: Callable) -> None:
         """Register a callback for notifications."""
         if feature not in self._notification_callbacks:
             self._notification_callbacks[feature] = []
@@ -479,9 +540,7 @@ class BraviaQuadClient:
                     if not self._reader:
                         break
 
-                    data = await asyncio.wait_for(
-                        self._reader.read(1024), timeout=1.0
-                    )
+                    data = await asyncio.wait_for(self._reader.read(1024), timeout=1.0)
 
                     if not data:
                         await asyncio.sleep(0.1)
@@ -497,12 +556,12 @@ class BraviaQuadClient:
 
                     for message in messages:
                         await self._process_incoming_message(message)
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     continue
                 except asyncio.CancelledError:
                     raise
-                except Exception as err:
-                    _LOGGER.error("Error in notification listener: %s", err)
+                except OSError:
+                    _LOGGER.exception("Error in notification listener")
                     await asyncio.sleep(1.0)
         except asyncio.CancelledError:
             _LOGGER.info("Notification listener cancelled")
@@ -574,8 +633,8 @@ class BraviaQuadClient:
         for fetch in fetchers:
             try:
                 await fetch()
-            except Exception as err:  # pragma: no cover - log and continue
-                _LOGGER.warning("Failed to fetch state via %s: %s", fetch.__name__, err)
+            except (OSError, ConnectionError):  # pragma: no cover - log and continue
+                _LOGGER.warning("Failed to fetch state via %s", fetch.__name__)
 
         _LOGGER.debug(
             "State fetch complete - Power: %s, Volume: %d, Input: %s, "
@@ -594,8 +653,8 @@ class BraviaQuadClient:
     def _get_next_command_id(self) -> int:
         """Return a unique command id."""
         self._command_id_counter += 1
-        if self._command_id_counter > 1_000_000:
-            self._command_id_counter = 10
+        if self._command_id_counter > CMD_ID_MAX:
+            self._command_id_counter = CMD_ID_INITIAL
         return self._command_id_counter
 
     def _decode_json_stream(self, data: str) -> list[dict[str, Any]]:
@@ -662,29 +721,59 @@ class BraviaQuadClient:
         if isinstance(value, str) and value.upper() == "ACK":
             return
 
-        try:
-            if feature == FEATURE_POWER:
-                self._power_state = value
-            elif feature == FEATURE_VOLUME:
-                self._volume = int(value)
-            elif feature == FEATURE_INPUT:
-                self._input = value
-            elif feature == FEATURE_REAR_LEVEL:
-                rear_level = int(value)
-                if 0 <= rear_level <= 10:
-                    self._rear_level = rear_level
-            elif feature == FEATURE_BASS_LEVEL:
-                bass_level = int(value)
-                if 0 <= bass_level <= 2:
-                    self._bass_level = bass_level
-            elif feature == FEATURE_VOICE_ENHANCER:
-                self._voice_enhancer = value
-            elif feature == FEATURE_SOUND_FIELD:
-                self._sound_field = value
-            elif feature == FEATURE_NIGHT_MODE:
-                self._night_mode = value
-        except (ValueError, TypeError):
-            _LOGGER.debug("Invalid value %s for feature %s", value, feature)
+        feature_handlers: dict[str, Callable[[Any], None]] = {
+            FEATURE_POWER: self._update_power_state,
+            FEATURE_VOLUME: self._update_volume_state,
+            FEATURE_INPUT: self._update_input_state,
+            FEATURE_REAR_LEVEL: self._update_rear_level_state,
+            FEATURE_BASS_LEVEL: self._update_bass_level_state,
+            FEATURE_VOICE_ENHANCER: self._update_voice_enhancer_state,
+            FEATURE_SOUND_FIELD: self._update_sound_field_state,
+            FEATURE_NIGHT_MODE: self._update_night_mode_state,
+        }
+
+        handler = feature_handlers.get(feature)
+        if handler:
+            try:
+                handler(value)
+            except (ValueError, TypeError):
+                _LOGGER.debug("Invalid value %s for feature %s", value, feature)
+
+    def _update_power_state(self, value: Any) -> None:
+        """Update power state from value."""
+        self._power_state = str(value)
+
+    def _update_volume_state(self, value: Any) -> None:
+        """Update volume state from value."""
+        self._volume = int(value)
+
+    def _update_input_state(self, value: Any) -> None:
+        """Update input state from value."""
+        self._input = str(value)
+
+    def _update_rear_level_state(self, value: Any) -> None:
+        """Update rear level state from value."""
+        rear_level = int(value)
+        if MIN_REAR_LEVEL <= rear_level <= MAX_REAR_LEVEL:
+            self._rear_level = rear_level
+
+    def _update_bass_level_state(self, value: Any) -> None:
+        """Update bass level state from value."""
+        bass_level = int(value)
+        if MIN_BASS_LEVEL <= bass_level <= MAX_BASS_LEVEL:
+            self._bass_level = bass_level
+
+    def _update_voice_enhancer_state(self, value: Any) -> None:
+        """Update voice enhancer state from value."""
+        self._voice_enhancer = str(value)
+
+    def _update_sound_field_state(self, value: Any) -> None:
+        """Update sound field state from value."""
+        self._sound_field = str(value)
+
+    def _update_night_mode_state(self, value: Any) -> None:
+        """Update night mode state from value."""
+        self._night_mode = str(value)
 
     async def _dispatch_notification_callbacks(
         self, feature: str | None, value: Any
@@ -703,8 +792,8 @@ class BraviaQuadClient:
                     await callback(value)
                 else:
                     callback(value)
-            except Exception as err:
-                _LOGGER.error("Error in notification callback: %s", err)
+            except (TypeError, ValueError, AttributeError):
+                _LOGGER.exception("Error in notification callback")
 
     def _resolve_pending_response(self, message: dict[str, Any]) -> None:
         """Resolve the future waiting for a command response."""
@@ -715,4 +804,3 @@ class BraviaQuadClient:
         future = self._pending_responses.get(command_id)
         if future and not future.done():
             future.set_result(message)
-

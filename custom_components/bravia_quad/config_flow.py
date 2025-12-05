@@ -4,17 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
-
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_NAME
-from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import HomeAssistantError
 
-from .const import DOMAIN
 from .bravia_quad_client import BraviaQuadClient
+from .const import DOMAIN
+
+if TYPE_CHECKING:
+    from homeassistant.core import HomeAssistant
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -26,7 +27,7 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
-async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
+async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:  # noqa: ARG001
     """Validate the user input allows us to connect."""
     host = data[CONF_HOST]
 
@@ -43,20 +44,18 @@ async def validate_input(hass: HomeAssistant, data: dict[str, Any]) -> dict[str,
 
         result = await client.async_test_connection()
         _LOGGER.info("Test connection result: %s", result)
-
+    except (OSError, TimeoutError) as err:
+        _LOGGER.exception("Connection error")
+        msg = f"Error connecting to device: {err}"
+        raise CannotConnectError(msg) from err
+    finally:
         await client.async_disconnect()
 
-        if not result:
-            raise CannotConnect(
-                "No response from device. Please verify IP control is enabled."
-            )
+    if not result:
+        msg = "No response from device. Please verify IP control is enabled."
+        raise CannotConnectError(msg)
 
-        return {"title": data.get(CONF_NAME, "Bravia Quad")}
-    except Exception as err:
-        if isinstance(err, CannotConnect):
-            raise
-        _LOGGER.exception("Unexpected exception: %s", err)
-        raise CannotConnect(f"Error connecting to device: {err}") from err
+    return {"title": data.get(CONF_NAME, "Bravia Quad")}
 
 
 class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
@@ -73,9 +72,9 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             try:
                 info = await validate_input(self.hass, user_input)
-            except CannotConnect:
+            except CannotConnectError:
                 errors["base"] = "cannot_connect"
-            except Exception:  # pylint: disable=broad-except
+            except Exception:
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
@@ -88,5 +87,5 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         )
 
 
-class CannotConnect(HomeAssistantError):
+class CannotConnectError(HomeAssistantError):
     """Error to indicate we cannot connect."""

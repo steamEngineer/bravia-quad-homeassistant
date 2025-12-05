@@ -1,4 +1,5 @@
 """Constants for the Bravia Quad integration."""
+
 from __future__ import annotations
 
 DOMAIN = "bravia_quad"
@@ -14,6 +15,19 @@ CMD_ID_POWER = 3
 CMD_ID_VOLUME = 2
 CMD_ID_INPUT = 2
 CMD_ID_AUDIO = 1
+
+# Device limits
+MAX_VOLUME = 100
+MIN_VOLUME = 0
+MAX_REAR_LEVEL = 10
+MIN_REAR_LEVEL = -10
+# Bass level valid range is 0-2 (see bravia_quad_client.py line 470)
+MAX_BASS_LEVEL = 2
+MIN_BASS_LEVEL = 0
+
+# Command ID limits (to prevent overflow)
+CMD_ID_INITIAL = 10
+CMD_ID_MAX = 1_000_000
 
 # Features
 FEATURE_POWER = "main.power"
@@ -50,14 +64,3 @@ INPUT_OPTIONS = {
 
 # Reverse mapping (value -> display name)
 INPUT_VALUES_TO_OPTIONS = {v: k for k, v in INPUT_OPTIONS.items()}
-
-# Bass Level options mapping (display name -> value)
-BASS_LEVEL_OPTIONS = {
-    "MIN": 0,
-    "MID": 1,
-    "MAX": 2,
-}
-
-# Reverse mapping (value -> display name)
-BASS_LEVEL_VALUES_TO_OPTIONS = {v: k for k, v in BASS_LEVEL_OPTIONS.items()}
-
