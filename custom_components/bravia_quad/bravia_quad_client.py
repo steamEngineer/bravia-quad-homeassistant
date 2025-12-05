@@ -9,14 +9,19 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from .const import (
+    AUTO_STANDBY_OFF,
     CMD_ID_AUDIO,
+    CMD_ID_AUTO_STANDBY,
+    CMD_ID_HDMI_CEC,
     CMD_ID_INITIAL,
     CMD_ID_INPUT,
     CMD_ID_MAX,
     CMD_ID_POWER,
     CMD_ID_VOLUME,
     DEFAULT_PORT,
+    FEATURE_AUTO_STANDBY,
     FEATURE_BASS_LEVEL,
+    FEATURE_HDMI_CEC,
     FEATURE_INPUT,
     FEATURE_NIGHT_MODE,
     FEATURE_POWER,
@@ -24,6 +29,7 @@ from .const import (
     FEATURE_SOUND_FIELD,
     FEATURE_VOICE_ENHANCER,
     FEATURE_VOLUME,
+    HDMI_CEC_OFF,
     MAX_BASS_LEVEL,
     MAX_REAR_LEVEL,
     MAX_VOLUME,
@@ -67,6 +73,8 @@ class BraviaQuadClient:
         self._voice_enhancer = VOICE_ENHANCER_OFF
         self._sound_field = SOUND_FIELD_OFF
         self._night_mode = NIGHT_MODE_OFF
+        self._hdmi_cec = HDMI_CEC_OFF
+        self._auto_standby = AUTO_STANDBY_OFF
         self._command_id_counter = CMD_ID_INITIAL
         self._command_lock = asyncio.Lock()
         self._pending_responses: dict[int, asyncio.Future] = {}
@@ -421,6 +429,80 @@ class BraviaQuadClient:
             return self._night_mode
         return self._night_mode
 
+    async def async_set_hdmi_cec(self, state: str) -> bool:
+        """Enable or disable HDMI CEC."""
+        command = {
+            "id": CMD_ID_HDMI_CEC,
+            "type": "set",
+            "feature": FEATURE_HDMI_CEC,
+            "value": state,
+        }
+        response = await self.async_send_command(command)
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._hdmi_cec = state
+            return True
+        return False
+
+    async def async_get_hdmi_cec(self) -> str:
+        """Get current HDMI CEC state."""
+        command = {
+            "id": CMD_ID_HDMI_CEC,
+            "type": "get",
+            "feature": FEATURE_HDMI_CEC,
+        }
+        response = await self.async_send_command(command)
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_HDMI_CEC
+        ):
+            self._hdmi_cec = response.get("value", HDMI_CEC_OFF)
+            return self._hdmi_cec
+        return self._hdmi_cec
+
+    async def async_set_auto_standby(self, state: str) -> bool:
+        """Enable or disable auto standby."""
+        command = {
+            "id": CMD_ID_AUTO_STANDBY,
+            "type": "set",
+            "feature": FEATURE_AUTO_STANDBY,
+            "value": state,
+        }
+        response = await self.async_send_command(command)
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._auto_standby = state
+            return True
+        return False
+
+    async def async_get_auto_standby(self) -> str:
+        """Get current auto standby state."""
+        command = {
+            "id": CMD_ID_AUTO_STANDBY,
+            "type": "get",
+            "feature": FEATURE_AUTO_STANDBY,
+        }
+        response = await self.async_send_command(command)
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_AUTO_STANDBY
+        ):
+            self._auto_standby = response.get("value", AUTO_STANDBY_OFF)
+            return self._auto_standby
+        return self._auto_standby
+
     async def async_set_rear_level(self, level: int) -> bool:
         """Set rear level (-10 to 10)."""
         if level < MIN_REAR_LEVEL or level > MAX_REAR_LEVEL:
@@ -606,6 +688,16 @@ class BraviaQuadClient:
         return self._night_mode
 
     @property
+    def hdmi_cec(self) -> str:
+        """Return current HDMI CEC state."""
+        return self._hdmi_cec
+
+    @property
+    def auto_standby(self) -> str:
+        """Return current auto standby state."""
+        return self._auto_standby
+
+    @property
     def rear_level(self) -> int:
         """Return current rear level."""
         return self._rear_level
@@ -628,6 +720,8 @@ class BraviaQuadClient:
             self.async_get_voice_enhancer,
             self.async_get_sound_field,
             self.async_get_night_mode,
+            self.async_get_hdmi_cec,
+            self.async_get_auto_standby,
         ]
 
         for fetch in fetchers:
@@ -639,7 +733,8 @@ class BraviaQuadClient:
         _LOGGER.debug(
             "State fetch complete - Power: %s, Volume: %d, Input: %s, "
             "Rear Level: %d, Bass Level: %d, Voice Enhancer: %s, "
-            "Sound Field: %s, Night Mode: %s",
+            "Sound Field: %s, Night Mode: %s, HDMI CEC: %s, "
+            "Auto Standby: %s",
             self._power_state,
             self._volume,
             self._input,
@@ -648,6 +743,8 @@ class BraviaQuadClient:
             self._voice_enhancer,
             self._sound_field,
             self._night_mode,
+            self._hdmi_cec,
+            self._auto_standby,
         )
 
     def _get_next_command_id(self) -> int:
@@ -730,6 +827,8 @@ class BraviaQuadClient:
             FEATURE_VOICE_ENHANCER: self._update_voice_enhancer_state,
             FEATURE_SOUND_FIELD: self._update_sound_field_state,
             FEATURE_NIGHT_MODE: self._update_night_mode_state,
+            FEATURE_HDMI_CEC: self._update_hdmi_cec_state,
+            FEATURE_AUTO_STANDBY: self._update_auto_standby_state,
         }
 
         handler = feature_handlers.get(feature)
@@ -774,6 +873,14 @@ class BraviaQuadClient:
     def _update_night_mode_state(self, value: Any) -> None:
         """Update night mode state from value."""
         self._night_mode = str(value)
+
+    def _update_hdmi_cec_state(self, value: Any) -> None:
+        """Update HDMI CEC state from value."""
+        self._hdmi_cec = str(value)
+
+    def _update_auto_standby_state(self, value: Any) -> None:
+        """Update auto standby state from value."""
+        self._auto_standby = str(value)
 
     async def _dispatch_notification_callbacks(
         self, feature: str | None, value: Any

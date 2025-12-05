@@ -15,6 +15,8 @@ CMD_ID_POWER = 3
 CMD_ID_VOLUME = 2
 CMD_ID_INPUT = 2
 CMD_ID_AUDIO = 1
+CMD_ID_HDMI_CEC = 1
+CMD_ID_AUTO_STANDBY = 1
 
 # Device limits
 MAX_VOLUME = 100
@@ -38,6 +40,8 @@ FEATURE_BASS_LEVEL = "main.bassstep"
 FEATURE_VOICE_ENHANCER = "audio.voiceenhancer"
 FEATURE_SOUND_FIELD = "audio.soundfield"
 FEATURE_NIGHT_MODE = "audio.nightmode"
+FEATURE_HDMI_CEC = "hdmi.cec"
+FEATURE_AUTO_STANDBY = "system.autostandby"
 
 # Power states
 POWER_ON = "on"
@@ -54,6 +58,14 @@ SOUND_FIELD_OFF = "off"
 # Night Mode states
 NIGHT_MODE_ON = "on"
 NIGHT_MODE_OFF = "off"
+
+# HDMI CEC states
+HDMI_CEC_ON = "on"
+HDMI_CEC_OFF = "off"
+
+# Auto Standby states
+AUTO_STANDBY_ON = "on"
+AUTO_STANDBY_OFF = "off"
 
 # Input options mapping (display name -> value)
 INPUT_OPTIONS = {

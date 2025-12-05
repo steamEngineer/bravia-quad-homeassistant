@@ -15,6 +15,8 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 - **Voice Enhancer**: Toggle voice enhancer on/off
 - **Sound Field**: Toggle sound field processing on/off
 - **Night Mode**: Toggle night mode on/off
+- **HDMI CEC**: Toggle HDMI CEC on/off
+- **Auto Standby**: Toggle automatic standby behavior on/off
 - **Real-time Updates**: Automatically receives and processes notifications from the device for all state changes
 - **Device Integration**: All entities are properly nested under a single device in Home Assistant
 
@@ -70,6 +72,8 @@ The integration creates the following entities under your Bravia Quad device:
 | `switch.bravia_quad_*_voice_enhancer` | Switch | Toggle voice enhancer | on/off |
 | `switch.bravia_quad_*_sound_field` | Switch | Toggle sound field processing | on/off |
 | `switch.bravia_quad_*_night_mode` | Switch | Toggle night mode | on/off |
+| `switch.bravia_quad_*_hdmi_cec` | Switch | Toggle HDMI CEC | on/off |
+| `switch.bravia_quad_*_auto_standby` | Switch | Toggle auto standby | on/off |
 
 *Note: `*` represents your device's unique entry ID*
 
@@ -112,6 +116,8 @@ When maintaining an open connection, the device sends real-time notifications fo
 {"feature": "audio.voiceenhancer", "type": "notify", "value": "upon"}
 {"feature": "audio.soundfield", "type": "notify", "value": "on"}
 {"feature": "audio.nightmode", "type": "notify", "value": "off"}
+{"feature": "hdmi.cec", "type": "notify", "value": "on"}
+{"feature": "system.autostandby", "type": "notify", "value": "off"}
 ```
 
 ## Supported Commands
@@ -164,6 +170,18 @@ When maintaining an open connection, the device sends real-time notifications fo
 - **Get Night Mode**: `{"id": 1, "type": "get", "feature": "audio.nightmode"}`
 - **Set Night Mode On**: `{"id": 1, "type": "set", "feature": "audio.nightmode", "value": "on"}`
 - **Set Night Mode Off**: `{"id": 1, "type": "set", "feature": "audio.nightmode", "value": "off"}`
+
+### HDMI CEC
+
+- **Get HDMI CEC**: `{"id": 1, "type": "get", "feature": "hdmi.cec"}`
+- **Set HDMI CEC On**: `{"id": 1, "type": "set", "feature": "hdmi.cec", "value": "on"}`
+- **Set HDMI CEC Off**: `{"id": 1, "type": "set", "feature": "hdmi.cec", "value": "off"}`
+
+### Auto Standby
+
+- **Get Auto Standby**: `{"id": 1, "type": "get", "feature": "system.autostandby"}`
+- **Set Auto Standby On**: `{"id": 1, "type": "set", "feature": "system.autostandby", "value": "on"}`
+- **Set Auto Standby Off**: `{"id": 1, "type": "set", "feature": "system.autostandby", "value": "off"}`
 
 ## Troubleshooting
 

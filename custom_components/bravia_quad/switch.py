@@ -10,10 +10,16 @@ from homeassistant.const import EntityCategory
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import (
+    AUTO_STANDBY_OFF,
+    AUTO_STANDBY_ON,
     DOMAIN,
+    FEATURE_AUTO_STANDBY,
+    FEATURE_HDMI_CEC,
     FEATURE_NIGHT_MODE,
     FEATURE_SOUND_FIELD,
     FEATURE_VOICE_ENHANCER,
+    HDMI_CEC_OFF,
+    HDMI_CEC_ON,
     NIGHT_MODE_OFF,
     NIGHT_MODE_ON,
     POWER_OFF,
@@ -45,6 +51,8 @@ async def async_setup_entry(
     # Create all switch entities
     entities = [
         BraviaQuadPowerSwitch(client, entry),
+        BraviaQuadHdmiCecSwitch(client, entry),
+        BraviaQuadAutoStandbySwitch(client, entry),
         BraviaQuadVoiceEnhancerSwitch(client, entry),
         BraviaQuadSoundFieldSwitch(client, entry),
         BraviaQuadNightModeSwitch(client, entry),
@@ -110,6 +118,122 @@ class BraviaQuadPowerSwitch(SwitchEntity):
             self._attr_is_on = power_state == POWER_ON
         except (OSError, TimeoutError):
             _LOGGER.exception("Failed to update power state")
+
+
+class BraviaQuadHdmiCecSwitch(SwitchEntity):
+    """Representation of a Bravia Quad HDMI CEC switch."""
+
+    _attr_should_poll = False
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the HDMI CEC switch."""
+        self._client = client
+        self._entry = entry
+        self._attr_has_entity_name = True
+        self._attr_name = "HDMI CEC"
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_hdmi_cec"
+        self._attr_is_on = client.hdmi_cec == HDMI_CEC_ON
+        self._attr_entity_category = EntityCategory.CONFIG
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=entry.data.get("name", "Bravia Quad"),
+            manufacturer="Sony",
+            model="Bravia Quad",
+            configuration_url=f"http://{entry.data['host']}",
+        )
+
+        self._client.register_notification_callback(
+            FEATURE_HDMI_CEC, self._on_hdmi_cec_notification
+        )
+
+    async def _on_hdmi_cec_notification(self, value: str) -> None:
+        """Handle HDMI CEC notification."""
+        self._attr_is_on = value == HDMI_CEC_ON
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **_kwargs: Any) -> None:
+        """Enable HDMI CEC."""
+        success = await self._client.async_set_hdmi_cec(HDMI_CEC_ON)
+        if success:
+            self._attr_is_on = True
+            self.async_write_ha_state()
+        else:
+            _LOGGER.error("Failed to enable HDMI CEC")
+
+    async def async_turn_off(self, **_kwargs: Any) -> None:
+        """Disable HDMI CEC."""
+        success = await self._client.async_set_hdmi_cec(HDMI_CEC_OFF)
+        if success:
+            self._attr_is_on = False
+            self.async_write_ha_state()
+        else:
+            _LOGGER.error("Failed to disable HDMI CEC")
+
+    async def async_update(self) -> None:
+        """Update HDMI CEC state."""
+        try:
+            hdmi_cec_state = await self._client.async_get_hdmi_cec()
+            self._attr_is_on = hdmi_cec_state == HDMI_CEC_ON
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update HDMI CEC state")
+
+
+class BraviaQuadAutoStandbySwitch(SwitchEntity):
+    """Representation of a Bravia Quad auto standby switch."""
+
+    _attr_should_poll = False
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the auto standby switch."""
+        self._client = client
+        self._entry = entry
+        self._attr_has_entity_name = True
+        self._attr_name = "Auto Standby"
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_auto_standby"
+        self._attr_is_on = client.auto_standby == AUTO_STANDBY_ON
+        self._attr_entity_category = EntityCategory.CONFIG
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=entry.data.get("name", "Bravia Quad"),
+            manufacturer="Sony",
+            model="Bravia Quad",
+            configuration_url=f"http://{entry.data['host']}",
+        )
+
+        self._client.register_notification_callback(
+            FEATURE_AUTO_STANDBY, self._on_auto_standby_notification
+        )
+
+    async def _on_auto_standby_notification(self, value: str) -> None:
+        """Handle auto standby notification."""
+        self._attr_is_on = value == POWER_ON
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **_kwargs: Any) -> None:
+        """Enable auto standby."""
+        success = await self._client.async_set_auto_standby(AUTO_STANDBY_ON)
+        if success:
+            self._attr_is_on = True
+            self.async_write_ha_state()
+        else:
+            _LOGGER.error("Failed to enable auto standby")
+
+    async def async_turn_off(self, **_kwargs: Any) -> None:
+        """Disable auto standby."""
+        success = await self._client.async_set_auto_standby(AUTO_STANDBY_OFF)
+        if success:
+            self._attr_is_on = False
+            self.async_write_ha_state()
+        else:
+            _LOGGER.error("Failed to disable auto standby")
+
+    async def async_update(self) -> None:
+        """Update auto standby state."""
+        try:
+            auto_standby_state = await self._client.async_get_auto_standby()
+            self._attr_is_on = auto_standby_state == AUTO_STANDBY_ON
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update auto standby state")
 
 
 class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
