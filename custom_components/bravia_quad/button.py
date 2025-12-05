@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING
 
@@ -49,6 +50,7 @@ class BraviaQuadDetectSubwooferButton(ButtonEntity):
         self._hass = hass
         self._client = client
         self._entry = entry
+        self._detection_lock = asyncio.Lock()
         self._attr_has_entity_name = True
         self._attr_name = "Detect Subwoofer"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_detect_subwoofer"
@@ -64,46 +66,52 @@ class BraviaQuadDetectSubwooferButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle button press to detect subwoofer."""
-        _LOGGER.info("Starting subwoofer detection...")
+        # Prevent concurrent detections with a lock
+        if self._detection_lock.locked():
+            _LOGGER.debug("Subwoofer detection already in progress, ignoring request")
+            return
 
-        has_subwoofer = await self._client.async_detect_subwoofer()
+        async with self._detection_lock:
+            _LOGGER.info("Starting subwoofer detection...")
 
-        # Get current value to check if it changed
-        current_value = self._entry.data.get(CONF_HAS_SUBWOOFER)
+            has_subwoofer = await self._client.async_detect_subwoofer()
 
-        if current_value != has_subwoofer:
-            _LOGGER.info(
-                "Subwoofer detection result changed: %s -> %s",
-                current_value,
-                has_subwoofer,
-            )
-            # Remove the old bass level entity before reload
-            # If switching TO subwoofer, remove the select entity
-            # If switching FROM subwoofer, remove the slider entity
-            entity_registry = er.async_get(self._hass)
-            if has_subwoofer:
-                # Remove the select entity (no subwoofer -> subwoofer)
-                old_unique_id = f"{DOMAIN}_{self._entry.entry_id}_bass_level_select"
+            # Get current value to check if it changed
+            current_value = self._entry.data.get(CONF_HAS_SUBWOOFER)
+
+            if current_value != has_subwoofer:
+                _LOGGER.info(
+                    "Subwoofer detection result changed: %s -> %s",
+                    current_value,
+                    has_subwoofer,
+                )
+                # Remove the old bass level entity before reload
+                # If switching TO subwoofer, remove the select entity
+                # If switching FROM subwoofer, remove the slider entity
+                entity_registry = er.async_get(self._hass)
+                if has_subwoofer:
+                    # Remove the select entity (no subwoofer -> subwoofer)
+                    old_unique_id = f"{DOMAIN}_{self._entry.entry_id}_bass_level_select"
+                else:
+                    # Remove the slider entity (subwoofer -> no subwoofer)
+                    old_unique_id = f"{DOMAIN}_{self._entry.entry_id}_bass_level_slider"
+
+                if old_entity := entity_registry.async_get_entity_id(
+                    "number" if not has_subwoofer else "select",
+                    DOMAIN,
+                    old_unique_id,
+                ):
+                    _LOGGER.debug("Removing stale bass level entity: %s", old_entity)
+                    entity_registry.async_remove(old_entity)
+
+                # Update entry data with new detection result
+                new_data = {**self._entry.data, CONF_HAS_SUBWOOFER: has_subwoofer}
+                self._hass.config_entries.async_update_entry(self._entry, data=new_data)
+
+                # Reload the integration to recreate entities with correct type
+                await self._hass.config_entries.async_reload(self._entry.entry_id)
             else:
-                # Remove the slider entity (subwoofer -> no subwoofer)
-                old_unique_id = f"{DOMAIN}_{self._entry.entry_id}_bass_level_slider"
-
-            if old_entity := entity_registry.async_get_entity_id(
-                "number" if not has_subwoofer else "select",
-                DOMAIN,
-                old_unique_id,
-            ):
-                _LOGGER.debug("Removing stale bass level entity: %s", old_entity)
-                entity_registry.async_remove(old_entity)
-
-            # Update entry data with new detection result
-            new_data = {**self._entry.data, CONF_HAS_SUBWOOFER: has_subwoofer}
-            self._hass.config_entries.async_update_entry(self._entry, data=new_data)
-
-            # Reload the integration to recreate entities with correct type
-            await self._hass.config_entries.async_reload(self._entry.entry_id)
-        else:
-            _LOGGER.info(
-                "Subwoofer detection result unchanged: %s",
-                has_subwoofer,
-            )
+                _LOGGER.info(
+                    "Subwoofer detection result unchanged: %s",
+                    has_subwoofer,
+                )
