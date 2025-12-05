@@ -468,7 +468,7 @@ class BraviaQuadClient:
         return self._rear_level
 
     async def async_set_bass_level(self, level: int) -> bool:
-        """Set bass level (-10 to 10)."""
+        """Set bass level (0 to 2)."""
         if level < MIN_BASS_LEVEL or level > MAX_BASS_LEVEL:
             msg = f"Bass level must be between {MIN_BASS_LEVEL} and {MAX_BASS_LEVEL}"
             raise ValueError(msg)
