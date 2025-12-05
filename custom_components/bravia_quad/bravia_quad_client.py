@@ -637,7 +637,9 @@ class BraviaQuadClient:
             _LOGGER.info(
                 "Subwoofer detected: device accepted bass level %d", test_value
             )
-            # Revert to original value
+            # Revert to original value. Note: there's a brief window where user
+            # bass level changes could be overwritten, but this is acceptable
+            # given detection is rare and the window is very short.
             revert_command = {
                 "id": CMD_ID_VOLUME,
                 "type": "set",
