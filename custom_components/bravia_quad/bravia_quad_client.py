@@ -284,7 +284,7 @@ class BraviaQuadClient:
         return self._volume
 
     async def async_set_input(self, input_value: str) -> bool:
-        """Set input (tv, hdmi1, spotify)."""
+        """Set input (tv, hdmi1, spotify, bluetooth)."""
         command = {
             "id": CMD_ID_INPUT,
             "type": "set",

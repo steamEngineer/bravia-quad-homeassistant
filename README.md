@@ -10,7 +10,7 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 - **Power Control**: Turn your Bravia Quad system on and off
 - **Volume Control**: Adjust main volume from 0-100 via a number entity
 - **Rear Level Control**: Adjust rear speaker level from -10-10 via a number entity
-- **Source Selection**: Switch between inputs (TV/eARC, HDMI In, Spotify)
+- **Source Selection**: Switch between inputs (TV/eARC, HDMI In, Spotify, Bluetooth)
 - **Bass Level Control**: Automatically adapts based on subwoofer presence:
   - With subwoofer: Slider from -10 to +10
   - Without subwoofer: Select between MIN, MID, MAX
@@ -72,7 +72,7 @@ The integration creates the following entities under your Bravia Quad device:
 | `number.bravia_quad_*_rear_level` | Number | Control rear speaker level | -10-10 |
 | `number.bravia_quad_*_bass_level` | Number | Control bass level (with subwoofer) | -10-10 |
 | `select.bravia_quad_*_bass_level` | Select | Control bass level (without subwoofer) | MIN, MID, MAX |
-| `select.bravia_quad_*_source` | Select | Select input source | TV (eARC), HDMI In, Spotify |
+| `select.bravia_quad_*_source` | Select | Select input source | TV (eARC), HDMI In, Spotify, Bluetooth |
 | `switch.bravia_quad_*_voice_enhancer` | Switch | Toggle voice enhancer | on/off |
 | `switch.bravia_quad_*_sound_field` | Switch | Toggle sound field processing | on/off |
 | `switch.bravia_quad_*_night_mode` | Switch | Toggle night mode | on/off |
@@ -154,6 +154,7 @@ When maintaining an open connection, the device sends real-time notifications fo
 - `tv` - TV (eARC)
 - `hdmi1` - HDMI In
 - `spotify` - Spotify
+- `bluetooth` - Bluetooth
 
 ### Bass Level Control
 

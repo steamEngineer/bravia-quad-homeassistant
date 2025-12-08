@@ -78,6 +78,7 @@ INPUT_OPTIONS = {
     "TV (eARC)": "tv",
     "HDMI In": "hdmi1",
     "Spotify": "spotify",
+    "Bluetooth": "bluetooth",
 }
 
 # Reverse mapping (value -> display name)
