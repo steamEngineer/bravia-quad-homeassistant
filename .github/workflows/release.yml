@@ -38,13 +38,13 @@ jobs:
           python3 << EOF
           import json
           import os
-          
+
           version = os.environ['VERSION']
           with open('manifest.json', 'r') as f:
               manifest = json.load(f)
-          
+
           manifest['version'] = version
-          
+
           with open('manifest.json', 'w') as f:
               json.dump(manifest, f, indent=2)
               f.write('\n')
@@ -56,7 +56,27 @@ jobs:
         run: |
           VERSION="${{ github.event.inputs.version }}"
           cd custom_components/bravia_quad
-          echo "__version__ = \"$VERSION\"" > __version__.py
+          python3 << EOF
+          import os
+          import re
+
+          version = os.environ['VERSION']
+          with open('__version__.py', 'r') as f:
+              content = f.read()
+
+          # Replace the __version__ line while preserving everything else
+          content = re.sub(
+              r'^__version__ = .*$',
+              f'__version__ = "{version}"',
+              content,
+              flags=re.MULTILINE
+          )
+
+          with open('__version__.py', 'w') as f:
+              f.write(content)
+          EOF
+        env:
+          VERSION: ${{ github.event.inputs.version }}
 
       - name: Commit version updates
         run: |
@@ -79,11 +99,11 @@ jobs:
           name: Release v${{ github.event.inputs.version }}
           body: |
             ## Changes
-            
+
             ${{ github.event.inputs.release_notes || 'See commit history for details.' }}
-            
+
             ## Installation
-            
+
             Install via HACS or download from the [releases page](https://github.com/${{ github.repository }}/releases).
           draft: false
           prerelease: false
