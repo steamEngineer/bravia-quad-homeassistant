@@ -1,5 +1,2 @@
-colorlog==6.10.1
-homeassistant==2025.11.3
-pip>=21.3.1
-pytest-homeassistant-custom-component==0.13.297
-ruff==0.14.7
+# Runtime requirements for bravia_quad integration
+# (No external dependencies - uses Python's built-in asyncio)
