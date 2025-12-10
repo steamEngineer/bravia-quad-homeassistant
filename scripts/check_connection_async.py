@@ -14,6 +14,7 @@ import contextlib
 import json
 import logging
 import sys
+import traceback
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -85,8 +86,6 @@ async def check_async_connection(host: str, port: int = DEFAULT_PORT) -> bool:
 
     except OSError as e:
         print(f"Error: {e}")  # noqa: T201
-        import traceback
-
         traceback.print_exc()
     finally:
         if writer:
