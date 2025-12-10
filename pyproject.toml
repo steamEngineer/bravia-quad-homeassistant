@@ -50,7 +50,7 @@ ignore = [
     "D",       # Don't require docstrings in tests
     "PLR2004", # Allow magic values in tests (common for test assertions)
     "S101",    # Allow assert statements in tests (pytest uses them)
-    "TCH002",  # Allow runtime imports in tests (needed for entity_registry, MockConfigEntry, etc.)
+    "TC002",   # Allow runtime imports in tests (needed for entity_registry, MockConfigEntry, etc.)
 ]
 
 [tool.ruff.lint.isort]
