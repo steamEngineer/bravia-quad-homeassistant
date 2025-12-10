@@ -6,60 +6,6 @@ readme = "README.md"
 license = "MIT"
 requires-python = ">=3.13"
 
-[tool.ruff]
-required-version = ">=0.8.0"
-target-version = "py313"
-
-[tool.ruff.lint]
-select = [
-    "B",      # flake8-bugbear
-    "C",      # complexity
-    "D",      # docstrings
-    "E",      # pycodestyle errors
-    "F",      # pyflakes
-    "I",      # isort
-    "ICN",    # flake8-import-conventions
-    "LOG",    # flake8-logging
-    "N",      # pep8-naming
-    "PGH",    # pygrep-hooks
-    "PIE",    # flake8-pie
-    "PL",     # pylint
-    "PT",     # flake8-pytest-style
-    "RSE",    # flake8-raise
-    "RUF",    # ruff-specific rules
-    "SIM",    # flake8-simplify
-    "T20",    # flake8-print
-    "TCH",    # flake8-type-checking
-    "TRY",    # tryceratops
-    "UP",     # pyupgrade
-    "W",      # pycodestyle warnings
-]
-ignore = [
-    "D100",   # Missing docstring in public module
-    "D104",   # Missing docstring in public package
-    "D203",   # 1 blank line required before class docstring
-    "D213",   # Multi-line docstring summary should start at the second line
-    "PLR0913", # Too many arguments
-    "TRY003", # Avoid specifying long messages outside the exception class
-]
-
-[tool.ruff.lint.per-file-ignores]
-"scripts/*" = ["T20"]  # Allow print statements in scripts
-"tests/*" = [
-    "ARG001",  # Allow unused function arguments (fixtures need to be referenced)
-    "D",       # Don't require docstrings in tests
-    "PLR2004", # Allow magic values in tests (common for test assertions)
-    "S101",    # Allow assert statements in tests (pytest uses them)
-    "TC002",   # Allow runtime imports in tests (needed for entity_registry, MockConfigEntry, etc.)
-]
-
-[tool.ruff.lint.isort]
-force-sort-within-sections = true
-combine-as-imports = true
-
-[tool.ruff.lint.pydocstyle]
-convention = "pep257"
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
