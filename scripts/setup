@@ -4,4 +4,21 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-python3 -m pip install --requirement requirements.txt
+# Check if uv is installed
+if ! command -v uv &> /dev/null; then
+    echo "Installing uv..."
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
+
+# Create venv if it doesn't exist
+if [[ ! -d ".venv" ]]; then
+    uv venv
+fi
+
+# Install dev requirements
+uv pip install -r requirements_dev.txt
+
+# Install pre-commit hooks
+uv run pre-commit install
+
+echo "Setup complete! Activate with: source .venv/bin/activate"
