@@ -49,6 +49,7 @@ FEATURE_NIGHT_MODE = "audio.nightmode"
 FEATURE_HDMI_CEC = "hdmi.cec"
 FEATURE_AUTO_STANDBY = "system.autostandby"
 FEATURE_DRC = "audio.drangecomp"
+FEATURE_AAV = "audio.aav"
 
 # Power states
 POWER_ON = "on"
@@ -78,6 +79,10 @@ AUTO_STANDBY_OFF = "off"
 DRC_AUTO = "auto"
 DRC_ON = "on"
 DRC_OFF = "off"
+
+# Advanced Auto Volume states
+AAV_ON = "on"
+AAV_OFF = "off"
 
 # Input options mapping (display name -> value)
 INPUT_OPTIONS = {

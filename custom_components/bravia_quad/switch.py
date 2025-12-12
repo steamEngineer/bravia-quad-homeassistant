@@ -10,6 +10,8 @@ from homeassistant.const import EntityCategory
 from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import (
+    AAV_OFF,
+    AAV_ON,
     AUTO_STANDBY_OFF,
     AUTO_STANDBY_ON,
     DOMAIN,
@@ -56,6 +58,7 @@ async def async_setup_entry(
         BraviaQuadVoiceEnhancerSwitch(client, entry),
         BraviaQuadSoundFieldSwitch(client, entry),
         BraviaQuadNightModeSwitch(client, entry),
+        BraviaQuadAdvancedAutoVolumeSwitch(client, entry),
     ]
 
     async_add_entities(entities)
@@ -414,3 +417,52 @@ class BraviaQuadNightModeSwitch(SwitchEntity):
             self._attr_is_on = night_mode_state == NIGHT_MODE_ON
         except (OSError, TimeoutError):
             _LOGGER.exception("Failed to update night mode state")
+
+
+class BraviaQuadAdvancedAutoVolumeSwitch(SwitchEntity):
+    """Representation of a Bravia Quad Advanced Auto Volume switch."""
+
+    _attr_should_poll = True
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the Advanced Auto Volume switch."""
+        self._client = client
+        self._entry = entry
+        self._attr_has_entity_name = True
+        self._attr_name = "Auto Volume"
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_advanced_auto_volume"
+        self._attr_is_on = client.aav == AAV_ON
+        self._attr_entity_category = EntityCategory.CONFIG
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=entry.data.get("name", "Bravia Quad"),
+            manufacturer="Sony",
+            model="Bravia Quad",
+            configuration_url=f"http://{entry.data['host']}",
+        )
+
+    async def async_turn_on(self, **_kwargs: Any) -> None:
+        """Enable Auto Volume."""
+        success = await self._client.async_set_aav(AAV_ON)
+        if success:
+            self._attr_is_on = True
+            self.async_write_ha_state()
+        else:
+            _LOGGER.error("Failed to enable Auto Volume")
+
+    async def async_turn_off(self, **_kwargs: Any) -> None:
+        """Disable Auto Volume."""
+        success = await self._client.async_set_aav(AAV_OFF)
+        if success:
+            self._attr_is_on = False
+            self.async_write_ha_state()
+        else:
+            _LOGGER.error("Failed to disable Auto Volume")
+
+    async def async_update(self) -> None:
+        """Update the switch state."""
+        try:
+            aav_state = await self._client.async_get_aav()
+            self._attr_is_on = aav_state == AAV_ON
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update Auto Volume state")
