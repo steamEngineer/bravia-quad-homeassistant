@@ -319,7 +319,7 @@ This project uses GitHub Actions for continuous integration and deployment:
 - **Tests**: Runs the pytest test suite on all pull requests
 - **Release**: Automated release workflow that:
   - Validates version format
-  - Updates version in `manifest.json` and `__version__.py`
+  - Updates version in `pyproject.toml` and `manifest.json`
   - Creates Git tags
   - Generates GitHub releases
 
