@@ -19,8 +19,10 @@ from .const import (
     CMD_ID_POWER,
     CMD_ID_VOLUME,
     DEFAULT_PORT,
+    DRC_AUTO,
     FEATURE_AUTO_STANDBY,
     FEATURE_BASS_LEVEL,
+    FEATURE_DRC,
     FEATURE_HDMI_CEC,
     FEATURE_INPUT,
     FEATURE_NIGHT_MODE,
@@ -77,6 +79,7 @@ class BraviaQuadClient:
         self._night_mode = NIGHT_MODE_OFF
         self._hdmi_cec = HDMI_CEC_OFF
         self._auto_standby = AUTO_STANDBY_OFF
+        self._drc = DRC_AUTO
         self._command_id_counter = CMD_ID_INITIAL
         self._command_lock = asyncio.Lock()
         self._pending_responses: dict[int, asyncio.Future] = {}
@@ -505,6 +508,43 @@ class BraviaQuadClient:
             return self._auto_standby
         return self._auto_standby
 
+    async def async_set_drc(self, state: str) -> bool:
+        """Set Dynamic Range Compressor state (auto/on/off)."""
+        command = {
+            "id": CMD_ID_AUDIO,
+            "type": "set",
+            "feature": FEATURE_DRC,
+            "value": state,
+        }
+        response = await self.async_send_command(command)
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._drc = state
+            return True
+        return False
+
+    async def async_get_drc(self) -> str:
+        """Get current Dynamic Range Compressor state."""
+        command = {
+            "id": CMD_ID_AUDIO,
+            "type": "get",
+            "feature": FEATURE_DRC,
+        }
+        response = await self.async_send_command(command)
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_DRC
+        ):
+            self._drc = response.get("value", DRC_AUTO)
+            return self._drc
+        return self._drc
+
     async def async_set_rear_level(self, level: int) -> bool:
         """Set rear level (-10 to 10)."""
         if level < MIN_REAR_LEVEL or level > MAX_REAR_LEVEL:
@@ -771,6 +811,11 @@ class BraviaQuadClient:
         """Return current bass level."""
         return self._bass_level
 
+    @property
+    def drc(self) -> str:
+        """Return current Dynamic Range Compressor state."""
+        return self._drc
+
     async def async_fetch_all_states(self) -> None:
         """Fetch all current states from the device."""
         _LOGGER.debug("Fetching all device states")
@@ -786,6 +831,7 @@ class BraviaQuadClient:
             self.async_get_night_mode,
             self.async_get_hdmi_cec,
             self.async_get_auto_standby,
+            self.async_get_drc,
         ]
 
         for fetch in fetchers:
@@ -798,7 +844,7 @@ class BraviaQuadClient:
             "State fetch complete - Power: %s, Volume: %d, Input: %s, "
             "Rear Level: %d, Bass Level: %d, Voice Enhancer: %s, "
             "Sound Field: %s, Night Mode: %s, HDMI CEC: %s, "
-            "Auto Standby: %s",
+            "Auto Standby: %s, DRC: %s",
             self._power_state,
             self._volume,
             self._input,
@@ -809,6 +855,7 @@ class BraviaQuadClient:
             self._night_mode,
             self._hdmi_cec,
             self._auto_standby,
+            self._drc,
         )
 
     def _get_next_command_id(self) -> int:
@@ -893,6 +940,7 @@ class BraviaQuadClient:
             FEATURE_NIGHT_MODE: self._update_night_mode_state,
             FEATURE_HDMI_CEC: self._update_hdmi_cec_state,
             FEATURE_AUTO_STANDBY: self._update_auto_standby_state,
+            FEATURE_DRC: self._update_drc_state,
         }
 
         handler = feature_handlers.get(feature)
@@ -945,6 +993,10 @@ class BraviaQuadClient:
     def _update_auto_standby_state(self, value: Any) -> None:
         """Update auto standby state from value."""
         self._auto_standby = str(value)
+
+    def _update_drc_state(self, value: Any) -> None:
+        """Update Dynamic Range Compressor state from value."""
+        self._drc = str(value)
 
     async def _dispatch_notification_callbacks(
         self, feature: str | None, value: Any

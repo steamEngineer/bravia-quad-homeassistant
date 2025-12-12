@@ -15,6 +15,8 @@ from .const import (
     BASS_LEVEL_VALUES_TO_OPTIONS,
     CONF_HAS_SUBWOOFER,
     DOMAIN,
+    DRC_OPTIONS,
+    DRC_VALUES_TO_OPTIONS,
     INPUT_OPTIONS,
     INPUT_VALUES_TO_OPTIONS,
 )
@@ -45,6 +47,9 @@ async def async_setup_entry(
     # Add bass level select only if no subwoofer detected
     if not entry.data.get(CONF_HAS_SUBWOOFER, False):
         entities.append(BraviaQuadBassLevelSelect(hass, client, entry))
+
+    # Add Dynamic Range Compressor select (polling-based)
+    entities.append(BraviaQuadDynamicRangeCompressorSelect(client, entry))
 
     async_add_entities(entities)
 
@@ -225,3 +230,57 @@ class BraviaQuadBassLevelSelect(SelectEntity):
                 _LOGGER.warning("Unknown bass level value: %s", bass_level_value)
         except (OSError, TimeoutError):
             _LOGGER.exception("Failed to update bass level")
+
+
+class BraviaQuadDynamicRangeCompressorSelect(SelectEntity):
+    """Representation of a Bravia Quad Dynamic Range Compressor selector."""
+
+    _attr_should_poll = True
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the Dynamic Range Compressor select entity."""
+        self._client = client
+        self._entry = entry
+        self._attr_has_entity_name = True
+        self._attr_name = "Dynamic Range Compressor (DRC)"
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_drc"
+        self._attr_options = list(DRC_OPTIONS.keys())
+        self._attr_entity_category = EntityCategory.CONFIG
+        # Initialize current option from client's current DRC state
+        current_drc_value = client.drc
+        self._attr_current_option = DRC_VALUES_TO_OPTIONS.get(current_drc_value, "Auto")
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry.entry_id)},
+            name=entry.data.get("name", "Bravia Quad"),
+            manufacturer="Sony",
+            model="Bravia Quad",
+            configuration_url=f"http://{entry.data['host']}",
+        )
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        # Convert display option (e.g., "Auto") to value (e.g., "auto")
+        drc_value = DRC_OPTIONS.get(option)
+        if not drc_value:
+            _LOGGER.error("Invalid DRC option: %s", option)
+            return
+
+        success = await self._client.async_set_drc(drc_value)
+        if success:
+            self._attr_current_option = option
+            self.async_write_ha_state()
+        else:
+            _LOGGER.error("Failed to set DRC to %s", option)
+
+    async def async_update(self) -> None:
+        """Update the current DRC state."""
+        try:
+            drc_value = await self._client.async_get_drc()
+            # Convert value to display option
+            option = DRC_VALUES_TO_OPTIONS.get(drc_value)
+            if option:
+                self._attr_current_option = option
+            else:
+                _LOGGER.warning("Unknown DRC value: %s", drc_value)
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update DRC")

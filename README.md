@@ -20,7 +20,8 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 - **Night Mode**: Toggle night mode on/off
 - **HDMI CEC**: Toggle HDMI CEC on/off
 - **Auto Standby**: Toggle automatic standby behavior on/off
-- **Real-time Updates**: Automatically receives and processes notifications from the device for all state changes
+- **Dynamic Range Compressor (DRC)**: Control Dynamic Range Compressor mode (Auto, On, Off) - polls for state changes
+- **Real-time Updates**: Automatically receives and processes notifications from the device for all state changes (where supported)
 - **Device Integration**: All entities are properly nested under a single device in Home Assistant
 
 ## Installation
@@ -78,6 +79,7 @@ The integration creates the following entities under your Bravia Quad device:
 | `switch.bravia_quad_*_night_mode` | Switch | Toggle night mode | on/off |
 | `switch.bravia_quad_*_hdmi_cec` | Switch | Toggle HDMI CEC | on/off |
 | `switch.bravia_quad_*_auto_standby` | Switch | Toggle auto standby | on/off |
+| `select.bravia_quad_*_drc` | Select | Dynamic Range Compressor (DRC) | Auto, On, Off |
 | `button.bravia_quad_*_detect_subwoofer` | Button | Re-detect subwoofer (diagnostic) | - |
 | `button.bravia_quad_*_bluetooth_pairing` | Button | Trigger Bluetooth pairing mode (diagnostic) | - |
 
@@ -199,6 +201,15 @@ The bass level range depends on whether a subwoofer is connected:
 - **Get Auto Standby**: `{"id": 1, "type": "get", "feature": "system.autostandby"}`
 - **Set Auto Standby On**: `{"id": 1, "type": "set", "feature": "system.autostandby", "value": "on"}`
 - **Set Auto Standby Off**: `{"id": 1, "type": "set", "feature": "system.autostandby", "value": "off"}`
+
+### Dynamic Range Compressor (DRC)
+
+- **Get DRC**: `{"id": 1, "type": "get", "feature": "audio.drangecomp"}`
+- **Set DRC Auto**: `{"id": 1, "type": "set", "feature": "audio.drangecomp", "value": "auto"}`
+- **Set DRC On**: `{"id": 1, "type": "set", "feature": "audio.drangecomp", "value": "on"}`
+- **Set DRC Off**: `{"id": 1, "type": "set", "feature": "audio.drangecomp", "value": "off"}`
+
+**Note**: The DRC entity uses polling to update its state, as the device does not send notifications for this feature.
 
 ## Troubleshooting
 
