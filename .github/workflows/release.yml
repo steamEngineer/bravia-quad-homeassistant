@@ -15,6 +15,7 @@ on:
 jobs:
   release:
     runs-on: ubuntu-latest
+    if: github.repository == 'steamEngineer/bravia-quad-homeassistant'
     permissions:
       contents: write
     steps:
