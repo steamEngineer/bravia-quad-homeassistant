@@ -7,7 +7,10 @@ cd "$(dirname "$0")/.."
 # Check if uv is installed
 if ! command -v uv &> /dev/null; then
     echo "Installing uv..."
-    python3 -m pip install --quiet uv
+    if ! python3 -m pip install --quiet uv; then
+        echo "Error: Failed to install uv. Please install manually: https://docs.astral.sh/uv/getting-started/installation/"
+        exit 1
+    fi
 fi
 
 # Create venv and install dev dependencies from pyproject.toml
