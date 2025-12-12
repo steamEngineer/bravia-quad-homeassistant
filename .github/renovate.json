@@ -1,0 +1,43 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "schedule": ["before 2am"],
+  "rebaseWhen": "behind-base-branch",
+  "dependencyDashboard": true,
+  "labels": ["dependencies", "no-stale"],
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true
+  },
+  "commitMessagePrefix": "⬆️",
+  "packageRules": [
+    {
+      "matchManagers": ["pep621"],
+      "addLabels": ["python"]
+    },
+    {
+      "matchManagers": ["pep621"],
+      "matchDepTypes": ["dev"],
+      "rangeStrategy": "pin"
+    },
+    {
+      "matchManagers": ["pep621"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    },
+    {
+      "matchManagers": ["pep621"],
+      "matchPackageNames": ["homeassistant"],
+      "enabled": false
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "addLabels": ["github_actions"],
+      "rangeStrategy": "pin"
+    },
+    {
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true
+    }
+  ]
+}
