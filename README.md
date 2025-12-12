@@ -221,6 +221,8 @@ The bass level range depends on whether a subwoofer is connected:
 
 **Note**: The Auto Volume entity uses polling to update its state, as the device does not send notifications for this feature.
 
+_Per [Sony docs](https://helpguide.sony.net/ht/a7000/v1/en/contents/TP1000070959.html) on the feature, Auto Volume should be **disabled** when listening to music._
+
 ## Troubleshooting
 
 ### Connection Issues
