@@ -1,0 +1,88 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Bravia Quad Setup",
+        "description": "Enter the IP address of your Bravia Quad device and optionally a friendly name.",
+        "data": {
+          "host": "IP Address",
+          "name": "Name"
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "Discovered Bravia Quad",
+        "description": "Do you want to set up {name}?"
+      },
+      "dhcp_confirm": {
+        "title": "Discovered Bravia Quad",
+        "description": "Do you want to set up {name}?"
+      }
+    },
+    "error": {
+      "cannot_connect": "Unable to connect to the Bravia Quad device. Please verify:\n- The IP address is correct\n- IP control is enabled on the device\n- Port 33336 is accessible",
+      "unknown": "Unexpected error occurred"
+    },
+    "abort": {
+      "already_configured": "Device is already configured",
+      "not_bravia_quad": "Discovered device is not a Bravia Quad speaker",
+      "cannot_connect": "Could not connect to device"
+    }
+  },
+  "entity": {
+    "button": {
+      "detect_subwoofer": {
+        "name": "Detect subwoofer"
+      },
+      "bluetooth_pairing": {
+        "name": "Bluetooth pairing"
+      }
+    },
+    "number": {
+      "volume": {
+        "name": "Volume"
+      },
+      "rear_level": {
+        "name": "Rear level"
+      },
+      "bass_level": {
+        "name": "Bass level"
+      }
+    },
+    "select": {
+      "input": {
+        "name": "Source"
+      },
+      "bass_level": {
+        "name": "Bass level"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Power"
+      },
+      "hdmi_cec": {
+        "name": "HDMI CEC"
+      },
+      "auto_standby": {
+        "name": "Auto standby"
+      },
+      "voice_enhancer": {
+        "name": "Voice enhancer"
+      },
+      "sound_field": {
+        "name": "Sound field"
+      },
+      "night_mode": {
+        "name": "Night mode"
+      }
+    }
+  },
+  "exceptions": {
+    "reload_failed": {
+      "message": "Integration reload failed. Please reload manually via Settings > Devices & Services > Bravia Quad > Reload"
+    },
+    "detection_failed": {
+      "message": "Failed to detect subwoofer due to a connection error. Please try again."
+    }
+  }
+}
