@@ -244,9 +244,27 @@ The easiest way to develop and test this integration is using the included DevCo
 
 | Script | Description |
 |--------|-------------|
-| `scripts/setup` | Installs Python dependencies from `requirements.txt` |
+| `scripts/setup` | Sets up development environment with uv (installs dependencies + pre-commit hooks) |
 | `scripts/develop` | Starts Home Assistant with the integration in debug mode |
 | `scripts/lint` | Runs Ruff to format and lint the code |
+
+### Setting Up Development Environment
+
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
+
+```bash
+# Install dependencies and set up pre-commit hooks
+./scripts/setup
+
+# Or manually with uv
+uv sync --dev
+
+# Run tests
+uv run pytest
+
+# Run Home Assistant in debug mode
+./scripts/develop
+```
 
 ### Project Structure
 
@@ -270,11 +288,26 @@ This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and code form
 
 - **Linting**: Automated linting runs on all pull requests via GitHub Actions
 - **Formatting**: Code is automatically formatted using Ruff
-- **Python Version**: Targets Python 3.13
+- **Python Version**: Targets Python 3.13.2+
 
 Run linting locally:
 ```bash
-scripts/lint
+./scripts/lint
+```
+
+### Testing
+
+The project includes a comprehensive test suite using pytest:
+
+```bash
+# Run all tests
+uv run pytest
+
+# Run tests with verbose output
+uv run pytest -v
+
+# Run tests with coverage
+uv run pytest --cov=custom_components/bravia_quad
 ```
 
 ### CI/CD
@@ -283,20 +316,28 @@ This project uses GitHub Actions for continuous integration and deployment:
 
 - **Hassfest**: Validates the integration manifest and ensures compliance with Home Assistant standards
 - **Lint**: Runs Ruff to check code quality and formatting on all pull requests
+- **Tests**: Runs the pytest test suite on all pull requests
 - **Release**: Automated release workflow that:
   - Validates version format
-  - Updates version in `manifest.json` and `__version__.py`
+  - Updates version in `pyproject.toml` and `manifest.json`
   - Creates Git tags
   - Generates GitHub releases
 
-Dependencies are automatically kept up to date via [Dependabot](https://github.com/dependabot) for:
+Dependencies are automatically kept up to date via [Renovate](https://docs.renovatebot.com/) for:
 - GitHub Actions
-- Python packages (pip)
-- DevContainer configuration
+- Python packages (via pyproject.toml)
 
 ### Testing
 
 To test the connection manually:
+
+```bash
+# Using netcat
+netcat <IP_ADDRESS> 33336
+{"id":3, "type":"get","feature":"main.power"}
+```
+
+Or using Python:
 
 ```python
 import socket

@@ -1,2 +1,0 @@
-# Runtime requirements for bravia_quad integration
-# (No external dependencies - uses Python's built-in asyncio)

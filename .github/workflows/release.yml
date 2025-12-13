@@ -23,6 +23,11 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
       - name: Validate version format
         run: |
           VERSION="${{ github.event.inputs.version }}"
@@ -52,37 +57,39 @@ jobs:
         env:
           VERSION: ${{ github.event.inputs.version }}
 
-      - name: Update version in __version__.py
+      - name: Update version in pyproject.toml
         run: |
           VERSION="${{ github.event.inputs.version }}"
-          cd custom_components/bravia_quad
           python3 << EOF
           import os
           import re
 
           version = os.environ['VERSION']
-          with open('__version__.py', 'r') as f:
+          with open('pyproject.toml', 'r') as f:
               content = f.read()
 
-          # Replace the __version__ line while preserving everything else
+          # Replace the version line while preserving everything else
           content = re.sub(
-              r'^__version__ = .*$',
-              f'__version__ = "{version}"',
+              r'^version = .*$',
+              f'version = "{version}"',
               content,
               flags=re.MULTILINE
           )
 
-          with open('__version__.py', 'w') as f:
+          with open('pyproject.toml', 'w') as f:
               f.write(content)
           EOF
         env:
           VERSION: ${{ github.event.inputs.version }}
 
+      - name: Regenerate uv.lock
+        run: uv lock
+
       - name: Commit version updates
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add custom_components/bravia_quad/manifest.json custom_components/bravia_quad/__version__.py
+          git add custom_components/bravia_quad/manifest.json pyproject.toml uv.lock
           git commit -m "Bump version to ${{ github.event.inputs.version }}" || exit 0
           git push
 
@@ -107,4 +114,3 @@ jobs:
             Install via HACS or download from the [releases page](https://github.com/${{ github.repository }}/releases).
           draft: false
           prerelease: false
-

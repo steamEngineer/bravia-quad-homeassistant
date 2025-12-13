@@ -76,4 +76,3 @@ HACS will automatically detect new releases and make them available to users. Af
 - Release notes help users understand what changed
 - Test the integration before creating a release
 - Ensure GitHub Actions workflows pass before releasing
-

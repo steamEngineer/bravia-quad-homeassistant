@@ -4,4 +4,19 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-python3 -m pip install --requirement requirements.txt
+# Check if uv is installed
+if ! command -v uv &> /dev/null; then
+    echo "Installing uv..."
+    if ! python3 -m pip install --quiet uv; then
+        echo "Error: Failed to install uv. Please install manually: https://docs.astral.sh/uv/getting-started/installation/"
+        exit 1
+    fi
+fi
+
+# Create venv and install dev dependencies from pyproject.toml
+uv sync --dev
+
+# Install pre-commit hooks
+uv run pre-commit install
+
+echo "Setup complete! Activate with: source .venv/bin/activate"
