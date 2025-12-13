@@ -39,6 +39,16 @@ def auto_enable_custom_integrations(
     return
 
 
+@pytest.fixture(autouse=True)
+def mock_zeroconf(hass: HomeAssistant) -> Generator[MagicMock]:
+    """Mock zeroconf to prevent socket errors in tests."""
+    with patch(
+        "homeassistant.components.zeroconf.async_setup",
+        return_value=True,
+    ):
+        yield
+
+
 @pytest.fixture
 def mock_config_entry() -> MockConfigEntry:
     """Return the default mocked config entry."""
