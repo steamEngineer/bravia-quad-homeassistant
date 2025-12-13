@@ -65,7 +65,7 @@ class BraviaQuadInputSelect(SelectEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the input select entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_input"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_input"
         self._attr_options = list(INPUT_OPTIONS.keys())
         current_input_value = client.input
         self._attr_current_option = INPUT_VALUES_TO_OPTIONS.get(
@@ -133,7 +133,7 @@ class BraviaQuadBassLevelSelect(SelectEntity):
         self._client = client
         self._entry = entry
         self._reloading = False
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_bass_level_select"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_bass_level_select"
         self._attr_options = list(BASS_LEVEL_OPTIONS.keys())
         current_bass_value = client.bass_level
         self._attr_current_option = BASS_LEVEL_VALUES_TO_OPTIONS.get(

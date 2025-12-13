@@ -6,7 +6,7 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from homeassistant.const import Platform
+from homeassistant.const import CONF_MAC, Platform
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 
@@ -43,10 +43,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady from err
 
     # Create device registry entry
+    # Use unique_id (MAC or host) as device identifier
     device_registry = dr.async_get(hass)
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.entry_id)},
+        identifiers={(DOMAIN, entry.unique_id)} if entry.unique_id else set(),
+        connections=(
+            {(dr.CONNECTION_NETWORK_MAC, entry.data[CONF_MAC])}
+            if CONF_MAC in entry.data
+            else set()
+        ),
         name=entry.data.get("name", "Bravia Quad"),
         manufacturer="Sony",
         model="Bravia Quad",

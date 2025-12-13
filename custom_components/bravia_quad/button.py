@@ -57,7 +57,7 @@ class BraviaQuadDetectSubwooferButton(ButtonEntity):
         self._client = client
         self._entry = entry
         self._detection_lock = asyncio.Lock()
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_detect_subwoofer"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_detect_subwoofer"
         self._attr_device_info = get_device_info(entry)
 
     async def async_press(self) -> None:
@@ -92,20 +92,24 @@ class BraviaQuadDetectSubwooferButton(ButtonEntity):
                 # If switching TO subwoofer, remove the select entity
                 # If switching FROM subwoofer, remove the slider entity
                 entity_registry = er.async_get(self._hass)
-                if has_subwoofer:
-                    # Remove the select entity (no subwoofer -> subwoofer)
-                    old_unique_id = f"{DOMAIN}_{self._entry.entry_id}_bass_level_select"
-                else:
-                    # Remove the slider entity (subwoofer -> no subwoofer)
-                    old_unique_id = f"{DOMAIN}_{self._entry.entry_id}_bass_level_slider"
+                platform = "number" if not has_subwoofer else "select"
+                entity_suffix = (
+                    "bass_level_select" if has_subwoofer else "bass_level_slider"
+                )
 
-                if old_entity := entity_registry.async_get_entity_id(
-                    "number" if not has_subwoofer else "select",
-                    DOMAIN,
-                    old_unique_id,
-                ):
-                    _LOGGER.debug("Removing stale bass level entity: %s", old_entity)
-                    entity_registry.async_remove(old_entity)
+                # Try both old (entry_id based) and new (unique_id based) formats
+                for base_id in (self._entry.unique_id, self._entry.entry_id):
+                    old_unique_id = f"{DOMAIN}_{base_id}_{entity_suffix}"
+                    if old_entity := entity_registry.async_get_entity_id(
+                        platform,
+                        DOMAIN,
+                        old_unique_id,
+                    ):
+                        _LOGGER.debug(
+                            "Removing stale bass level entity: %s", old_entity
+                        )
+                        entity_registry.async_remove(old_entity)
+                        break
 
                 # Update entry data with new detection result
                 new_data = {**self._entry.data, CONF_HAS_SUBWOOFER: has_subwoofer}
@@ -141,7 +145,7 @@ class BraviaQuadBluetoothPairingButton(ButtonEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the Bluetooth pairing button entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_bluetooth_pairing"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_bluetooth_pairing"
         self._attr_device_info = get_device_info(entry)
 
     async def async_press(self) -> None:

@@ -13,10 +13,12 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import format_mac
 
 from .bravia_quad_client import BraviaQuadClient
-from .const import CONF_HAS_SUBWOOFER, DOMAIN
 
 if TYPE_CHECKING:
-    from homeassistant.components.zeroconf import ZeroconfServiceInfo
+    from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
+    from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
+
+from .const import CONF_HAS_SUBWOOFER, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -127,6 +129,19 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         if device_id:
             self._discovered_mac = format_mac(device_id)
 
+        # Check if there's an existing entry configured with IP as unique_id
+        # If so, migrate it to use MAC as unique_id
+        if self._discovered_mac:
+            for entry in self._async_current_entries():
+                if entry.unique_id == self._discovered_host:
+                    # Migrate from IP-based to MAC-based unique_id
+                    self.hass.config_entries.async_update_entry(
+                        entry,
+                        unique_id=self._discovered_mac,
+                        data={**entry.data, CONF_MAC: self._discovered_mac},
+                    )
+                    return self.async_abort(reason="already_configured")
+
         # Use MAC address as unique ID if available, otherwise use host
         unique_id = self._discovered_mac or self._discovered_host
         await self.async_set_unique_id(unique_id)
@@ -134,6 +149,82 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
 
         self.context["title_placeholders"] = {"name": self._discovered_name}
         return await self.async_step_zeroconf_confirm()
+
+    async def async_step_dhcp(
+        self, discovery_info: DhcpServiceInfo
+    ) -> ConfigFlowResult:
+        """Handle a flow initialized by DHCP discovery."""
+        _LOGGER.debug("Bravia Quad device found via DHCP: %s", discovery_info)
+
+        self._discovered_host = discovery_info.ip
+        self._discovered_mac = format_mac(discovery_info.macaddress)
+        self._discovered_name = discovery_info.hostname or "Bravia Quad"
+
+        # Check if there's an existing entry configured with IP as unique_id
+        # If so, migrate it to use MAC as unique_id
+        for entry in self._async_current_entries():
+            if entry.unique_id == self._discovered_host:
+                # Migrate from IP-based to MAC-based unique_id
+                self.hass.config_entries.async_update_entry(
+                    entry,
+                    unique_id=self._discovered_mac,
+                    data={**entry.data, CONF_MAC: self._discovered_mac},
+                )
+                return self.async_abort(reason="already_configured")
+
+        # Use MAC address as unique ID
+        await self.async_set_unique_id(self._discovered_mac)
+        self._abort_if_unique_id_configured(updates={CONF_HOST: self._discovered_host})
+
+        # Test if this is actually a Bravia Quad by trying to connect
+        try:
+            client = BraviaQuadClient(self._discovered_host, self._discovered_name)
+            await client.async_connect()
+            result = await client.async_test_connection()
+            await client.async_disconnect()
+            if not result:
+                return self.async_abort(reason="not_bravia_quad")
+        except (OSError, TimeoutError):
+            return self.async_abort(reason="cannot_connect")
+
+        self.context["title_placeholders"] = {"name": self._discovered_name}
+        return await self.async_step_dhcp_confirm()
+
+    async def async_step_dhcp_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle user confirmation of DHCP discovered device."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            data = {
+                CONF_HOST: self._discovered_host,
+                CONF_NAME: self._discovered_name,
+            }
+            try:
+                info = await validate_input(data)
+            except CannotConnectError:
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected exception during DHCP confirmation")
+                errors["base"] = "unknown"
+            else:
+                entry_data = {
+                    CONF_HOST: self._discovered_host,
+                    CONF_NAME: self._discovered_name,
+                    CONF_MAC: self._discovered_mac,
+                    CONF_HAS_SUBWOOFER: info[CONF_HAS_SUBWOOFER],
+                }
+                return self.async_create_entry(
+                    title=self._discovered_name or "Bravia Quad",
+                    data=entry_data,
+                )
+
+        return self.async_show_form(
+            step_id="dhcp_confirm",
+            description_placeholders={"name": self._discovered_name or "Bravia Quad"},
+            errors=errors,
+        )
 
     async def async_step_zeroconf_confirm(
         self, user_input: dict[str, Any] | None = None
@@ -169,7 +260,7 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="zeroconf_confirm",
-            description_placeholders={"name": self._discovered_name},
+            description_placeholders={"name": self._discovered_name or "Bravia Quad"},
             errors=errors,
         )
 

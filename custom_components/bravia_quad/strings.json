@@ -12,6 +12,10 @@
       "zeroconf_confirm": {
         "title": "Discovered Bravia Quad",
         "description": "Do you want to set up {name}?"
+      },
+      "dhcp_confirm": {
+        "title": "Discovered Bravia Quad",
+        "description": "Do you want to set up {name}?"
       }
     },
     "error": {
@@ -20,7 +24,8 @@
     },
     "abort": {
       "already_configured": "Device is already configured",
-      "not_bravia_quad": "Discovered device is not a Bravia Quad speaker"
+      "not_bravia_quad": "Discovered device is not a Bravia Quad speaker",
+      "cannot_connect": "Could not connect to device"
     }
   },
   "entity": {

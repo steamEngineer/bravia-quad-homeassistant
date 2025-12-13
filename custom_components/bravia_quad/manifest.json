@@ -6,6 +6,11 @@
   ],
   "config_flow": true,
   "dependencies": ["zeroconf"],
+  "dhcp": [
+    {
+      "macaddress": "60FF9E*"
+    }
+  ],
   "documentation": "https://github.com/steamEngineer/bravia-quad-homeassistant",
   "integration_type": "device",
   "iot_class": "local_push",
