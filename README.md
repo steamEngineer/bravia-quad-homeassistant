@@ -1,6 +1,6 @@
 # Bravia Quad Home Assistant Integration
 
-[![hacs_badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/custom-components/hacs)
+[![hacs_badge](https://img.shields.io/badge/HACS-Default-green.svg)](https://github.com/custom-components/hacs)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A Home Assistant custom integration for controlling Sony Bravia Quad home theater systems via TCP/IP.
@@ -31,11 +31,8 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 
 1. Ensure [HACS](https://hacs.xyz/) is installed
 2. Go to HACS → Integrations
-3. Click the three dots in the top right corner
-4. Select "Custom repositories"
-5. Add this repository URL and select "Integration" as the category
-6. Search for "Bravia Quad" in HACS and install it
-7. Restart Home Assistant
+3. Search for "Bravia Quad" and install it
+4. Restart Home Assistant
 
 ### Manual Installation
 
