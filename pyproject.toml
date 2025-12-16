@@ -1,6 +1,6 @@
 [project]
 name = "bravia-quad-homeassistant"
-version = "1.3.2"
+version = "1.4.0"
 description = "Home Assistant custom integration for Sony Bravia Quad AV amplifiers"
 readme = "README.md"
 license = "MIT"

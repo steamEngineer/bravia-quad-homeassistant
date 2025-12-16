@@ -567,7 +567,7 @@ wheels = [
 
 [[package]]
 name = "bravia-quad-homeassistant"
-version = "1.3.2"
+version = "1.4.0"
 source = { virtual = "." }
 
 [package.dev-dependencies]
