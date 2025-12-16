@@ -44,6 +44,9 @@
       },
       "bass_level": {
         "name": "Bass level"
+      },
+      "drc": {
+        "name": "Dynamic Range Compressor"
       }
     },
     "switch": {
@@ -64,6 +67,9 @@
       },
       "night_mode": {
         "name": "Night mode"
+      },
+      "auto_volume": {
+        "name": "Auto Volume"
       }
     }
   },
