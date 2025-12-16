@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING
 from homeassistant.components.select import SelectEntity
 from homeassistant.const import EntityCategory
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import (
     BASS_LEVEL_OPTIONS,
@@ -18,6 +17,7 @@ from .const import (
     INPUT_OPTIONS,
     INPUT_VALUES_TO_OPTIONS,
 )
+from .helpers import get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -52,28 +52,20 @@ async def async_setup_entry(
 class BraviaQuadInputSelect(SelectEntity):
     """Representation of a Bravia Quad input selector."""
 
+    _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_translation_key = "input"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the input select entity."""
         self._client = client
-        self._entry = entry
-        self._attr_has_entity_name = True
-        self._attr_name = "Source"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_input"
         self._attr_options = list(INPUT_OPTIONS.keys())
-        # Initialize current option from client's current input
         current_input_value = client.input
         self._attr_current_option = INPUT_VALUES_TO_OPTIONS.get(
             current_input_value, next(iter(INPUT_OPTIONS.keys()), "TV (eARC)")
         )
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
         # Register for input notifications
         self._client.register_notification_callback(
@@ -122,7 +114,10 @@ class BraviaQuadInputSelect(SelectEntity):
 class BraviaQuadBassLevelSelect(SelectEntity):
     """Representation of a Bravia Quad bass level selector (for non-subwoofer mode)."""
 
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_translation_key = "bass_level"
 
     def __init__(
         self, hass: HomeAssistant, client: BraviaQuadClient, entry: ConfigEntry
@@ -132,23 +127,13 @@ class BraviaQuadBassLevelSelect(SelectEntity):
         self._client = client
         self._entry = entry
         self._reloading = False
-        self._attr_has_entity_name = True
-        self._attr_name = "Bass Level"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_bass_level_select"
         self._attr_options = list(BASS_LEVEL_OPTIONS.keys())
-        self._attr_entity_category = EntityCategory.CONFIG
-        # Initialize current option from client's current bass level
         current_bass_value = client.bass_level
         self._attr_current_option = BASS_LEVEL_VALUES_TO_OPTIONS.get(
             current_bass_value, "MID"
         )
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
         # Register for bass level notifications
         self._client.register_notification_callback(

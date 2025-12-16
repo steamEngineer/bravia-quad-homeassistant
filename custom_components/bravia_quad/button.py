@@ -10,9 +10,9 @@ from homeassistant.components.button import ButtonEntity
 from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import CONF_HAS_SUBWOOFER, DOMAIN
+from .helpers import get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -43,7 +43,11 @@ async def async_setup_entry(
 class BraviaQuadDetectSubwooferButton(ButtonEntity):
     """Button to detect subwoofer presence."""
 
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:speaker-wireless"
     _attr_should_poll = False
+    _attr_translation_key = "detect_subwoofer"
 
     def __init__(
         self, hass: HomeAssistant, client: BraviaQuadClient, entry: ConfigEntry
@@ -53,18 +57,8 @@ class BraviaQuadDetectSubwooferButton(ButtonEntity):
         self._client = client
         self._entry = entry
         self._detection_lock = asyncio.Lock()
-        self._attr_has_entity_name = True
-        self._attr_name = "Detect Subwoofer"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_detect_subwoofer"
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._attr_icon = "mdi:speaker-wireless"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
     async def async_press(self) -> None:
         """Handle button press to detect subwoofer."""
@@ -138,24 +132,17 @@ class BraviaQuadDetectSubwooferButton(ButtonEntity):
 class BraviaQuadBluetoothPairingButton(ButtonEntity):
     """Button to trigger Bluetooth pairing mode."""
 
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:bluetooth"
     _attr_should_poll = False
+    _attr_translation_key = "bluetooth_pairing"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the Bluetooth pairing button entity."""
         self._client = client
-        self._entry = entry
-        self._attr_has_entity_name = True
-        self._attr_name = "Trigger BT Pairing"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_bluetooth_pairing"
-        self._attr_entity_category = EntityCategory.DIAGNOSTIC
-        self._attr_icon = "mdi:bluetooth"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
     async def async_press(self) -> None:
         """Handle button press to trigger Bluetooth pairing mode."""

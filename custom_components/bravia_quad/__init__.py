@@ -7,6 +7,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.const import Platform
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 
 from .bravia_quad_client import BraviaQuadClient
@@ -33,13 +34,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Create client instance
     client = BraviaQuadClient(entry.data["host"], entry.data.get("name", "Bravia Quad"))
 
-    # Test connection
+    # Test connection - raise ConfigEntryNotReady on failure
     try:
         await client.async_connect()
         await client.async_test_connection()
-    except (OSError, TimeoutError):
-        _LOGGER.exception("Failed to connect to Bravia Quad")
-        return False
+    except (OSError, TimeoutError) as err:
+        await client.async_disconnect()
+        raise ConfigEntryNotReady from err
 
     # Create device registry entry
     device_registry = dr.async_get(hass)

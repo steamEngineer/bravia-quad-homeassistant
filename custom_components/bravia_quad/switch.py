@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
-from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import (
     AUTO_STANDBY_OFF,
@@ -29,6 +28,7 @@ from .const import (
     VOICE_ENHANCER_OFF,
     VOICE_ENHANCER_ON,
 )
+from .helpers import get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -64,24 +64,16 @@ async def async_setup_entry(
 class BraviaQuadPowerSwitch(SwitchEntity):
     """Representation of a Bravia Quad power switch."""
 
+    _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_translation_key = "power"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the switch."""
         self._client = client
-        self._entry = entry
-        self._attr_has_entity_name = True
-        self._attr_name = "Power"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_power"
-        # Initialize from client's current state
         self._attr_is_on = client.power_state == POWER_ON
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
         # Register for power notifications
         self._client.register_notification_callback(
@@ -123,24 +115,17 @@ class BraviaQuadPowerSwitch(SwitchEntity):
 class BraviaQuadHdmiCecSwitch(SwitchEntity):
     """Representation of a Bravia Quad HDMI CEC switch."""
 
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_translation_key = "hdmi_cec"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the HDMI CEC switch."""
         self._client = client
-        self._entry = entry
-        self._attr_has_entity_name = True
-        self._attr_name = "HDMI CEC"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_hdmi_cec"
         self._attr_is_on = client.hdmi_cec == HDMI_CEC_ON
-        self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
         self._client.register_notification_callback(
             FEATURE_HDMI_CEC, self._on_hdmi_cec_notification
@@ -181,24 +166,17 @@ class BraviaQuadHdmiCecSwitch(SwitchEntity):
 class BraviaQuadAutoStandbySwitch(SwitchEntity):
     """Representation of a Bravia Quad auto standby switch."""
 
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_translation_key = "auto_standby"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the auto standby switch."""
         self._client = client
-        self._entry = entry
-        self._attr_has_entity_name = True
-        self._attr_name = "Auto Standby"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_auto_standby"
         self._attr_is_on = client.auto_standby == AUTO_STANDBY_ON
-        self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
         self._client.register_notification_callback(
             FEATURE_AUTO_STANDBY, self._on_auto_standby_notification
@@ -239,25 +217,17 @@ class BraviaQuadAutoStandbySwitch(SwitchEntity):
 class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
     """Representation of a Bravia Quad voice enhancer switch."""
 
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_translation_key = "voice_enhancer"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the voice enhancer switch."""
         self._client = client
-        self._entry = entry
-        self._attr_has_entity_name = True
-        self._attr_name = "Voice Enhancer"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_voice_enhancer"
-        # Initialize from client's current state
         self._attr_is_on = client.voice_enhancer == VOICE_ENHANCER_ON
-        self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
         # Register for voice enhancer notifications
         self._client.register_notification_callback(
@@ -299,25 +269,17 @@ class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
 class BraviaQuadSoundFieldSwitch(SwitchEntity):
     """Representation of a Bravia Quad sound field switch."""
 
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_translation_key = "sound_field"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the sound field switch."""
         self._client = client
-        self._entry = entry
-        self._attr_has_entity_name = True
-        self._attr_name = "Sound Field"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_sound_field"
-        # Initialize from client's current state
         self._attr_is_on = client.sound_field == SOUND_FIELD_ON
-        self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
         # Register for sound field notifications
         self._client.register_notification_callback(
@@ -359,25 +321,17 @@ class BraviaQuadSoundFieldSwitch(SwitchEntity):
 class BraviaQuadNightModeSwitch(SwitchEntity):
     """Representation of a Bravia Quad night mode switch."""
 
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
     _attr_should_poll = False
+    _attr_translation_key = "night_mode"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the night mode switch."""
         self._client = client
-        self._entry = entry
-        self._attr_has_entity_name = True
-        self._attr_name = "Night Mode"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_night_mode"
-        # Initialize from client's current state
         self._attr_is_on = client.night_mode == NIGHT_MODE_ON
-        self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
         # Register for night mode notifications
         self._client.register_notification_callback(

@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.const import EntityCategory
-from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import (
     CONF_HAS_SUBWOOFER,
@@ -17,6 +16,7 @@ from .const import (
     MIN_BASS_LEVEL,
     MIN_REAR_LEVEL,
 )
+from .helpers import get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -55,28 +55,20 @@ async def async_setup_entry(
 class BraviaQuadVolumeNumber(NumberEntity):
     """Representation of a Bravia Quad volume control."""
 
+    _attr_has_entity_name = True
+    _attr_mode = NumberMode.SLIDER
+    _attr_native_max_value = MAX_VOLUME
+    _attr_native_min_value = 0
+    _attr_native_step = 1
     _attr_should_poll = False
+    _attr_translation_key = "volume"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the volume number entity."""
         self._client = client
-        self._entry = entry
-        self._attr_has_entity_name = True
-        self._attr_name = "Volume"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_volume"
-        self._attr_native_min_value = 0
-        self._attr_native_max_value = MAX_VOLUME
-        self._attr_native_step = 1
-        # Initialize from client's current state
         self._attr_native_value = client.volume
-        self._attr_mode = NumberMode.SLIDER
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
         # Register for volume notifications
         self._client.register_notification_callback(
@@ -115,29 +107,21 @@ class BraviaQuadVolumeNumber(NumberEntity):
 class BraviaQuadRearLevelNumber(NumberEntity):
     """Representation of a Bravia Quad rear level control."""
 
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_mode = NumberMode.SLIDER
+    _attr_native_max_value = MAX_REAR_LEVEL
+    _attr_native_min_value = MIN_REAR_LEVEL
+    _attr_native_step = 1
     _attr_should_poll = False
+    _attr_translation_key = "rear_level"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the rear level number entity."""
         self._client = client
-        self._entry = entry
-        self._attr_has_entity_name = True
-        self._attr_name = "Rear Level"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_rear_level"
-        self._attr_native_min_value = MIN_REAR_LEVEL
-        self._attr_native_max_value = MAX_REAR_LEVEL
-        self._attr_native_step = 1
-        # Initialize from client's current state
         self._attr_native_value = client.rear_level
-        self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_mode = NumberMode.SLIDER
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
         # Register for rear level notifications
         self._client.register_notification_callback(
@@ -176,29 +160,21 @@ class BraviaQuadRearLevelNumber(NumberEntity):
 class BraviaQuadBassLevelNumber(NumberEntity):
     """Representation of a Bravia Quad bass level control."""
 
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_mode = NumberMode.SLIDER
+    _attr_native_max_value = MAX_BASS_LEVEL
+    _attr_native_min_value = MIN_BASS_LEVEL
+    _attr_native_step = 1
     _attr_should_poll = False
+    _attr_translation_key = "bass_level"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the bass level number entity."""
         self._client = client
-        self._entry = entry
-        self._attr_has_entity_name = True
-        self._attr_name = "Bass Level"
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_bass_level_slider"
-        self._attr_native_min_value = MIN_BASS_LEVEL
-        self._attr_native_max_value = MAX_BASS_LEVEL
-        self._attr_native_step = 1
-        # Initialize from client's current state
         self._attr_native_value = client.bass_level
-        self._attr_entity_category = EntityCategory.CONFIG
-        self._attr_mode = NumberMode.SLIDER
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, entry.entry_id)},
-            name=entry.data.get("name", "Bravia Quad"),
-            manufacturer="Sony",
-            model="Bravia Quad",
-            configuration_url=f"http://{entry.data['host']}",
-        )
+        self._attr_device_info = get_device_info(entry)
 
         # Register for bass level notifications
         self._client.register_notification_callback(
