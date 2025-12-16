@@ -48,6 +48,8 @@ FEATURE_SOUND_FIELD = "audio.soundfield"
 FEATURE_NIGHT_MODE = "audio.nightmode"
 FEATURE_HDMI_CEC = "hdmi.cec"
 FEATURE_AUTO_STANDBY = "system.autostandby"
+FEATURE_DRC = "audio.drangecomp"
+FEATURE_AAV = "audio.aav"
 
 # Power states
 POWER_ON = "on"
@@ -73,6 +75,15 @@ HDMI_CEC_OFF = "off"
 AUTO_STANDBY_ON = "on"
 AUTO_STANDBY_OFF = "off"
 
+# Dynamic Range Compressor states
+DRC_AUTO = "auto"
+DRC_ON = "on"
+DRC_OFF = "off"
+
+# Advanced Auto Volume states
+AAV_ON = "on"
+AAV_OFF = "off"
+
 # Input options mapping (display name -> value)
 INPUT_OPTIONS = {
     "TV (eARC)": "tv",
@@ -94,3 +105,13 @@ BASS_LEVEL_OPTIONS = {
 
 # Reverse mapping (value -> display name)
 BASS_LEVEL_VALUES_TO_OPTIONS = {v: k for k, v in BASS_LEVEL_OPTIONS.items()}
+
+# Dynamic Range Compressor options mapping (display name -> value)
+DRC_OPTIONS = {
+    "Auto": "auto",
+    "On": "on",
+    "Off": "off",
+}
+
+# Reverse mapping (value -> display name)
+DRC_VALUES_TO_OPTIONS = {v: k for k, v in DRC_OPTIONS.items()}
