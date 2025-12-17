@@ -42,3 +42,18 @@ repos:
     hooks:
       - id: yamllint
         exclude: ^config/
+
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy
+        entry: uv run mypy custom_components/bravia_quad
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: pytest
+        name: pytest
+        entry: uv run pytest tests/ -v --tb=short
+        language: system
+        pass_filenames: false
+        always_run: true

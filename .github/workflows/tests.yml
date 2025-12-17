@@ -1,4 +1,4 @@
-name: Lint
+name: Tests
 
 on:
   push:
@@ -11,8 +11,8 @@ on:
 permissions: {}
 
 jobs:
-  ruff:
-    name: "Ruff"
+  pytest:
+    name: "pytest"
     runs-on: "ubuntu-latest"
     if: github.repository == 'steamEngineer/bravia-quad-homeassistant'
     steps:
@@ -27,8 +27,8 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
 
-      - name: Lint
-        run: uvx ruff check .
+      - name: Install dependencies
+        run: uv sync --dev
 
-      - name: Format
-        run: uvx ruff format . --check
+      - name: Run tests
+        run: uv run pytest tests/ -v --tb=short

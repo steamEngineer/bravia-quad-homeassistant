@@ -12,6 +12,7 @@ permissions: {}
 jobs:
   validate:
     runs-on: ubuntu-latest
+    if: github.repository == 'steamEngineer/bravia-quad-homeassistant'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
