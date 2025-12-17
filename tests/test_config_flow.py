@@ -486,3 +486,161 @@ async def test_dhcp_discovery_already_configured_by_mac(
 
     # Verify the host was updated to the new IP
     assert existing_entry.data[CONF_HOST] == TEST_HOST
+
+
+async def test_zeroconf_confirm_connection_error(hass: HomeAssistant) -> None:
+    """Test zeroconf confirm step handles connection errors."""
+    discovery_info = ZeroconfServiceInfo(
+        ip_address=make_ip_address(TEST_HOST),
+        ip_addresses=[make_ip_address(TEST_HOST)],
+        port=7000,
+        hostname="bravia-quad.local",
+        type="_airplay._tcp.local.",
+        name="Living Room._airplay._tcp.local.",
+        properties={
+            "model": "Bravia Theatre Quad",
+            "deviceid": "60:FF:9E:12:34:56",
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "zeroconf_confirm"
+
+    with patch(
+        "custom_components.bravia_quad.config_flow.BraviaQuadClient",
+        autospec=True,
+    ) as client_mock:
+        client = client_mock.return_value
+        client.async_connect = AsyncMock(side_effect=OSError("Connection refused"))
+        client.async_disconnect = AsyncMock()
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={}
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "cannot_connect"}
+
+
+async def test_zeroconf_confirm_unknown_error(hass: HomeAssistant) -> None:
+    """Test zeroconf confirm step handles unknown errors."""
+    discovery_info = ZeroconfServiceInfo(
+        ip_address=make_ip_address(TEST_HOST),
+        ip_addresses=[make_ip_address(TEST_HOST)],
+        port=7000,
+        hostname="bravia-quad.local",
+        type="_airplay._tcp.local.",
+        name="Living Room._airplay._tcp.local.",
+        properties={
+            "model": "Bravia Theatre Quad",
+            "deviceid": "60:FF:9E:12:34:56",
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "zeroconf_confirm"
+
+    with patch(
+        "custom_components.bravia_quad.config_flow.BraviaQuadClient",
+        autospec=True,
+    ) as client_mock:
+        client = client_mock.return_value
+        client.async_connect = AsyncMock()
+        client.async_disconnect = AsyncMock()
+        client.async_test_connection = AsyncMock(side_effect=RuntimeError("Unexpected"))
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={}
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "unknown"}
+
+
+async def test_dhcp_confirm_connection_error(hass: HomeAssistant) -> None:
+    """Test DHCP confirm step handles connection errors."""
+    discovery_info = DhcpServiceInfo(
+        ip=TEST_HOST,
+        hostname="bravia-quad",
+        macaddress="60ff9e123456",
+    )
+
+    with patch(
+        "custom_components.bravia_quad.config_flow.BraviaQuadClient",
+        autospec=True,
+    ) as client_mock:
+        client = client_mock.return_value
+        client.async_connect = AsyncMock()
+        client.async_disconnect = AsyncMock()
+        client.async_test_connection = AsyncMock(return_value=True)
+
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": SOURCE_DHCP}, data=discovery_info
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "dhcp_confirm"
+
+    with patch(
+        "custom_components.bravia_quad.config_flow.BraviaQuadClient",
+        autospec=True,
+    ) as client_mock:
+        client = client_mock.return_value
+        client.async_connect = AsyncMock(side_effect=OSError("Connection refused"))
+        client.async_disconnect = AsyncMock()
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={}
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "cannot_connect"}
+
+
+async def test_dhcp_confirm_unknown_error(hass: HomeAssistant) -> None:
+    """Test DHCP confirm step handles unknown errors."""
+    discovery_info = DhcpServiceInfo(
+        ip=TEST_HOST,
+        hostname="bravia-quad",
+        macaddress="60ff9e123456",
+    )
+
+    with patch(
+        "custom_components.bravia_quad.config_flow.BraviaQuadClient",
+        autospec=True,
+    ) as client_mock:
+        client = client_mock.return_value
+        client.async_connect = AsyncMock()
+        client.async_disconnect = AsyncMock()
+        client.async_test_connection = AsyncMock(return_value=True)
+
+        result = await hass.config_entries.flow.async_init(
+            DOMAIN, context={"source": SOURCE_DHCP}, data=discovery_info
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "dhcp_confirm"
+
+    with patch(
+        "custom_components.bravia_quad.config_flow.BraviaQuadClient",
+        autospec=True,
+    ) as client_mock:
+        client = client_mock.return_value
+        client.async_connect = AsyncMock()
+        client.async_disconnect = AsyncMock()
+        client.async_test_connection = AsyncMock(side_effect=RuntimeError("Unexpected"))
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={}
+        )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["errors"] == {"base": "unknown"}
