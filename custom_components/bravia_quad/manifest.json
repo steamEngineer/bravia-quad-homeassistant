@@ -16,7 +16,8 @@
     {
       "type": "_airplay._tcp.local.",
       "properties": {
-        "manufacturer": "sony*"
+        "manufacturer": "sony*",
+        "model": "bravia theatre*"
       }
     }
   ]

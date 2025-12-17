@@ -276,29 +276,6 @@ async def test_zeroconf_discovery(hass: HomeAssistant) -> None:
     assert result["result"].unique_id == TEST_MAC_FORMATTED
 
 
-async def test_zeroconf_discovery_not_bravia(hass: HomeAssistant) -> None:
-    """Test zeroconf discovery aborts for non-Bravia devices."""
-    discovery_info = ZeroconfServiceInfo(
-        ip_address=make_ip_address(TEST_HOST),
-        ip_addresses=[make_ip_address(TEST_HOST)],
-        port=7000,
-        hostname="other-device.local",
-        type="_airplay._tcp.local.",
-        name="Other Device._airplay._tcp.local.",
-        properties={
-            "model": "Other Speaker",
-            "deviceid": "AA:BB:CC:DD:EE:FF",
-        },
-    )
-
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
-    )
-
-    assert result["type"] is FlowResultType.ABORT
-    assert result["reason"] == "not_bravia_quad"
-
-
 async def test_zeroconf_discovery_migrates_existing_ip_entry(
     hass: HomeAssistant,
 ) -> None:

@@ -115,11 +115,6 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         """Handle a flow initialized by zeroconf discovery."""
         _LOGGER.debug("Bravia Quad device found via zeroconf: %s", discovery_info)
 
-        # Check if this is a Bravia Theatre Quad device
-        model = discovery_info.properties.get("model", "")
-        if "bravia" not in model.lower():
-            return self.async_abort(reason="not_bravia_quad")
-
         # Get device information from AirPlay properties
         self._discovered_host = discovery_info.host
         self._discovered_name = discovery_info.name.split("._")[
