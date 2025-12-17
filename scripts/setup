@@ -14,7 +14,7 @@ if ! command -v uv &> /dev/null; then
 fi
 
 # Create venv and install dev dependencies from pyproject.toml
-uv sync --dev
+uv sync --all-extras --dev
 
 # Install pre-commit hooks
 uv run pre-commit install
