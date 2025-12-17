@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.const import CONF_HOST, CONF_NAME, Platform
+from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.bravia_quad.const import (
@@ -18,6 +19,16 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from homeassistant.core import HomeAssistant
+
+
+def get_entity_id_by_unique_id_suffix(
+    entity_registry: er.EntityRegistry, suffix: str
+) -> str | None:
+    """Get entity_id from the registry by unique_id suffix."""
+    for entry in entity_registry.entities.values():
+        if entry.unique_id and entry.unique_id.endswith(suffix):
+            return entry.entity_id
+    return None
 
 
 @pytest.fixture(autouse=True)

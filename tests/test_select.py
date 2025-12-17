@@ -8,6 +8,8 @@ import pytest
 from homeassistant.const import ATTR_ENTITY_ID, Platform
 from homeassistant.helpers import entity_registry as er
 
+from .conftest import get_entity_id_by_unique_id_suffix
+
 if TYPE_CHECKING:
     from unittest.mock import MagicMock
 
@@ -20,16 +22,6 @@ SELECT_DOMAIN = "select"
 def platforms() -> list[Platform]:
     """Return the platforms to be loaded for this test."""
     return [Platform.SELECT]
-
-
-def get_entity_id_by_unique_id_suffix(
-    entity_registry: er.EntityRegistry, suffix: str
-) -> str | None:
-    """Get entity_id from the registry by unique_id suffix."""
-    for entry in entity_registry.entities.values():
-        if entry.unique_id and entry.unique_id.endswith(suffix):
-            return entry.entity_id
-    return None
 
 
 @pytest.mark.usefixtures("init_integration")
