@@ -43,11 +43,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         raise ConfigEntryNotReady from err
 
     # Create device registry entry
-    # Use unique_id (MAC or host) as device identifier
+    # Use unique_id (MAC or host) as device identifier, fall back to entry_id
     device_registry = dr.async_get(hass)
+    unique_id = entry.unique_id or entry.entry_id
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.unique_id)} if entry.unique_id else set(),
+        identifiers={(DOMAIN, unique_id)},
         connections=(
             {(dr.CONNECTION_NETWORK_MAC, entry.data[CONF_MAC])}
             if CONF_MAC in entry.data
