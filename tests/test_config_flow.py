@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 TEST_HOST = "192.168.1.100"
-TEST_MAC = "60:ff:9e:12:34:56"
 TEST_MAC_FORMATTED = "60:ff:9e:12:34:56"
 
 
