@@ -51,6 +51,7 @@ async def test_switch_entities(
         "_voice_enhancer": "off",
         "_sound_field": "off",
         "_night_mode": "off",
+        "_advanced_auto_volume": "off",
     }
 
     for suffix, expected_state in expected_entities.items():
@@ -330,3 +331,51 @@ async def test_night_mode_switch_turn_off(
     )
 
     mock_bravia_quad_client.async_set_night_mode.assert_called_once_with("off")
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_advanced_auto_volume_switch_turn_on(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test turning on the advanced auto volume switch."""
+    entity_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, "_advanced_auto_volume"
+    )
+    assert entity_id is not None
+
+    mock_bravia_quad_client.async_set_aav.return_value = True
+
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_ON,
+        {ATTR_ENTITY_ID: entity_id},
+        blocking=True,
+    )
+
+    mock_bravia_quad_client.async_set_aav.assert_called_once_with("on")
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_advanced_auto_volume_switch_turn_off(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test turning off the advanced auto volume switch."""
+    entity_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, "_advanced_auto_volume"
+    )
+    assert entity_id is not None
+
+    mock_bravia_quad_client.async_set_aav.return_value = True
+
+    await hass.services.async_call(
+        SWITCH_DOMAIN,
+        SERVICE_TURN_OFF,
+        {ATTR_ENTITY_ID: entity_id},
+        blocking=True,
+    )
+
+    mock_bravia_quad_client.async_set_aav.assert_called_once_with("off")

@@ -143,6 +143,11 @@ def mock_bravia_quad_client() -> Generator[MagicMock]:
         client.async_set_auto_standby = AsyncMock(return_value=True)
         client.auto_standby = "off"
 
+        # Advanced Auto Volume
+        client.async_get_aav = AsyncMock(return_value="off")
+        client.async_set_aav = AsyncMock(return_value=True)
+        client.aav = "off"
+
         # Send command (for bluetooth pairing)
         client.async_send_command = AsyncMock(return_value={"value": "ACK"})
 
