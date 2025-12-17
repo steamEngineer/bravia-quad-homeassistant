@@ -145,6 +145,10 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         self.context["title_placeholders"] = {"name": self._discovered_name}
         return await self.async_step_zeroconf_confirm()
 
+    # NOTE: DHCP discovery is implemented but not yet enabled in manifest.json.
+    # Before enabling, verify that the DHCP MAC address matches the Zeroconf
+    # deviceid to ensure proper unique_id migration between discovery methods.
+    # To enable: add "dhcp" to manifest dependencies and add dhcp matcher config.
     async def async_step_dhcp(
         self, discovery_info: DhcpServiceInfo
     ) -> ConfigFlowResult:
