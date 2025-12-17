@@ -275,6 +275,51 @@ async def test_zeroconf_discovery(hass: HomeAssistant) -> None:
     assert result["result"].unique_id == TEST_MAC_FORMATTED
 
 
+async def test_zeroconf_discovery_without_deviceid(hass: HomeAssistant) -> None:
+    """Test zeroconf discovery uses IP-based unique_id when deviceid is missing."""
+    discovery_info = ZeroconfServiceInfo(
+        ip_address=make_ip_address(TEST_HOST),
+        ip_addresses=[make_ip_address(TEST_HOST)],
+        port=7000,
+        hostname="bravia-quad.local",
+        type="_airplay._tcp.local.",
+        name="Living Room._airplay._tcp.local.",
+        properties={
+            "model": "Bravia Theatre Quad",
+            # No deviceid property
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "zeroconf_confirm"
+
+    with patch(
+        "custom_components.bravia_quad.config_flow.BraviaQuadClient",
+        autospec=True,
+    ) as client_mock:
+        client = client_mock.return_value
+        client.async_connect = AsyncMock()
+        client.async_disconnect = AsyncMock()
+        client.async_test_connection = AsyncMock(return_value=True)
+        client.async_detect_subwoofer = AsyncMock(return_value=True)
+
+        result = await hass.config_entries.flow.async_configure(
+            result["flow_id"], user_input={}
+        )
+        await hass.async_block_till_done()
+
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["data"][CONF_HOST] == TEST_HOST
+    # No MAC in data when deviceid is missing
+    assert CONF_MAC not in result["data"]
+    # Unique ID falls back to host IP
+    assert result["result"].unique_id == TEST_HOST
+
+
 async def test_zeroconf_discovery_migrates_existing_ip_entry(
     hass: HomeAssistant,
 ) -> None:
