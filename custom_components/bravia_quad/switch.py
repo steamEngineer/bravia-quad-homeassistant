@@ -385,7 +385,7 @@ class BraviaQuadAdvancedAutoVolumeSwitch(SwitchEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the Advanced Auto Volume switch."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_advanced_auto_volume"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_advanced_auto_volume"
         # Initialize from client's current state
         self._attr_is_on = client.aav == AAV_ON
         self._attr_device_info = get_device_info(entry)

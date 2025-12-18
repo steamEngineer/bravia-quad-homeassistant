@@ -12,7 +12,7 @@ from homeassistant.helpers import device_registry as dr
 
 from .bravia_quad_client import BraviaQuadClient
 from .const import CONF_HAS_SUBWOOFER, DOMAIN
-from .helpers import get_device_info
+from .helpers import get_device_info, migrate_entity_unique_ids
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -31,6 +31,9 @@ PLATFORMS: list[Platform] = [
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Bravia Quad from a config entry."""
     hass.data.setdefault(DOMAIN, {})
+
+    # Migrate legacy entity unique_ids (entry_id -> unique_id format)
+    migrate_entity_unique_ids(hass, entry)
 
     # Create client instance
     client = BraviaQuadClient(entry.data["host"], entry.data.get("name", "Bravia Quad"))

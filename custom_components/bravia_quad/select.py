@@ -229,7 +229,7 @@ class BraviaQuadDynamicRangeCompressorSelect(SelectEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the Dynamic Range Compressor select entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_drc"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_drc"
         self._attr_options = list(DRC_OPTIONS.keys())
         # Initialize current option from client's current DRC state
         current_drc_value = client.drc

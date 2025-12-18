@@ -97,19 +97,14 @@ class BraviaQuadDetectSubwooferButton(ButtonEntity):
                     "bass_level_select" if has_subwoofer else "bass_level_slider"
                 )
 
-                # Try both old (entry_id based) and new (unique_id based) formats
-                for base_id in (self._entry.unique_id, self._entry.entry_id):
-                    old_unique_id = f"{DOMAIN}_{base_id}_{entity_suffix}"
-                    if old_entity := entity_registry.async_get_entity_id(
-                        platform,
-                        DOMAIN,
-                        old_unique_id,
-                    ):
-                        _LOGGER.debug(
-                            "Removing stale bass level entity: %s", old_entity
-                        )
-                        entity_registry.async_remove(old_entity)
-                        break
+                old_unique_id = f"{DOMAIN}_{self._entry.unique_id}_{entity_suffix}"
+                if old_entity := entity_registry.async_get_entity_id(
+                    platform,
+                    DOMAIN,
+                    old_unique_id,
+                ):
+                    _LOGGER.debug("Removing stale bass level entity: %s", old_entity)
+                    entity_registry.async_remove(old_entity)
 
                 # Update entry data with new detection result
                 new_data = {**self._entry.data, CONF_HAS_SUBWOOFER: has_subwoofer}
