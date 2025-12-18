@@ -13,13 +13,14 @@ from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.bravia_quad.const import CONF_HAS_SUBWOOFER, DOMAIN
+from custom_components.bravia_quad.const import CONF_HAS_SUBWOOFER, CONF_MODEL, DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 TEST_HOST = "192.168.1.100"
 TEST_MAC_FORMATTED = "60:ff:9e:12:34:56"
+TEST_MODEL = "Bravia Theatre Quad"
 
 
 async def test_user_flow_success(hass: HomeAssistant) -> None:
@@ -271,6 +272,7 @@ async def test_zeroconf_discovery(hass: HomeAssistant) -> None:
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_HOST] == TEST_HOST
     assert result["data"][CONF_MAC] == TEST_MAC_FORMATTED
+    assert result["data"][CONF_MODEL] == TEST_MODEL
     # Unique ID should be MAC address
     assert result["result"].unique_id == TEST_MAC_FORMATTED
 
@@ -523,6 +525,49 @@ async def test_dhcp_discovery_already_configured_by_mac(
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_DHCP}, data=discovery_info
+    )
+
+    # Flow should abort - already configured
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+
+    # Verify the host was updated to the new IP
+    assert existing_entry.data[CONF_HOST] == TEST_HOST
+
+
+async def test_zeroconf_discovery_already_configured_by_mac(
+    hass: HomeAssistant,
+) -> None:
+    """Test zeroconf discovery updates host when already configured by MAC."""
+    # Create existing entry with MAC as unique_id
+    existing_entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bravia Quad",
+        data={
+            CONF_HOST: "192.168.1.50",  # Old IP
+            CONF_NAME: "Bravia Quad",
+            CONF_MAC: TEST_MAC_FORMATTED,
+            CONF_HAS_SUBWOOFER: True,
+        },
+        unique_id=TEST_MAC_FORMATTED,
+    )
+    existing_entry.add_to_hass(hass)
+
+    discovery_info = ZeroconfServiceInfo(
+        ip_address=make_ip_address(TEST_HOST),  # New IP
+        ip_addresses=[make_ip_address(TEST_HOST)],
+        port=7000,
+        hostname="bravia-quad.local",
+        type="_airplay._tcp.local.",
+        name="Living Room._airplay._tcp.local.",
+        properties={
+            "model": "Bravia Theatre Quad",
+            "deviceid": "60:FF:9E:12:34:56",
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
     )
 
     # Flow should abort - already configured
