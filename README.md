@@ -260,6 +260,48 @@ The easiest way to develop and test this integration is using the included DevCo
 4. Once the container is ready, run `scripts/develop` to start Home Assistant with the integration loaded.
 5. Access Home Assistant at [http://localhost:8123](http://localhost:8123).
 
+### DevContainer Network Modes
+
+The devcontainer supports two network modes that can be switched using VS Code tasks:
+
+#### Bridge Mode (Default)
+- **Isolated network**: Container runs on Docker's default bridge network
+- **Port forwarding**: Ports are forwarded from container to host
+- **Use case**: General development, when mDNS/zeroconf discovery is not needed
+
+#### Host Mode
+- **Shared network**: Container shares the host's network stack directly
+- **Direct access**: Container can access host network interfaces and services
+- **Use case**: **Required for mDNS/zeroconf discovery** - allows the container to receive multicast DNS traffic from devices on your local network
+
+**Why Host Mode for mDNS/Zeroconf?**
+
+mDNS (multicast DNS) and zeroconf discovery rely on Layer 2 network traffic (multicast packets). When using bridge networking (the docker default), these multicast packets are isolated from the Docker network and cannot reach the container. Host networking allows the container to directly access the host's network interfaces, enabling it to receive and respond to mDNS broadcasts from devices like the Bravia Quad system.
+
+**Switching Network Modes:**
+
+1. Open the Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
+2. Type "Tasks: Run Task"
+3. Select either:
+   - **"Devcontainer: Set Host Network Mode"** - For mDNS/zeroconf development
+   - **"Devcontainer: Set Bridge Network Mode"** - For default isolated networking
+4. **Rebuild the devcontainer** for changes to take effect:
+   - Command Palette → "Dev Containers: Rebuild Container"
+
+> **⚠️ Important for Docker Desktop Users:**
+>
+> If you encounter errors when switching to host mode, you may need to enable host networking in Docker Desktop first:
+>
+> 1. Sign in to your Docker account in Docker Desktop
+> 2. Navigate to **Settings**
+> 3. Under the **Resources** tab, select **Network**
+> 4. Check the **Enable host networking** option
+> 5. Select **Apply and restart**
+>
+> See the [Docker Desktop host networking documentation](https://docs.docker.com/engine/network/drivers/host/#docker-desktop) for more details.
+>
+> **Note:** Host networking requires Docker Desktop version 4.34 or later and only works with Linux containers. It also doesn't work with Enhanced Container Isolation enabled.
+
 ### Available Scripts
 
 | Script | Description |
