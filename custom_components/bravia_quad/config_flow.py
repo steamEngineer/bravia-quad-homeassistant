@@ -13,19 +13,18 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import format_mac
 
 from .bravia_quad_client import BraviaQuadClient
+from .const import CONF_HAS_SUBWOOFER, CONF_MODEL, DEFAULT_NAME, DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
     from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
-
-from .const import CONF_HAS_SUBWOOFER, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_HOST): str,
-        vol.Optional(CONF_NAME, default="Bravia Quad"): str,
+        vol.Optional(CONF_NAME, default=DEFAULT_NAME): str,
     }
 )
 
@@ -35,7 +34,7 @@ async def validate_input(data: dict[str, Any]) -> dict[str, Any]:
     host = data[CONF_HOST]
 
     # Create a temporary client to test connection
-    client = BraviaQuadClient(host, data.get(CONF_NAME, "Bravia Quad"))
+    client = BraviaQuadClient(host, data.get(CONF_NAME, DEFAULT_NAME))
 
     try:
         _LOGGER.info("Attempting to connect to Bravia Quad at %s", host)
@@ -65,7 +64,7 @@ async def validate_input(data: dict[str, Any]) -> dict[str, Any]:
         await client.async_disconnect()
 
     return {
-        "title": data.get(CONF_NAME, "Bravia Quad"),
+        "title": data.get(CONF_NAME, DEFAULT_NAME),
         CONF_HAS_SUBWOOFER: has_subwoofer,
     }
 
@@ -80,6 +79,7 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         self._discovered_host: str | None = None
         self._discovered_name: str | None = None
         self._discovered_mac: str | None = None
+        self._discovered_model: str | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -123,6 +123,8 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         device_id = discovery_info.properties.get("deviceid", "")
         if device_id:
             self._discovered_mac = format_mac(device_id)
+        # Capture model from Zeroconf properties (e.g., "Bravia Theatre Quad")
+        self._discovered_model = discovery_info.properties.get("model")
 
         # Check if there's an existing entry configured with IP as unique_id
         # If so, migrate it to use MAC as unique_id
@@ -157,7 +159,7 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
 
         self._discovered_host = discovery_info.ip
         self._discovered_mac = format_mac(discovery_info.macaddress)
-        self._discovered_name = discovery_info.hostname or "Bravia Quad"
+        self._discovered_name = discovery_info.hostname or DEFAULT_NAME
 
         # Check if there's an existing entry configured with IP as unique_id
         # If so, migrate it to use MAC as unique_id
@@ -215,13 +217,13 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
                     CONF_HAS_SUBWOOFER: info[CONF_HAS_SUBWOOFER],
                 }
                 return self.async_create_entry(
-                    title=self._discovered_name or "Bravia Quad",
+                    title=self._discovered_name or DEFAULT_NAME,
                     data=entry_data,
                 )
 
         return self.async_show_form(
             step_id="dhcp_confirm",
-            description_placeholders={"name": self._discovered_name or "Bravia Quad"},
+            description_placeholders={"name": self._discovered_name or DEFAULT_NAME},
             errors=errors,
         )
 
@@ -252,14 +254,16 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
                 }
                 if self._discovered_mac:
                     entry_data[CONF_MAC] = self._discovered_mac
+                if self._discovered_model:
+                    entry_data[CONF_MODEL] = self._discovered_model
                 return self.async_create_entry(
-                    title=self._discovered_name or "Bravia Quad",
+                    title=self._discovered_name or DEFAULT_NAME,
                     data=entry_data,
                 )
 
         return self.async_show_form(
             step_id="zeroconf_confirm",
-            description_placeholders={"name": self._discovered_name or "Bravia Quad"},
+            description_placeholders={"name": self._discovered_name or DEFAULT_NAME},
             errors=errors,
         )
 
