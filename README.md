@@ -7,6 +7,7 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 
 ## Features
 
+- **Auto-Discovery**: Automatically discovers Bravia Quad devices on your network using mDNS/zeroconf - no manual IP configuration needed
 - **Power Control**: Turn your Bravia Quad system on and off
 - **Volume Control**: Adjust main volume from 0-100 via a number entity
 - **Rear Level Control**: Adjust rear speaker level from -10-10 via a number entity
@@ -49,9 +50,22 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 
 ## Configuration
 
+### Auto-Discovery
+
+The integration supports automatic discovery of Bravia Quad devices on your local network using mDNS/zeroconf. When you add the integration, Home Assistant will automatically detect any Bravia Quad devices and prompt you to configure them.
+
+**If your device is not automatically discovered**, you can add it manually by:
+
+1. Selecting "Bravia Quad" from the integration list
+2. Choosing "Configure" or "Submit" when prompted
+3. Entering the device's IP address manually
+4. Optionally providing a friendly name (defaults to "Bravia Quad")
+
+### Manual Configuration
+
 During setup, you will be prompted to provide:
 
-- **IP Address**: The IP address of your Bravia Quad device
+- **IP Address**: The IP address of your Bravia Quad device (required if not auto-discovered)
 - **Name** (optional): A friendly name for the device (defaults to "Bravia Quad")
 
 The integration will automatically test the connection by sending a power status request. Make sure:
