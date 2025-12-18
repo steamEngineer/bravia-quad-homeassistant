@@ -20,11 +20,16 @@ def get_device_info(entry: ConfigEntry) -> DeviceInfo:
     if CONF_MAC in entry.data:
         connections.add((CONNECTION_NETWORK_MAC, entry.data[CONF_MAC]))
 
-    # Build identifiers - unique_id should always be set, but handle None
-    unique_id = entry.unique_id or entry.entry_id
+    # unique_id must be set - all config flows set it via MAC address or host
+    if entry.unique_id is None:
+        msg = (
+            f"Config entry {entry.entry_id} has no unique_id. "
+            "This indicates a bug in the config flow."
+        )
+        raise ValueError(msg)
 
     return DeviceInfo(
-        identifiers={(DOMAIN, unique_id)},
+        identifiers={(DOMAIN, entry.unique_id)},
         connections=connections,
         name=entry.data.get("name", "Bravia Quad"),
         manufacturer="Sony",
