@@ -6,6 +6,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from homeassistant.const import CONF_MAC
+from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 
@@ -18,24 +19,67 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
-def migrate_entity_unique_ids(hass: HomeAssistant, entry: ConfigEntry) -> None:
+def migrate_legacy_identifiers(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """
-    Migrate entity unique_ids from entry_id to unique_id format.
+    Migrate legacy device and entity identifiers from entry_id to unique_id format.
 
     This handles legacy entries created before discovery support was added,
-    where entities used entry.entry_id instead of entry.unique_id.
+    where devices and entities used entry.entry_id instead of entry.unique_id.
     """
     if entry.unique_id is None or entry.unique_id == entry.entry_id:
         # No migration needed - either no unique_id or they're the same
         return
 
+    # Type narrowing: unique_id is now confirmed to be str
+    unique_id: str = entry.unique_id
+
+    _migrate_device(hass, entry.entry_id, unique_id)
+    _migrate_entities(hass, entry.entry_id, unique_id)
+
+
+def _migrate_device(hass: HomeAssistant, entry_id: str, unique_id: str) -> None:
+    """Migrate device identifier from entry_id to unique_id format."""
+    device_registry = dr.async_get(hass)
+
+    old_identifier = (DOMAIN, entry_id)
+    new_identifier = (DOMAIN, unique_id)
+
+    # Find old device with entry_id-based identifier
+    old_device = device_registry.async_get_device(identifiers={old_identifier})
+    if old_device is None:
+        return
+
+    # Check if new device already exists
+    new_device = device_registry.async_get_device(identifiers={new_identifier})
+
+    if new_device:
+        # Both devices exist - remove the old one (entities already migrated)
+        _LOGGER.debug("Removing legacy device %s (new device exists)", old_device.id)
+        device_registry.async_remove_device(old_device.id)
+    else:
+        # Migrate the old device to new identifier
+        _LOGGER.debug(
+            "Migrating device identifier: %s -> %s",
+            old_identifier,
+            new_identifier,
+        )
+        device_registry.async_update_device(
+            old_device.id,
+            new_identifiers={new_identifier},
+        )
+
+    _LOGGER.info("Migrated device from legacy identifier format")
+
+
+def _migrate_entities(hass: HomeAssistant, entry_id: str, unique_id: str) -> None:
+    """Migrate entity unique_ids from entry_id to unique_id format."""
     entity_registry = er.async_get(hass)
-    old_prefix = f"{DOMAIN}_{entry.entry_id}_"
-    new_prefix = f"{DOMAIN}_{entry.unique_id}_"
+    old_prefix = f"{DOMAIN}_{entry_id}_"
+    new_prefix = f"{DOMAIN}_{unique_id}_"
     migrated_count = 0
 
     # Get all entities for this config entry
-    entities = er.async_entries_for_config_entry(entity_registry, entry.entry_id)
+    entities = er.async_entries_for_config_entry(entity_registry, entry_id)
 
     for entity_entry in entities:
         if not entity_entry.unique_id.startswith(old_prefix):
