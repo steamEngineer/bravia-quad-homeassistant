@@ -6,12 +6,12 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from homeassistant.const import Platform
+from homeassistant.const import CONF_NAME, Platform
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 
 from .bravia_quad_client import BraviaQuadClient
-from .const import CONF_HAS_SUBWOOFER, DOMAIN
+from .const import CONF_HAS_SUBWOOFER, DEFAULT_NAME, DOMAIN
 from .helpers import get_device_info, migrate_legacy_identifiers
 
 if TYPE_CHECKING:
@@ -36,7 +36,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     migrate_legacy_identifiers(hass, entry)
 
     # Create client instance
-    client = BraviaQuadClient(entry.data["host"], entry.data.get("name", "Bravia Quad"))
+    client = BraviaQuadClient(
+        entry.data["host"], entry.data.get(CONF_NAME, DEFAULT_NAME)
+    )
 
     # Test connection - raise ConfigEntryNotReady on failure
     try:

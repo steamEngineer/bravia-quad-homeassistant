@@ -5,12 +5,12 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from homeassistant.const import CONF_MAC
+from homeassistant.const import CONF_MAC, CONF_NAME
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
 
-from .const import DOMAIN
+from .const import CONF_MODEL, DEFAULT_MODEL, DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -140,8 +140,8 @@ def get_device_info(entry: ConfigEntry) -> DeviceInfo:
     return DeviceInfo(
         identifiers={(DOMAIN, entry.unique_id)},
         connections=connections,
-        name=entry.data.get("name", "Bravia Quad"),
+        name=entry.data.get(CONF_NAME, DEFAULT_MODEL),
         manufacturer="Sony",
-        model="Bravia Quad",
+        model=entry.data.get(CONF_MODEL, DEFAULT_MODEL),
         configuration_url=f"http://{entry.data['host']}",
     )
