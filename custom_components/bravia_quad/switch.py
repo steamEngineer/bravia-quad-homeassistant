@@ -75,7 +75,7 @@ class BraviaQuadPowerSwitch(SwitchEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the switch."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_power"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_power"
         self._attr_is_on = client.power_state == POWER_ON
         self._attr_device_info = get_device_info(entry)
 
@@ -127,7 +127,7 @@ class BraviaQuadHdmiCecSwitch(SwitchEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the HDMI CEC switch."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_hdmi_cec"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_hdmi_cec"
         self._attr_is_on = client.hdmi_cec == HDMI_CEC_ON
         self._attr_device_info = get_device_info(entry)
 
@@ -178,7 +178,7 @@ class BraviaQuadAutoStandbySwitch(SwitchEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the auto standby switch."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_auto_standby"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_auto_standby"
         self._attr_is_on = client.auto_standby == AUTO_STANDBY_ON
         self._attr_device_info = get_device_info(entry)
 
@@ -229,7 +229,7 @@ class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the voice enhancer switch."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_voice_enhancer"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_voice_enhancer"
         self._attr_is_on = client.voice_enhancer == VOICE_ENHANCER_ON
         self._attr_device_info = get_device_info(entry)
 
@@ -281,7 +281,7 @@ class BraviaQuadSoundFieldSwitch(SwitchEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the sound field switch."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_sound_field"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_sound_field"
         self._attr_is_on = client.sound_field == SOUND_FIELD_ON
         self._attr_device_info = get_device_info(entry)
 
@@ -333,7 +333,7 @@ class BraviaQuadNightModeSwitch(SwitchEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the night mode switch."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_night_mode"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_night_mode"
         self._attr_is_on = client.night_mode == NIGHT_MODE_ON
         self._attr_device_info = get_device_info(entry)
 
@@ -385,7 +385,7 @@ class BraviaQuadAdvancedAutoVolumeSwitch(SwitchEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the Advanced Auto Volume switch."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_advanced_auto_volume"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_advanced_auto_volume"
         # Initialize from client's current state
         self._attr_is_on = client.aav == AAV_ON
         self._attr_device_info = get_device_info(entry)

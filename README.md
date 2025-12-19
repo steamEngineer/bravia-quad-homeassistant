@@ -7,6 +7,7 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 
 ## Features
 
+- **Auto-Discovery**: Automatically discovers Bravia Quad devices on your network using mDNS/zeroconf - no manual IP configuration needed
 - **Power Control**: Turn your Bravia Quad system on and off
 - **Volume Control**: Adjust main volume from 0-100 via a number entity
 - **Rear Level Control**: Adjust rear speaker level from -10-10 via a number entity
@@ -24,6 +25,22 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 - **Auto Volume**: Toggle Auto Volume on/off - polls for state changes
 - **Real-time Updates**: Automatically receives and processes notifications from the device for all state changes (where supported)
 - **Device Integration**: All entities are properly nested under a single device in Home Assistant
+
+## Device Compatibility
+
+The following table details device compatibility with this Home Assistant integration. Compatibility is based on whether devices use the same TCP/IP protocol (port 33336) as the BRAVIA Theatre Quad.
+
+| Device Name | Model | Compatibility |
+|-------------|-------|---------------|
+| BRAVIA Theatre Quad | HT-A9M2 | Compatible |
+| BRAVIA Theatre Bar 6 | HT-B600/BD60 | Untested |
+| BRAVIA Theatre Bar 8 | HT-A8000 | Untested |
+| BRAVIA Theatre Bar 9 | HT-A9000 | Untested |
+| BRAVIA Theatre System 6 | HT-S60 | Untested |
+| HT-AX7 | HT-AX7 | Untested |
+| HT-S2000 | HT-S2000 | Untested |
+
+*Note: Devices marked as "Untested" may be compatible if they use the same TCP/IP control protocol. **Compatibility testing and feedback from users with these devices is welcome!**. For a complete list of Sony Sound Bars & Home Theatre Systems, see the [Sony Support Article](https://www.sony.com/electronics/support/articles/00305900).*
 
 ## Installation
 
@@ -49,9 +66,22 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 
 ## Configuration
 
+### Auto-Discovery
+
+The integration supports automatic discovery of Bravia Quad devices on your local network using mDNS/zeroconf. When you add the integration, Home Assistant will automatically detect any Bravia Quad devices and prompt you to configure them.
+
+**If your device is not automatically discovered**, you can add it manually by:
+
+1. Selecting "Bravia Quad" from the integration list
+2. Choosing "Configure" or "Submit" when prompted
+3. Entering the device's IP address manually
+4. Optionally providing a friendly name (defaults to "Bravia Quad")
+
+### Manual Configuration
+
 During setup, you will be prompted to provide:
 
-- **IP Address**: The IP address of your Bravia Quad device
+- **IP Address**: The IP address of your Bravia Quad device (required if not auto-discovered)
 - **Name** (optional): A friendly name for the device (defaults to "Bravia Quad")
 
 The integration will automatically test the connection by sending a power status request. Make sure:
@@ -259,6 +289,48 @@ The easiest way to develop and test this integration is using the included DevCo
 3. Open the repository in VS Code and click "Reopen in Container" when prompted (or use the command palette: `Dev Containers: Reopen in Container`).
 4. Once the container is ready, run `scripts/develop` to start Home Assistant with the integration loaded.
 5. Access Home Assistant at [http://localhost:8123](http://localhost:8123).
+
+### DevContainer Network Modes
+
+The devcontainer supports two network modes that can be switched using VS Code tasks:
+
+#### Bridge Mode (Default)
+- **Isolated network**: Container runs on Docker's default bridge network
+- **Port forwarding**: Ports are forwarded from container to host
+- **Use case**: General development, when mDNS/zeroconf discovery is not needed
+
+#### Host Mode
+- **Shared network**: Container shares the host's network stack directly
+- **Direct access**: Container can access host network interfaces and services
+- **Use case**: **Required for mDNS/zeroconf discovery** - allows the container to receive multicast DNS traffic from devices on your local network
+
+**Why Host Mode for mDNS/Zeroconf?**
+
+mDNS (multicast DNS) and zeroconf discovery rely on Layer 2 network traffic (multicast packets). When using bridge networking (the docker default), these multicast packets are isolated from the Docker network and cannot reach the container. Host networking allows the container to directly access the host's network interfaces, enabling it to receive and respond to mDNS broadcasts from devices like the Bravia Quad system.
+
+**Switching Network Modes:**
+
+1. Open the Command Palette (Ctrl+Shift+P / Cmd+Shift+P)
+2. Type "Tasks: Run Task"
+3. Select either:
+   - **"Devcontainer: Set Host Network Mode"** - For mDNS/zeroconf development
+   - **"Devcontainer: Set Bridge Network Mode"** - For default isolated networking
+4. **Rebuild the devcontainer** for changes to take effect:
+   - Command Palette → "Dev Containers: Rebuild Container"
+
+> **⚠️ Important for Docker Desktop Users:**
+>
+> If you encounter errors when switching to host mode, you may need to enable host networking in Docker Desktop first:
+>
+> 1. Sign in to your Docker account in Docker Desktop
+> 2. Navigate to **Settings**
+> 3. Under the **Resources** tab, select **Network**
+> 4. Check the **Enable host networking** option
+> 5. Select **Apply and restart**
+>
+> See the [Docker Desktop host networking documentation](https://docs.docker.com/engine/network/drivers/host/#docker-desktop) for more details.
+>
+> **Note:** Host networking requires Docker Desktop version 4.34 or later and only works with Linux containers. It also doesn't work with Enhanced Container Isolation enabled.
 
 ### Available Scripts
 

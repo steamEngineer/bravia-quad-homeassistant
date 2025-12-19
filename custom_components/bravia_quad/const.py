@@ -6,8 +6,13 @@ DOMAIN = "bravia_quad"
 
 # Configuration keys
 CONF_HAS_SUBWOOFER = "has_subwoofer"
+CONF_MODEL = "model"
 
-# Default port for Bravia Quad TCP communication
+# Default values
+DEFAULT_MODEL = "Bravia Theatre"
+DEFAULT_NAME = "Bravia Theatre"
+
+# Default port for Bravia Theatre TCP communication
 DEFAULT_PORT = 33336
 
 # Timeout for TCP operations

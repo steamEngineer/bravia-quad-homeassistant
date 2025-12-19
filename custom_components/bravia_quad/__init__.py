@@ -6,12 +6,13 @@ import asyncio
 import logging
 from typing import TYPE_CHECKING
 
-from homeassistant.const import Platform
+from homeassistant.const import CONF_NAME, Platform
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 
 from .bravia_quad_client import BraviaQuadClient
-from .const import CONF_HAS_SUBWOOFER, DOMAIN
+from .const import CONF_HAS_SUBWOOFER, DEFAULT_NAME, DOMAIN
+from .helpers import get_device_info, migrate_legacy_identifiers
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -31,8 +32,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Bravia Quad from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
+    # Migrate legacy device and entity identifiers (entry_id -> unique_id format)
+    migrate_legacy_identifiers(hass, entry)
+
     # Create client instance
-    client = BraviaQuadClient(entry.data["host"], entry.data.get("name", "Bravia Quad"))
+    client = BraviaQuadClient(
+        entry.data["host"], entry.data.get(CONF_NAME, DEFAULT_NAME)
+    )
 
     # Test connection - raise ConfigEntryNotReady on failure
     try:
@@ -42,15 +48,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await client.async_disconnect()
         raise ConfigEntryNotReady from err
 
-    # Create device registry entry
+    # Create device registry entry using shared helper
     device_registry = dr.async_get(hass)
+    device_info = get_device_info(entry)
     device_registry.async_get_or_create(
         config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.entry_id)},
-        name=entry.data.get("name", "Bravia Quad"),
-        manufacturer="Sony",
-        model="Bravia Quad",
-        configuration_url=f"http://{entry.data['host']}",
+        **device_info,
     )
 
     # Store client in hass.data

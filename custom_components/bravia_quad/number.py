@@ -66,7 +66,7 @@ class BraviaQuadVolumeNumber(NumberEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the volume number entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_volume"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_volume"
         self._attr_native_value = client.volume
         self._attr_device_info = get_device_info(entry)
 
@@ -119,7 +119,7 @@ class BraviaQuadRearLevelNumber(NumberEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the rear level number entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_rear_level"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_rear_level"
         self._attr_native_value = client.rear_level
         self._attr_device_info = get_device_info(entry)
 
@@ -172,7 +172,7 @@ class BraviaQuadBassLevelNumber(NumberEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the bass level number entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_bass_level_slider"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_bass_level_slider"
         self._attr_native_value = client.bass_level
         self._attr_device_info = get_device_info(entry)
 
