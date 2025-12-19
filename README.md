@@ -5,6 +5,15 @@
 
 A Home Assistant custom integration for controlling Sony Bravia Quad home theater systems via TCP/IP.
 
+_This integration may also be compatible with other Bravia audio devices - see the [Device Compatibility](#device-compatibility) section for details._
+
+<details>
+<summary>View Device Page Screenshot</summary>
+
+<img src="assets/pictures/bravia_quad_device_page.png" alt="Bravia Quad Device Page in Home Assistant" width="500">
+
+</details>
+
 ## Features
 
 - **Auto-Discovery**: Automatically discovers Bravia Quad devices on your network using mDNS/zeroconf - no manual IP configuration needed
@@ -30,15 +39,15 @@ A Home Assistant custom integration for controlling Sony Bravia Quad home theate
 
 The following table details device compatibility with this Home Assistant integration. Compatibility is based on whether devices use the same TCP/IP protocol (port 33336) as the BRAVIA Theatre Quad.
 
-| Device Name | Model | Compatibility |
-|-------------|-------|---------------|
-| BRAVIA Theatre Quad | HT-A9M2 | Compatible |
-| BRAVIA Theatre Bar 6 | HT-B600/BD60 | Untested |
-| BRAVIA Theatre Bar 8 | HT-A8000 | Untested |
-| BRAVIA Theatre Bar 9 | HT-A9000 | Untested |
-| BRAVIA Theatre System 6 | HT-S60 | Untested |
-| HT-AX7 | HT-AX7 | Untested |
-| HT-S2000 | HT-S2000 | Untested |
+| Device Name | Model | Connection Type | Compatibility |
+|-------------|-------|-----------------|---------------|
+| BRAVIA Theatre Quad | HT-A9M2 | WiFi | Compatible |
+| BRAVIA Theatre Bar 8 | HT-A8000 | WiFi | Untested |
+| BRAVIA Theatre Bar 9 | HT-A9000 | WiFi | Untested |
+| BRAVIA Theatre Bar 6 | HT-B600/BD60 | Bluetooth | Incompatible |
+| BRAVIA Theatre System 6 | HT-S60 | Bluetooth | Incompatible |
+| HT-AX7 | HT-AX7 | Bluetooth | Incompatible |
+| HT-S2000 | HT-S2000 | Bluetooth | Incompatible |
 
 *Note: Devices marked as "Untested" may be compatible if they use the same TCP/IP control protocol. **Compatibility testing and feedback from users with these devices is welcome!**. For a complete list of Sony Sound Bars & Home Theatre Systems, see the [Sony Support Article](https://www.sony.com/electronics/support/articles/00305900).*
 
