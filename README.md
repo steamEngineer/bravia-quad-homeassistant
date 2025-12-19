@@ -5,6 +5,15 @@
 
 A Home Assistant custom integration for controlling Sony Bravia Quad home theater systems via TCP/IP.
 
+_This integration may also be compatible with other Bravia audio devices - see the [Device Compatibility](#device-compatibility) section for details._
+
+<details>
+<summary>View Device Page Screenshot</summary>
+
+<img src="assets/pictures/bravia_quad_device_page.png" alt="Bravia Quad Device Page in Home Assistant" width="500">
+
+</details>
+
 ## Features
 
 - **Auto-Discovery**: Automatically discovers Bravia Quad devices on your network using mDNS/zeroconf - no manual IP configuration needed
