@@ -1,0 +1,35 @@
+---
+name: PR Labels
+
+# yamllint disable-line rule:truthy
+on:
+  pull_request:
+    types: [opened, labeled, unlabeled, synchronize]
+  workflow_call:
+
+jobs:
+  pr_labels:
+    name: 🏷️ Verify PR has label
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔍 Verify PR has at least one label
+        uses: mheap/github-action-required-labels@v5
+        with:
+          mode: minimum
+          count: 1
+          labels: |
+            breaking-change
+            new-feature
+            feature
+            bug
+            bugfix
+            fix
+            enhancement
+            refactor
+            performance
+            maintenance
+            chore
+            ci
+            documentation
+            dependencies
+            skip-changelog
