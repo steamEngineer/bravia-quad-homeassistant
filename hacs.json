@@ -1,5 +1,8 @@
 {
   "name": "Bravia Quad",
   "homeassistant": "2025.12.0",
-  "hacs": "2.0.5"
+  "hacs": "2.0.5",
+  "render_readme": true,
+  "zip_release": true,
+  "filename": "bravia_quad.zip"
 }

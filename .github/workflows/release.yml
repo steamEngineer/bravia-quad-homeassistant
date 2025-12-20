@@ -115,3 +115,14 @@ jobs:
             Install via HACS or download from the [releases page](https://github.com/${{ github.repository }}/releases).
           draft: false
           prerelease: false
+
+      - name: 📦 Create release archive
+        working-directory: custom_components/bravia_quad
+        run: zip -r ../../bravia_quad.zip .
+
+      - name: 📎 Upload release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          files: bravia_quad.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
