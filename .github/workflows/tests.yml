@@ -31,4 +31,4 @@ jobs:
         run: uv sync --dev
 
       - name: Run tests
-        run: uvx pytest tests/ -v --tb=short
+        run: uv run pytest tests/ -v --tb=short
