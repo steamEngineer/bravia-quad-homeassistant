@@ -1,0 +1,24 @@
+name: Publish prerelease
+
+on:
+  workflow_dispatch:
+    inputs:
+      identifier:
+        description: alpha | beta | rc
+        required: true
+        default: beta
+
+permissions:
+  contents: write
+
+jobs:
+  prerelease:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: release-drafter/release-drafter@v6
+        with:
+          publish: true
+          prerelease: true
+          prerelease-identifier: ${{ inputs.identifier }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,71 @@
+name: Release Drafter
+
+on:
+  push:
+    branches:
+      - main
+
+template: |
+  ## What's Changed
+
+  $CHANGES
+
+categories:
+  - title: "🚨 Breaking changes"
+    labels:
+      - "breaking-change"
+  - title: "✨ New features"
+    labels:
+      - "new-feature"
+      - "feature"
+  - title: "🐛 Bug fixes"
+    labels:
+      - "bugfix"
+      - "bug"
+      - "fix"
+  - title: "🚀 Enhancements"
+    labels:
+      - "enhancement"
+      - "refactor"
+      - "performance"
+  - title: "🧰 Maintenance"
+    labels:
+      - "maintenance"
+      - "chore"
+      - "ci"
+  - title: "📚 Documentation"
+    labels:
+      - "documentation"
+      - "docs"
+  - title: "⬆️ Dependency updates"
+    labels:
+      - "dependencies"
+
+change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
+name-template: "v$RESOLVED_VERSION"
+tag-template: "v$RESOLVED_VERSION"
+version-resolver:
+  major:
+    labels:
+      - "major"
+      - "breaking-change"
+  minor:
+    labels:
+      - "minor"
+      - "new-feature"
+      - "feature"
+  patch:
+    labels:
+      - "bugfix"
+      - "bug"
+      - "fix"
+      - "chore"
+      - "ci"
+      - "dependencies"
+      - "documentation"
+      - "enhancement"
+      - "performance"
+  default: patch
+
+exclude-labels:
+  - "skip-changelog"
