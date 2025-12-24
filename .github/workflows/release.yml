@@ -14,107 +14,28 @@ on:
 
 jobs:
   release:
+    name: 📦 Create release archive
     runs-on: ubuntu-latest
-    if: github.repository == 'steamEngineer/bravia-quad-homeassistant'
     permissions:
       contents: write
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
+      - name: ⤵️ Checkout code
+        uses: actions/checkout@v6
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
-        with:
-          version: "latest"
-
-      - name: Validate version format
+      - name: 🔢 Get version from tag
+        id: version
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          if ! echo "$VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "Error: Version must be in format X.Y.Z (e.g., 1.0.1)"
-            exit 1
-          fi
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
 
-      - name: Update version in manifest.json
+      - name: 📝 Update manifest.json version
+        run: python3 scripts/update_manifest_version.py ${{ steps.version.outputs.version }}
+
+      - name: 🔍 Verify version
         run: |
-          VERSION="${{ github.event.inputs.version }}"
-          cd custom_components/bravia_quad
-          python3 << EOF
-          import json
-          import os
-
-          version = os.environ['VERSION']
-          with open('manifest.json', 'r') as f:
-              manifest = json.load(f)
-
-          manifest['version'] = version
-
-          with open('manifest.json', 'w') as f:
-              json.dump(manifest, f, indent=2)
-              f.write('\n')
-          EOF
-        env:
-          VERSION: ${{ github.event.inputs.version }}
-
-      - name: Update version in pyproject.toml
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          python3 << EOF
-          import os
-          import re
-
-          version = os.environ['VERSION']
-          with open('pyproject.toml', 'r') as f:
-              content = f.read()
-
-          # Replace the version line while preserving everything else
-          content = re.sub(
-              r'^version = .*$',
-              f'version = "{version}"',
-              content,
-              flags=re.MULTILINE
-          )
-
-          with open('pyproject.toml', 'w') as f:
-              f.write(content)
-          EOF
-        env:
-          VERSION: ${{ github.event.inputs.version }}
-
-      - name: Regenerate uv.lock
-        run: uv lock
-
-      - name: Commit version updates
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add custom_components/bravia_quad/manifest.json pyproject.toml uv.lock
-          git commit -m "Bump version to ${{ github.event.inputs.version }}" || exit 0
-          git push
-
-      - name: Create Git tag
-        run: |
-          VERSION="${{ github.event.inputs.version }}"
-          git tag -a "v$VERSION" -m "Release v$VERSION"
-          git push origin "v$VERSION"
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          tag_name: v${{ github.event.inputs.version }}
-          name: Release v${{ github.event.inputs.version }}
-          body: |
-            ## Changes
-
-            ${{ github.event.inputs.release_notes || 'See commit history for details.' }}
-
-            ## Installation
-
-            Install via HACS or download from the [releases page](https://github.com/${{ github.repository }}/releases).
-          draft: false
-          prerelease: false
+          echo "=== manifest.json ==="
+          grep '"version"' custom_components/bravia_quad/manifest.json
 
       - name: 📦 Create release archive
         working-directory: custom_components/bravia_quad
