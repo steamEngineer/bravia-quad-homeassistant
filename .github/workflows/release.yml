@@ -1,16 +1,8 @@
 name: Release
 
 on:
-  workflow_dispatch:
-    inputs:
-      version:
-        description: 'Version number (e.g., 1.0.1)'
-        required: true
-        type: string
-      release_notes:
-        description: 'Release notes (optional)'
-        required: false
-        type: string
+  release:
+    types: [published]
 
 jobs:
   release:
