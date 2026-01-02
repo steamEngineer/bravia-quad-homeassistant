@@ -27,8 +27,38 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 )
 
 
+async def validate_connection(host: str) -> None:
+    """
+    Validate we can connect to the device (without subwoofer detection).
+
+    Used for reauth flow where we only need to verify connectivity.
+    """
+    client = BraviaQuadClient(host, DEFAULT_NAME)
+
+    try:
+        _LOGGER.debug("Validating connection to Bravia Quad at %s", host)
+        await client.async_connect()
+        await asyncio.sleep(0.2)
+
+        result = await client.async_test_connection()
+        if not result:
+            msg = "No response from device. Please verify IP control is enabled."
+            raise CannotConnectError(msg)
+
+    except (OSError, TimeoutError) as err:
+        _LOGGER.exception("Connection error")
+        msg = f"Error connecting to device: {err}"
+        raise CannotConnectError(msg) from err
+    finally:
+        await client.async_disconnect()
+
+
 async def validate_input(host: str) -> dict[str, Any]:
-    """Validate the user input allows us to connect and detect subwoofer."""
+    """
+    Validate the user input allows us to connect and detect subwoofer.
+
+    Used for initial setup where we need full device detection.
+    """
     # Create a temporary client to test connection
     client = BraviaQuadClient(host, DEFAULT_NAME)
 
@@ -222,7 +252,7 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             new_host = user_input[CONF_HOST]
             try:
-                await validate_input(new_host)
+                await validate_connection(new_host)
             except CannotConnectError:
                 errors["base"] = "cannot_connect"
             except Exception:
