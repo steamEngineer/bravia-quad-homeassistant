@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
-from homeassistant.const import CONF_HOST, CONF_MAC, CONF_NAME
+from homeassistant.const import CONF_HOST, CONF_MAC
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import format_mac
 
@@ -16,7 +16,6 @@ from .bravia_quad_client import BraviaQuadClient
 from .const import CONF_HAS_SUBWOOFER, CONF_MODEL, DEFAULT_NAME, DOMAIN
 
 if TYPE_CHECKING:
-    from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
     from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -24,17 +23,14 @@ _LOGGER = logging.getLogger(__name__)
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
         vol.Required(CONF_HOST): str,
-        vol.Optional(CONF_NAME, default=DEFAULT_NAME): str,
     }
 )
 
 
-async def validate_input(data: dict[str, Any]) -> dict[str, Any]:
+async def validate_input(host: str) -> dict[str, Any]:
     """Validate the user input allows us to connect and detect subwoofer."""
-    host = data[CONF_HOST]
-
     # Create a temporary client to test connection
-    client = BraviaQuadClient(host, data.get(CONF_NAME, DEFAULT_NAME))
+    client = BraviaQuadClient(host, DEFAULT_NAME)
 
     try:
         _LOGGER.info("Attempting to connect to Bravia Quad at %s", host)
@@ -64,7 +60,6 @@ async def validate_input(data: dict[str, Any]) -> dict[str, Any]:
         await client.async_disconnect()
 
     return {
-        "title": data.get(CONF_NAME, DEFAULT_NAME),
         CONF_HAS_SUBWOOFER: has_subwoofer,
     }
 
@@ -73,6 +68,7 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for Bravia Quad."""
 
     VERSION = 1
+    MINOR_VERSION = 1
 
     def __init__(self) -> None:
         """Initialize the config flow."""
@@ -80,33 +76,62 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         self._discovered_name: str | None = None
         self._discovered_mac: str | None = None
         self._discovered_model: str | None = None
+        self._user_host: str | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Handle the initial step."""
+        """Handle the initial step where user enters IP address."""
         errors: dict[str, str] = {}
 
         if user_input is not None:
+            host = user_input[CONF_HOST]
+            self._user_host = host
             try:
-                info = await validate_input(user_input)
+                await validate_input(host)
             except CannotConnectError:
                 errors["base"] = "cannot_connect"
             except Exception:
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
-                await self.async_set_unique_id(user_input[CONF_HOST])
-                self._abort_if_unique_id_configured()
-                # Add subwoofer detection result to entry data
-                entry_data = {
-                    **user_input,
-                    CONF_HAS_SUBWOOFER: info[CONF_HAS_SUBWOOFER],
-                }
-                return self.async_create_entry(title=info["title"], data=entry_data)
+                # Connection validated, proceed to confirmation step
+                return await self.async_step_user_confirm()
 
         return self.async_show_form(
             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+        )
+
+    async def async_step_user_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle user confirmation after successful connection test."""
+        errors: dict[str, str] = {}
+
+        if user_input is not None:
+            if (host := self._user_host) is None:
+                return self.async_abort(reason="unknown")
+            try:
+                info = await validate_input(host)
+            except CannotConnectError:
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected exception during confirmation")
+                errors["base"] = "unknown"
+            else:
+                # Use host as unique_id; discovery will migrate to MAC when available
+                await self.async_set_unique_id(host)
+                self._abort_if_unique_id_configured()
+                entry_data = {
+                    CONF_HOST: host,
+                    CONF_HAS_SUBWOOFER: info[CONF_HAS_SUBWOOFER],
+                }
+                return self.async_create_entry(title=DEFAULT_NAME, data=entry_data)
+
+        return self.async_show_form(
+            step_id="user_confirm",
+            description_placeholders={"host": self._user_host or ""},
+            errors=errors,
         )
 
     async def async_step_zeroconf(
@@ -147,86 +172,6 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         self.context["title_placeholders"] = {"name": self._discovered_name}
         return await self.async_step_zeroconf_confirm()
 
-    # NOTE: DHCP discovery is implemented but not yet enabled in manifest.json.
-    # Before enabling, verify that the DHCP MAC address matches the Zeroconf
-    # deviceid to ensure proper unique_id migration between discovery methods.
-    # To enable: add "dhcp" to manifest dependencies and add dhcp matcher config.
-    async def async_step_dhcp(
-        self, discovery_info: DhcpServiceInfo
-    ) -> ConfigFlowResult:
-        """Handle a flow initialized by DHCP discovery."""
-        _LOGGER.debug("Bravia Quad device found via DHCP: %s", discovery_info)
-
-        self._discovered_host = discovery_info.ip
-        self._discovered_mac = format_mac(discovery_info.macaddress)
-        self._discovered_name = discovery_info.hostname or DEFAULT_NAME
-
-        # Check if there's an existing entry configured with IP as unique_id
-        # If so, migrate it to use MAC as unique_id
-        for entry in self._async_current_entries():
-            if entry.unique_id == self._discovered_host:
-                # Migrate from IP-based to MAC-based unique_id
-                self.hass.config_entries.async_update_entry(
-                    entry,
-                    unique_id=self._discovered_mac,
-                    data={**entry.data, CONF_MAC: self._discovered_mac},
-                )
-                return self.async_abort(reason="already_configured")
-
-        # Use MAC address as unique ID
-        await self.async_set_unique_id(self._discovered_mac)
-        self._abort_if_unique_id_configured(updates={CONF_HOST: self._discovered_host})
-
-        # Test if this is actually a Bravia Quad by trying to connect
-        try:
-            client = BraviaQuadClient(self._discovered_host, self._discovered_name)
-            await client.async_connect()
-            result = await client.async_test_connection()
-            await client.async_disconnect()
-            if not result:
-                return self.async_abort(reason="not_bravia_quad")
-        except (OSError, TimeoutError):
-            return self.async_abort(reason="cannot_connect")
-
-        self.context["title_placeholders"] = {"name": self._discovered_name}
-        return await self.async_step_dhcp_confirm()
-
-    async def async_step_dhcp_confirm(
-        self, user_input: dict[str, Any] | None = None
-    ) -> ConfigFlowResult:
-        """Handle user confirmation of DHCP discovered device."""
-        errors: dict[str, str] = {}
-
-        if user_input is not None:
-            data = {
-                CONF_HOST: self._discovered_host,
-                CONF_NAME: self._discovered_name,
-            }
-            try:
-                info = await validate_input(data)
-            except CannotConnectError:
-                errors["base"] = "cannot_connect"
-            except Exception:
-                _LOGGER.exception("Unexpected exception during DHCP confirmation")
-                errors["base"] = "unknown"
-            else:
-                entry_data = {
-                    CONF_HOST: self._discovered_host,
-                    CONF_NAME: self._discovered_name,
-                    CONF_MAC: self._discovered_mac,
-                    CONF_HAS_SUBWOOFER: info[CONF_HAS_SUBWOOFER],
-                }
-                return self.async_create_entry(
-                    title=self._discovered_name or DEFAULT_NAME,
-                    data=entry_data,
-                )
-
-        return self.async_show_form(
-            step_id="dhcp_confirm",
-            description_placeholders={"name": self._discovered_name or DEFAULT_NAME},
-            errors=errors,
-        )
-
     async def async_step_zeroconf_confirm(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
@@ -234,22 +179,18 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         errors: dict[str, str] = {}
 
         if user_input is not None:
-            # Test connection to the discovered device
-            data = {
-                CONF_HOST: self._discovered_host,
-                CONF_NAME: self._discovered_name,
-            }
+            if (host := self._discovered_host) is None:
+                return self.async_abort(reason="unknown")
             try:
-                info = await validate_input(data)
+                info = await validate_input(host)
             except CannotConnectError:
                 errors["base"] = "cannot_connect"
             except Exception:
                 _LOGGER.exception("Unexpected exception during zeroconf confirmation")
                 errors["base"] = "unknown"
             else:
-                entry_data = {
-                    CONF_HOST: self._discovered_host,
-                    CONF_NAME: self._discovered_name,
+                entry_data: dict[str, Any] = {
+                    CONF_HOST: host,
                     CONF_HAS_SUBWOOFER: info[CONF_HAS_SUBWOOFER],
                 }
                 if self._discovered_mac:
@@ -264,6 +205,46 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="zeroconf_confirm",
             description_placeholders={"name": self._discovered_name or DEFAULT_NAME},
+            errors=errors,
+        )
+
+    async def async_step_reauth(self, _entry_data: dict[str, Any]) -> ConfigFlowResult:
+        """Handle re-authentication when the device becomes unreachable."""
+        return await self.async_step_reauth_confirm()
+
+    async def async_step_reauth_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Handle user input for re-authentication."""
+        errors: dict[str, str] = {}
+        reauth_entry = self._get_reauth_entry()
+
+        if user_input is not None:
+            new_host = user_input[CONF_HOST]
+            try:
+                await validate_input(new_host)
+            except CannotConnectError:
+                errors["base"] = "cannot_connect"
+            except Exception:
+                _LOGGER.exception("Unexpected exception during reauth")
+                errors["base"] = "unknown"
+            else:
+                # Update the config entry with the new host
+                return self.async_update_reload_and_abort(
+                    reauth_entry,
+                    data_updates={CONF_HOST: new_host},
+                )
+
+        return self.async_show_form(
+            step_id="reauth_confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        CONF_HOST, default=reauth_entry.data.get(CONF_HOST)
+                    ): str,
+                }
+            ),
+            description_placeholders={"name": reauth_entry.title},
             errors=errors,
         )
 

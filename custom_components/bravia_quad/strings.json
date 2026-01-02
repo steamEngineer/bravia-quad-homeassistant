@@ -2,30 +2,37 @@
   "config": {
     "step": {
       "user": {
-        "title": "Bravia Quad Setup",
-        "description": "Enter the IP address of your Bravia Quad device and optionally a friendly name.",
+        "title": "Bravia Theatre setup",
+        "description": "Enter the IP address of your Bravia Theatre device.",
         "data": {
-          "host": "IP Address",
-          "name": "Name"
+          "host": "IP address"
         }
       },
+      "user_confirm": {
+        "title": "Confirm setup",
+        "description": "Connection to {host} was successful. Do you want to add this device?"
+      },
       "zeroconf_confirm": {
-        "title": "Discovered Bravia Quad",
+        "title": "Discovered Bravia Theatre",
         "description": "Do you want to set up {name}?"
       },
-      "dhcp_confirm": {
-        "title": "Discovered Bravia Quad",
-        "description": "Do you want to set up {name}?"
+      "reauth_confirm": {
+        "title": "Re-authenticate {name}",
+        "description": "The device is no longer reachable. Update the IP address if it has changed.",
+        "data": {
+          "host": "IP address"
+        }
       }
     },
     "error": {
-      "cannot_connect": "Unable to connect to the Bravia Quad device. Please verify:\n- The IP address is correct\n- IP control is enabled on the device\n- Port 33336 is accessible",
+      "cannot_connect": "Unable to connect to the Bravia Theatre device. Please verify:\n- The IP address is correct\n- IP control is enabled on the device\n- Port 33336 is accessible",
       "unknown": "Unexpected error occurred"
     },
     "abort": {
       "already_configured": "Device is already configured",
-      "not_bravia_quad": "Discovered device is not a Bravia Quad speaker",
-      "cannot_connect": "Could not connect to device"
+      "not_bravia_quad": "Discovered device is not a Bravia Theatre speaker",
+      "cannot_connect": "Could not connect to device",
+      "reauth_successful": "Re-authentication was successful"
     }
   },
   "entity": {
@@ -85,7 +92,7 @@
   },
   "exceptions": {
     "reload_failed": {
-      "message": "Integration reload failed. Please reload manually via Settings > Devices & Services > Bravia Quad > Reload"
+      "message": "Integration reload failed. Please reload manually via Settings > Devices & Services > Bravia Theatre > Reload"
     },
     "detection_failed": {
       "message": "Failed to detect subwoofer due to a connection error. Please try again."
