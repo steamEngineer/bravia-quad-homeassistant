@@ -24,7 +24,7 @@
     },
     "abort": {
       "already_configured": "Device is already configured",
-      "not_bravia_quad": "Discovered device is not a Bravia Quad speaker",
+      "not_bravia_theatre": "Discovered device is not a Bravia Theatre speaker",
       "cannot_connect": "Could not connect to device"
     }
   },
