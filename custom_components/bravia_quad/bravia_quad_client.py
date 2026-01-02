@@ -101,10 +101,10 @@ class BraviaQuadClient:
             # Give the connection a moment to stabilize
             await asyncio.sleep(0.1)
             self._connected = True
-            _LOGGER.info("Connected to Bravia Quad at %s:%s", self.host, self.port)
+            _LOGGER.debug("Connected to Bravia Quad at %s:%s", self.host, self.port)
         except OSError as err:
             self._connected = False
-            _LOGGER.exception("Failed to connect to Bravia Quad")
+            _LOGGER.debug("Failed to connect to Bravia Quad at %s: %s", self.host, err)
             raise ConnectionError(str(err)) from err
 
     async def async_disconnect(self) -> None:
