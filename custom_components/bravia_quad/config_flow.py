@@ -107,6 +107,7 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         self._discovered_mac: str | None = None
         self._discovered_model: str | None = None
         self._user_host: str | None = None
+        self._user_has_subwoofer: bool | None = None
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -118,14 +119,15 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
             host = user_input[CONF_HOST]
             self._user_host = host
             try:
-                await validate_input(host)
+                info = await validate_input(host)
             except CannotConnectError:
                 errors["base"] = "cannot_connect"
             except Exception:
                 _LOGGER.exception("Unexpected exception")
                 errors["base"] = "unknown"
             else:
-                # Connection validated, proceed to confirmation step
+                # Store result and proceed to confirmation step
+                self._user_has_subwoofer = info[CONF_HAS_SUBWOOFER]
                 return await self.async_step_user_confirm()
 
         return self.async_show_form(
@@ -136,32 +138,23 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Handle user confirmation after successful connection test."""
-        errors: dict[str, str] = {}
-
         if user_input is not None:
-            if (host := self._user_host) is None:
-                return self.async_abort(reason="unknown")
-            try:
-                info = await validate_input(host)
-            except CannotConnectError:
-                errors["base"] = "cannot_connect"
-            except Exception:
-                _LOGGER.exception("Unexpected exception during confirmation")
-                errors["base"] = "unknown"
-            else:
-                # Use host as unique_id; discovery will migrate to MAC when available
-                await self.async_set_unique_id(host)
-                self._abort_if_unique_id_configured()
-                entry_data = {
-                    CONF_HOST: host,
-                    CONF_HAS_SUBWOOFER: info[CONF_HAS_SUBWOOFER],
-                }
-                return self.async_create_entry(title=DEFAULT_NAME, data=entry_data)
+            if (host := self._user_host) is None or self._user_has_subwoofer is None:
+                # Session lost, restart the flow
+                return await self.async_step_user()
+
+            # Use host as unique_id; discovery will migrate to MAC when available
+            await self.async_set_unique_id(host)
+            self._abort_if_unique_id_configured()
+            entry_data = {
+                CONF_HOST: host,
+                CONF_HAS_SUBWOOFER: self._user_has_subwoofer,
+            }
+            return self.async_create_entry(title=DEFAULT_NAME, data=entry_data)
 
         return self.async_show_form(
             step_id="user_confirm",
             description_placeholders={"host": self._user_host or ""},
-            errors=errors,
         )
 
     async def async_step_zeroconf(
