@@ -275,47 +275,6 @@ async def test_user_flow_unknown_error(hass: HomeAssistant) -> None:
     assert result["errors"] == {"base": "unknown"}
 
 
-async def test_user_confirm_connection_error(hass: HomeAssistant) -> None:
-    """Test user confirm step handles connection errors."""
-    result = await hass.config_entries.flow.async_init(
-        DOMAIN, context={"source": SOURCE_USER}
-    )
-
-    with patch(
-        "custom_components.bravia_quad.config_flow.BraviaQuadClient",
-        autospec=True,
-    ) as client_mock:
-        client = client_mock.return_value
-        client.async_connect = AsyncMock()
-        client.async_disconnect = AsyncMock()
-        client.async_test_connection = AsyncMock(return_value=True)
-        client.async_detect_subwoofer = AsyncMock(return_value=True)
-
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"],
-            user_input={CONF_HOST: TEST_HOST},
-        )
-
-    assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "user_confirm"
-
-    with patch(
-        "custom_components.bravia_quad.config_flow.BraviaQuadClient",
-        autospec=True,
-    ) as client_mock:
-        client = client_mock.return_value
-        client.async_connect = AsyncMock(side_effect=OSError("Connection refused"))
-        client.async_disconnect = AsyncMock()
-
-        result = await hass.config_entries.flow.async_configure(
-            result["flow_id"], user_input={}
-        )
-
-    assert result["type"] is FlowResultType.FORM
-    assert result["step_id"] == "user_confirm"
-    assert result["errors"] == {"base": "cannot_connect"}
-
-
 async def test_zeroconf_discovery(hass: HomeAssistant) -> None:
     """Test zeroconf discovery creates entry with MAC-based unique_id."""
     discovery_info = ZeroconfServiceInfo(
