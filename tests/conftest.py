@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from homeassistant.const import CONF_HOST, CONF_NAME, Platform
+from homeassistant.const import CONF_HOST, Platform
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
@@ -57,7 +57,6 @@ def mock_config_entry() -> MockConfigEntry:
         domain=DOMAIN,
         data={
             CONF_HOST: "192.168.1.100",
-            CONF_NAME: "Bravia Quad",
             CONF_HAS_SUBWOOFER: True,
         },
         unique_id="192.168.1.100",
@@ -73,7 +72,6 @@ def mock_config_entry_no_subwoofer() -> MockConfigEntry:
         domain=DOMAIN,
         data={
             CONF_HOST: "192.168.1.100",
-            CONF_NAME: "Bravia Quad",
             CONF_HAS_SUBWOOFER: False,
         },
         unique_id="192.168.1.100",
