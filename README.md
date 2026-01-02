@@ -1,6 +1,8 @@
 # Bravia Quad Home Assistant Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-green.svg)](https://github.com/custom-components/hacs)
+![GitHub Downloads](https://img.shields.io/github/downloads/steamEngineer/bravia-quad-homeassistant/total)
+![GitHub Release](https://img.shields.io/github/v/release/steamEngineer/bravia-quad-homeassistant)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 A Home Assistant custom integration for controlling Sony Bravia Quad home theater systems via TCP/IP.
