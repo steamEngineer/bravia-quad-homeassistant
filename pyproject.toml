@@ -1,7 +1,7 @@
 [project]
-name = "bravia-quad-homeassistant"
+name = "bravia-theatre-homeassistant"
 version = "0.0.0"
-description = "Home Assistant custom integration for Sony Bravia Quad AV amplifiers"
+description = "Home Assistant custom integration for Sony Bravia Theatre AV amplifiers"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.13.2"

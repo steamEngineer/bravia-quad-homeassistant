@@ -1,11 +1,11 @@
-# Bravia Quad Home Assistant Integration
+# Bravia Theatre Home Assistant Integration
 
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-green.svg)](https://github.com/custom-components/hacs)
 ![GitHub Downloads](https://img.shields.io/github/downloads/steamEngineer/bravia-quad-homeassistant/total)
 ![GitHub Release](https://img.shields.io/github/v/release/steamEngineer/bravia-quad-homeassistant)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A Home Assistant custom integration for controlling Sony Bravia Quad home theater systems via TCP/IP.
+A Home Assistant custom integration for controlling Sony Bravia Theatre home theater systems via TCP/IP.
 
 _This integration may also be compatible with other Bravia audio devices - see the [Device Compatibility](#device-compatibility) section for details._
 
@@ -18,8 +18,8 @@ _This integration may also be compatible with other Bravia audio devices - see t
 
 ## Features
 
-- **Auto-Discovery**: Automatically discovers Bravia Quad devices on your network using mDNS/zeroconf - no manual IP configuration needed
-- **Power Control**: Turn your Bravia Quad system on and off
+- **Auto-Discovery**: Automatically discovers Bravia Theatre devices on your network using mDNS/zeroconf - no manual IP configuration needed
+- **Power Control**: Turn your Bravia Theatre system on and off
 - **Volume Control**: Adjust main volume from 0-100 via a number entity
 - **Rear Level Control**: Adjust rear speaker level from -10-10 via a number entity
 - **Source Selection**: Switch between inputs (TV/eARC, HDMI In, Spotify, Bluetooth, Airplay)
@@ -39,7 +39,7 @@ _This integration may also be compatible with other Bravia audio devices - see t
 
 ## Device Compatibility
 
-The following table details device compatibility with this Home Assistant integration. Compatibility is based on whether devices use the same TCP/IP protocol (port 33336) as the BRAVIA Theatre Quad.
+The following table details device compatibility with this Home Assistant integration. Compatibility is based on whether devices use the same TCP/IP protocol (port 33336) as the BRAVIA Theatre Theatre.
 
 | Device Name | Model | Connection Type | Compatibility |
 |-------------|-------|-----------------|---------------|
@@ -59,7 +59,7 @@ The following table details device compatibility with this Home Assistant integr
 
 1. Ensure [HACS](https://hacs.xyz/) is installed
 2. Go to HACS → Integrations
-3. Search for "Bravia Quad" and install it
+3. Search for "Bravia Theatre" and install it
 4. Restart Home Assistant
 
 ### Manual Installation
@@ -73,7 +73,7 @@ The following table details device compatibility with this Home Assistant integr
 
 3. Go to **Settings** → **Devices & Services** → **Add Integration**
 
-4. Search for "Bravia Quad" and follow the setup wizard
+4. Search for "Bravia Theatre" and follow the setup wizard
 
 ## Prerequisites
 
@@ -89,31 +89,31 @@ Before setting up this integration, ensure **External control** is enabled on yo
 
 ### Auto-Discovery
 
-The integration supports automatic discovery of Bravia Quad devices on your local network using mDNS/zeroconf. When you add the integration, Home Assistant will automatically detect any Bravia Quad devices and prompt you to configure them.
+The integration supports automatic discovery of Bravia Theatre devices on your local network using mDNS/zeroconf. When you add the integration, Home Assistant will automatically detect any Bravia Theatre devices and prompt you to configure them.
 
 **If your device is not automatically discovered**, you can add it manually by:
 
-1. Selecting "Bravia Quad" from the integration list
+1. Selecting "Bravia Theatre" from the integration list
 2. Choosing "Configure" or "Submit" when prompted
 3. Entering the device's IP address manually
-4. Optionally providing a friendly name (defaults to "Bravia Quad")
+4. Optionally providing a friendly name (defaults to "Bravia Theatre")
 
 ### Manual Configuration
 
 During setup, you will be prompted to provide:
 
-- **IP Address**: The IP address of your Bravia Quad device (required if not auto-discovered)
-- **Name** (optional): A friendly name for the device (defaults to "Bravia Quad")
+- **IP Address**: The IP address of your Bravia Theatre device (required if not auto-discovered)
+- **Name** (optional): A friendly name for the device (defaults to "Bravia Theatre")
 
 The integration will automatically test the connection by sending a power status request. Make sure:
 
-- IP control is enabled on your Bravia Quad device
+- IP control is enabled on your Bravia Theatre device
 - The device is accessible on your network
 - Port 33336 is not blocked by a firewall
 
 ## Entities
 
-The integration creates the following entities under your Bravia Quad device:
+The integration creates the following entities under your Bravia Theatre device:
 
 | Entity | Type | Description | Range/Options |
 |--------|------|-------------|---------------|
@@ -139,7 +139,7 @@ The integration creates the following entities under your Bravia Quad device:
 
 ## Protocol Details
 
-The integration communicates with the Bravia Quad device via TCP on port **33336** using JSON messages:
+The integration communicates with the Bravia Theatre device via TCP on port **33336** using JSON messages:
 
 ### Command Format
 
@@ -278,7 +278,7 @@ _Per [Sony docs](https://helpguide.sony.net/ht/a7000/v1/en/contents/TP1000070959
 If you encounter connection problems:
 
 1. **Verify IP Address**: Ensure the IP address is correct and the device is on the same network
-2. **Check IP Control**: Verify that IP control is enabled on your Bravia Quad device
+2. **Check IP Control**: Verify that IP control is enabled on your Bravia Theatre device
 3. **Firewall**: Ensure port 33336 is not blocked by your firewall
 4. **Test Connection**: Test the connection manually using netcat:
    ```bash
@@ -291,7 +291,7 @@ If you encounter connection problems:
 
 - Check the Home Assistant logs for any error messages
 - Ensure the notification listener is running (check logs for "Starting notification listener")
-- Try reloading the integration: **Settings** → **Devices & Services** → **Bravia Quad** → **Reload**
+- Try reloading the integration: **Settings** → **Devices & Services** → **Bravia Theatre** → **Reload**
 
 ### Volume or Source Shows Default Values
 
@@ -327,7 +327,7 @@ The devcontainer supports two network modes that can be switched using VS Code t
 
 **Why Host Mode for mDNS/Zeroconf?**
 
-mDNS (multicast DNS) and zeroconf discovery rely on Layer 2 network traffic (multicast packets). When using bridge networking (the docker default), these multicast packets are isolated from the Docker network and cannot reach the container. Host networking allows the container to directly access the host's network interfaces, enabling it to receive and respond to mDNS broadcasts from devices like the Bravia Quad system.
+mDNS (multicast DNS) and zeroconf discovery rely on Layer 2 network traffic (multicast packets). When using bridge networking (the docker default), these multicast packets are isolated from the Docker network and cannot reach the container. Host networking allows the container to directly access the host's network interfaces, enabling it to receive and respond to mDNS broadcasts from devices like the Bravia Theatre system.
 
 **Switching Network Modes:**
 
