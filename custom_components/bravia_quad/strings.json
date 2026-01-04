@@ -14,7 +14,7 @@
       },
       "zeroconf_confirm": {
         "title": "Discovered Bravia Theatre",
-        "description": "Do you want to set up {name}?"
+        "description": "Do you want to set up {name}?\n\nMake sure **External control** is enabled in the Sony Home Entertainment Connect app under **Settings > Network settings**."
       },
       "reauth_confirm": {
         "title": "Re-authenticate {name}",

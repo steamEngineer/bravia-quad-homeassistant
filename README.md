@@ -75,6 +75,16 @@ The following table details device compatibility with this Home Assistant integr
 
 4. Search for "Bravia Quad" and follow the setup wizard
 
+## Prerequisites
+
+Before setting up this integration, ensure **External control** is enabled on your Bravia device:
+
+1. Open the **Sony Home Entertainment Connect** app on your phone
+2. Go to **Settings** → **Network settings**
+3. Enable **External control**
+
+> ⚠️ Without this setting enabled, the integration will not be able to communicate with your device.
+
 ## Configuration
 
 ### Auto-Discovery
