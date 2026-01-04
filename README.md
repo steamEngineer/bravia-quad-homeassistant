@@ -53,6 +53,16 @@ The following table details device compatibility with this Home Assistant integr
 
 *Note: Devices marked as "Untested" may be compatible if they use the same TCP/IP control protocol. **Compatibility testing and feedback from users with these devices is welcome!**. For a complete list of Sony Sound Bars & Home Theatre Systems, see the [Sony Support Article](https://www.sony.com/electronics/support/articles/00305900).*
 
+## Prerequisites
+
+Before setting up this integration, ensure **External control** is enabled on your Bravia device:
+
+1. Open the **Sony Home Entertainment Connect** app on your phone
+2. Go to **Settings** → **Network settings**
+3. Enable **External control**
+
+> ⚠️ Without this setting enabled, the integration will not be able to communicate with your device.
+
 ## Installation
 
 ### HACS (Recommended)
@@ -74,16 +84,6 @@ The following table details device compatibility with this Home Assistant integr
 3. Go to **Settings** → **Devices & Services** → **Add Integration**
 
 4. Search for "Bravia Theatre" and follow the setup wizard
-
-## Prerequisites
-
-Before setting up this integration, ensure **External control** is enabled on your Bravia device:
-
-1. Open the **Sony Home Entertainment Connect** app on your phone
-2. Go to **Settings** → **Network settings**
-3. Enable **External control**
-
-> ⚠️ Without this setting enabled, the integration will not be able to communicate with your device.
 
 ## Configuration
 
