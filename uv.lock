@@ -566,7 +566,7 @@ wheels = [
 ]
 
 [[package]]
-name = "bravia-quad-homeassistant"
+name = "bravia-theatre-homeassistant"
 version = "0.0.0"
 source = { virtual = "." }
 dependencies = [
