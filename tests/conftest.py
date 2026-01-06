@@ -172,6 +172,7 @@ def mock_bravia_quad_client() -> Generator[MagicMock]:
 
         # Notification callbacks
         client.register_notification_callback = MagicMock()
+        client.unregister_notification_callback = MagicMock()
 
         yield client
 
