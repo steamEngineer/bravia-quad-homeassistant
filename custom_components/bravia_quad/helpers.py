@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
+    from .bravia_quad_client import BraviaQuadClient
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -145,3 +147,33 @@ def get_device_info(entry: ConfigEntry) -> DeviceInfo:
         model=entry.data.get(CONF_MODEL, DEFAULT_MODEL),
         configuration_url=f"http://{entry.data['host']}",
     )
+
+
+class BraviaQuadNotificationMixin:
+    """
+    Mixin for entities that subscribe to Bravia Quad notifications.
+
+    Subclasses must define:
+    - _client: BraviaQuadClient instance
+    - _notification_feature: str - the feature name to subscribe to
+    - _on_notification: async callback method to handle notifications
+    """
+
+    _client: BraviaQuadClient
+    _notification_feature: str
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle notification callback. Override in subclass."""
+        raise NotImplementedError
+
+    async def async_added_to_hass(self) -> None:
+        """Register notification callback when entity is added."""
+        self._client.register_notification_callback(
+            self._notification_feature, self._on_notification
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unregister notification callback when entity is removed."""
+        self._client.unregister_notification_callback(
+            self._notification_feature, self._on_notification
+        )
