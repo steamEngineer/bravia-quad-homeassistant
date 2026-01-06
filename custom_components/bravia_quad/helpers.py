@@ -168,12 +168,14 @@ class BraviaQuadNotificationMixin:
 
     async def async_added_to_hass(self) -> None:
         """Register notification callback when entity is added."""
+        await super().async_added_to_hass()  # type: ignore[misc]
         self._client.register_notification_callback(
             self._notification_feature, self._on_notification
         )
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister notification callback when entity is removed."""
+        await super().async_will_remove_from_hass()  # type: ignore[misc]
         self._client.unregister_notification_callback(
             self._notification_feature, self._on_notification
         )
