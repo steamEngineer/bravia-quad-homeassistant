@@ -10,6 +10,7 @@ from homeassistant.const import Platform
 from custom_components.bravia_quad.const import (
     FEATURE_AAV,
     FEATURE_AUTO_STANDBY,
+    FEATURE_BASS_LEVEL,
     FEATURE_DRC,
     FEATURE_HDMI_CEC,
     FEATURE_INPUT,
@@ -72,6 +73,7 @@ SWITCH_FEATURES = {
 NUMBER_FEATURES = {
     FEATURE_VOLUME,
     FEATURE_REAR_LEVEL,
+    FEATURE_BASS_LEVEL,
 }
 
 SELECT_FEATURES = {
@@ -83,6 +85,7 @@ SELECT_FEATURES = {
 SWITCH_TEST_CASES = [
     SwitchTestCase("_power", FEATURE_POWER, "on", "off"),
     SwitchTestCase("_hdmi_cec", FEATURE_HDMI_CEC, "on", "off"),
+    SwitchTestCase("_auto_standby", FEATURE_AUTO_STANDBY, "on", "off"),
     SwitchTestCase("_night_mode", FEATURE_NIGHT_MODE, "on", "off"),
     SwitchTestCase("_sound_field", FEATURE_SOUND_FIELD, "on", "off"),
     SwitchTestCase("_voice_enhancer", FEATURE_VOICE_ENHANCER, "upon", "upoff"),
@@ -92,6 +95,7 @@ SWITCH_TEST_CASES = [
 NUMBER_TEST_CASES = [
     NumberTestCase("_volume", FEATURE_VOLUME, "50", "75"),
     NumberTestCase("_rear_level", FEATURE_REAR_LEVEL, "0", "5"),
+    NumberTestCase("_bass_level_slider", FEATURE_BASS_LEVEL, "0", "-3"),
 ]
 
 SELECT_TEST_CASES = [
