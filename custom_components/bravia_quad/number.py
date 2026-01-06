@@ -11,12 +11,15 @@ from homeassistant.const import EntityCategory
 from .const import (
     CONF_HAS_SUBWOOFER,
     DOMAIN,
+    FEATURE_BASS_LEVEL,
+    FEATURE_REAR_LEVEL,
+    FEATURE_VOLUME,
     MAX_BASS_LEVEL,
     MAX_REAR_LEVEL,
     MIN_BASS_LEVEL,
     MIN_REAR_LEVEL,
 )
-from .helpers import get_device_info
+from .helpers import BraviaQuadNotificationMixin, get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -52,7 +55,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class BraviaQuadVolumeNumber(NumberEntity):
+class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
     """Representation of a Bravia Quad volume control."""
 
     _attr_has_entity_name = True
@@ -62,6 +65,7 @@ class BraviaQuadVolumeNumber(NumberEntity):
     _attr_native_step = 1
     _attr_should_poll = False
     _attr_translation_key = "volume"
+    _notification_feature = FEATURE_VOLUME
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the volume number entity."""
@@ -70,12 +74,7 @@ class BraviaQuadVolumeNumber(NumberEntity):
         self._attr_native_value = client.volume
         self._attr_device_info = get_device_info(entry)
 
-        # Register for volume notifications
-        self._client.register_notification_callback(
-            "main.volumestep", self._on_volume_notification
-        )
-
-    async def _on_volume_notification(self, value: Any) -> None:
+    async def _on_notification(self, value: Any) -> None:
         """Handle volume notification."""
         try:
             volume = int(value)
@@ -104,7 +103,7 @@ class BraviaQuadVolumeNumber(NumberEntity):
             _LOGGER.exception("Failed to update volume")
 
 
-class BraviaQuadRearLevelNumber(NumberEntity):
+class BraviaQuadRearLevelNumber(BraviaQuadNotificationMixin, NumberEntity):
     """Representation of a Bravia Quad rear level control."""
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -115,6 +114,7 @@ class BraviaQuadRearLevelNumber(NumberEntity):
     _attr_native_step = 1
     _attr_should_poll = False
     _attr_translation_key = "rear_level"
+    _notification_feature = FEATURE_REAR_LEVEL
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the rear level number entity."""
@@ -123,12 +123,7 @@ class BraviaQuadRearLevelNumber(NumberEntity):
         self._attr_native_value = client.rear_level
         self._attr_device_info = get_device_info(entry)
 
-        # Register for rear level notifications
-        self._client.register_notification_callback(
-            "main.rearvolumestep", self._on_rear_level_notification
-        )
-
-    async def _on_rear_level_notification(self, value: Any) -> None:
+    async def _on_notification(self, value: Any) -> None:
         """Handle rear level notification."""
         try:
             rear_level = int(value)
@@ -157,7 +152,7 @@ class BraviaQuadRearLevelNumber(NumberEntity):
             _LOGGER.exception("Failed to update rear level")
 
 
-class BraviaQuadBassLevelNumber(NumberEntity):
+class BraviaQuadBassLevelNumber(BraviaQuadNotificationMixin, NumberEntity):
     """Representation of a Bravia Quad bass level control."""
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -168,6 +163,7 @@ class BraviaQuadBassLevelNumber(NumberEntity):
     _attr_native_step = 1
     _attr_should_poll = False
     _attr_translation_key = "bass_level"
+    _notification_feature = FEATURE_BASS_LEVEL
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the bass level number entity."""
@@ -176,12 +172,7 @@ class BraviaQuadBassLevelNumber(NumberEntity):
         self._attr_native_value = client.bass_level
         self._attr_device_info = get_device_info(entry)
 
-        # Register for bass level notifications
-        self._client.register_notification_callback(
-            "main.bassstep", self._on_bass_level_notification
-        )
-
-    async def _on_bass_level_notification(self, value: Any) -> None:
+    async def _on_notification(self, value: Any) -> None:
         """Handle bass level notification."""
         try:
             bass_level = int(value)

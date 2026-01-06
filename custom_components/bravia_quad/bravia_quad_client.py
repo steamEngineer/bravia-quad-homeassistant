@@ -748,6 +748,14 @@ class BraviaQuadClient:
             self._notification_callbacks[feature] = []
         self._notification_callbacks[feature].append(callback)
 
+    def unregister_notification_callback(
+        self, feature: str, callback: Callable
+    ) -> None:
+        """Unregister a callback for notifications."""
+        if feature in self._notification_callbacks:
+            with contextlib.suppress(ValueError):
+                self._notification_callbacks[feature].remove(callback)
+
     async def async_listen_for_notifications(self) -> None:
         """Ensure the notification listener is running."""
         if self._listener_task and not self._listener_task.done():

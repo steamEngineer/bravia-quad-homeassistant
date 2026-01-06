@@ -16,11 +16,13 @@ from .const import (
     DOMAIN,
     DRC_OPTIONS,
     DRC_VALUES_TO_OPTIONS,
+    FEATURE_BASS_LEVEL,
     FEATURE_DRC,
+    FEATURE_INPUT,
     INPUT_OPTIONS,
     INPUT_VALUES_TO_OPTIONS,
 )
-from .helpers import get_device_info
+from .helpers import BraviaQuadNotificationMixin, get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -55,12 +57,13 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class BraviaQuadInputSelect(SelectEntity):
+class BraviaQuadInputSelect(BraviaQuadNotificationMixin, SelectEntity):
     """Representation of a Bravia Quad input selector."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_translation_key = "input"
+    _notification_feature = FEATURE_INPUT
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the input select entity."""
@@ -73,12 +76,7 @@ class BraviaQuadInputSelect(SelectEntity):
         )
         self._attr_device_info = get_device_info(entry)
 
-        # Register for input notifications
-        self._client.register_notification_callback(
-            "main.input", self._on_input_notification
-        )
-
-    async def _on_input_notification(self, value: str) -> None:
+    async def _on_notification(self, value: str) -> None:
         """Handle input notification."""
         # Convert value (e.g., "tv") to display option (e.g., "TV (eARC)")
         option = INPUT_VALUES_TO_OPTIONS.get(value)
@@ -117,13 +115,14 @@ class BraviaQuadInputSelect(SelectEntity):
             _LOGGER.exception("Failed to update input")
 
 
-class BraviaQuadBassLevelSelect(SelectEntity):
+class BraviaQuadBassLevelSelect(BraviaQuadNotificationMixin, SelectEntity):
     """Representation of a Bravia Quad bass level selector (for non-subwoofer mode)."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_translation_key = "bass_level"
+    _notification_feature = FEATURE_BASS_LEVEL
 
     def __init__(
         self, hass: HomeAssistant, client: BraviaQuadClient, entry: ConfigEntry
@@ -141,12 +140,7 @@ class BraviaQuadBassLevelSelect(SelectEntity):
         )
         self._attr_device_info = get_device_info(entry)
 
-        # Register for bass level notifications
-        self._client.register_notification_callback(
-            "main.bassstep", self._on_bass_level_notification
-        )
-
-    async def _on_bass_level_notification(self, value: str) -> None:
+    async def _on_notification(self, value: str) -> None:
         """Handle bass level notification."""
         try:
             bass_level = int(value)
@@ -218,13 +212,14 @@ class BraviaQuadBassLevelSelect(SelectEntity):
             _LOGGER.exception("Failed to update bass level")
 
 
-class BraviaQuadDynamicRangeCompressorSelect(SelectEntity):
+class BraviaQuadDynamicRangeCompressorSelect(BraviaQuadNotificationMixin, SelectEntity):
     """Representation of a Bravia Quad Dynamic Range Compressor selector."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
-    _attr_should_poll = True
+    _attr_should_poll = False
     _attr_translation_key = "drc"
+    _notification_feature = FEATURE_DRC
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the Dynamic Range Compressor select entity."""
@@ -236,12 +231,7 @@ class BraviaQuadDynamicRangeCompressorSelect(SelectEntity):
         self._attr_current_option = DRC_VALUES_TO_OPTIONS.get(current_drc_value, "Auto")
         self._attr_device_info = get_device_info(entry)
 
-        # Register for DRC notifications
-        self._client.register_notification_callback(
-            FEATURE_DRC, self._on_drc_notification
-        )
-
-    async def _on_drc_notification(self, value: str) -> None:
+    async def _on_notification(self, value: str) -> None:
         """Handle Dynamic Range Compressor notification."""
         # Convert value (e.g., "auto") to display option (e.g., "Auto")
         option = DRC_VALUES_TO_OPTIONS.get(value)

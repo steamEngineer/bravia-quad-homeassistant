@@ -18,6 +18,7 @@ from .const import (
     FEATURE_AUTO_STANDBY,
     FEATURE_HDMI_CEC,
     FEATURE_NIGHT_MODE,
+    FEATURE_POWER,
     FEATURE_SOUND_FIELD,
     FEATURE_VOICE_ENHANCER,
     HDMI_CEC_OFF,
@@ -31,7 +32,7 @@ from .const import (
     VOICE_ENHANCER_OFF,
     VOICE_ENHANCER_ON,
 )
-from .helpers import get_device_info
+from .helpers import BraviaQuadNotificationMixin, get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -65,12 +66,13 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class BraviaQuadPowerSwitch(SwitchEntity):
+class BraviaQuadPowerSwitch(BraviaQuadNotificationMixin, SwitchEntity):
     """Representation of a Bravia Quad power switch."""
 
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_translation_key = "power"
+    _notification_feature = FEATURE_POWER
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the switch."""
@@ -79,12 +81,7 @@ class BraviaQuadPowerSwitch(SwitchEntity):
         self._attr_is_on = client.power_state == POWER_ON
         self._attr_device_info = get_device_info(entry)
 
-        # Register for power notifications
-        self._client.register_notification_callback(
-            "main.power", self._on_power_notification
-        )
-
-    async def _on_power_notification(self, value: str) -> None:
+    async def _on_notification(self, value: str) -> None:
         """Handle power state notification."""
         self._attr_is_on = value == POWER_ON
         self.async_write_ha_state()
@@ -116,13 +113,14 @@ class BraviaQuadPowerSwitch(SwitchEntity):
             _LOGGER.exception("Failed to update power state")
 
 
-class BraviaQuadHdmiCecSwitch(SwitchEntity):
+class BraviaQuadHdmiCecSwitch(BraviaQuadNotificationMixin, SwitchEntity):
     """Representation of a Bravia Quad HDMI CEC switch."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_translation_key = "hdmi_cec"
+    _notification_feature = FEATURE_HDMI_CEC
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the HDMI CEC switch."""
@@ -131,11 +129,7 @@ class BraviaQuadHdmiCecSwitch(SwitchEntity):
         self._attr_is_on = client.hdmi_cec == HDMI_CEC_ON
         self._attr_device_info = get_device_info(entry)
 
-        self._client.register_notification_callback(
-            FEATURE_HDMI_CEC, self._on_hdmi_cec_notification
-        )
-
-    async def _on_hdmi_cec_notification(self, value: str) -> None:
+    async def _on_notification(self, value: str) -> None:
         """Handle HDMI CEC notification."""
         self._attr_is_on = value == HDMI_CEC_ON
         self.async_write_ha_state()
@@ -167,13 +161,14 @@ class BraviaQuadHdmiCecSwitch(SwitchEntity):
             _LOGGER.exception("Failed to update HDMI CEC state")
 
 
-class BraviaQuadAutoStandbySwitch(SwitchEntity):
+class BraviaQuadAutoStandbySwitch(BraviaQuadNotificationMixin, SwitchEntity):
     """Representation of a Bravia Quad auto standby switch."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_translation_key = "auto_standby"
+    _notification_feature = FEATURE_AUTO_STANDBY
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the auto standby switch."""
@@ -182,11 +177,7 @@ class BraviaQuadAutoStandbySwitch(SwitchEntity):
         self._attr_is_on = client.auto_standby == AUTO_STANDBY_ON
         self._attr_device_info = get_device_info(entry)
 
-        self._client.register_notification_callback(
-            FEATURE_AUTO_STANDBY, self._on_auto_standby_notification
-        )
-
-    async def _on_auto_standby_notification(self, value: str) -> None:
+    async def _on_notification(self, value: str) -> None:
         """Handle auto standby notification."""
         self._attr_is_on = value == POWER_ON
         self.async_write_ha_state()
@@ -218,13 +209,14 @@ class BraviaQuadAutoStandbySwitch(SwitchEntity):
             _LOGGER.exception("Failed to update auto standby state")
 
 
-class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
+class BraviaQuadVoiceEnhancerSwitch(BraviaQuadNotificationMixin, SwitchEntity):
     """Representation of a Bravia Quad voice enhancer switch."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_translation_key = "voice_enhancer"
+    _notification_feature = FEATURE_VOICE_ENHANCER
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the voice enhancer switch."""
@@ -233,12 +225,7 @@ class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
         self._attr_is_on = client.voice_enhancer == VOICE_ENHANCER_ON
         self._attr_device_info = get_device_info(entry)
 
-        # Register for voice enhancer notifications
-        self._client.register_notification_callback(
-            FEATURE_VOICE_ENHANCER, self._on_voice_enhancer_notification
-        )
-
-    async def _on_voice_enhancer_notification(self, value: str) -> None:
+    async def _on_notification(self, value: str) -> None:
         """Handle voice enhancer state notification."""
         self._attr_is_on = value == VOICE_ENHANCER_ON
         self.async_write_ha_state()
@@ -270,13 +257,14 @@ class BraviaQuadVoiceEnhancerSwitch(SwitchEntity):
             _LOGGER.exception("Failed to update voice enhancer state")
 
 
-class BraviaQuadSoundFieldSwitch(SwitchEntity):
+class BraviaQuadSoundFieldSwitch(BraviaQuadNotificationMixin, SwitchEntity):
     """Representation of a Bravia Quad sound field switch."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_translation_key = "sound_field"
+    _notification_feature = FEATURE_SOUND_FIELD
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the sound field switch."""
@@ -285,12 +273,7 @@ class BraviaQuadSoundFieldSwitch(SwitchEntity):
         self._attr_is_on = client.sound_field == SOUND_FIELD_ON
         self._attr_device_info = get_device_info(entry)
 
-        # Register for sound field notifications
-        self._client.register_notification_callback(
-            FEATURE_SOUND_FIELD, self._on_sound_field_notification
-        )
-
-    async def _on_sound_field_notification(self, value: str) -> None:
+    async def _on_notification(self, value: str) -> None:
         """Handle sound field state notification."""
         self._attr_is_on = value == SOUND_FIELD_ON
         self.async_write_ha_state()
@@ -322,13 +305,14 @@ class BraviaQuadSoundFieldSwitch(SwitchEntity):
             _LOGGER.exception("Failed to update sound field state")
 
 
-class BraviaQuadNightModeSwitch(SwitchEntity):
+class BraviaQuadNightModeSwitch(BraviaQuadNotificationMixin, SwitchEntity):
     """Representation of a Bravia Quad night mode switch."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_should_poll = False
     _attr_translation_key = "night_mode"
+    _notification_feature = FEATURE_NIGHT_MODE
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the night mode switch."""
@@ -337,12 +321,7 @@ class BraviaQuadNightModeSwitch(SwitchEntity):
         self._attr_is_on = client.night_mode == NIGHT_MODE_ON
         self._attr_device_info = get_device_info(entry)
 
-        # Register for night mode notifications
-        self._client.register_notification_callback(
-            FEATURE_NIGHT_MODE, self._on_night_mode_notification
-        )
-
-    async def _on_night_mode_notification(self, value: str) -> None:
+    async def _on_notification(self, value: str) -> None:
         """Handle night mode state notification."""
         self._attr_is_on = value == NIGHT_MODE_ON
         self.async_write_ha_state()
@@ -374,13 +353,14 @@ class BraviaQuadNightModeSwitch(SwitchEntity):
             _LOGGER.exception("Failed to update night mode state")
 
 
-class BraviaQuadAdvancedAutoVolumeSwitch(SwitchEntity):
+class BraviaQuadAdvancedAutoVolumeSwitch(BraviaQuadNotificationMixin, SwitchEntity):
     """Representation of a Bravia Quad Advanced Auto Volume switch."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
-    _attr_should_poll = True
+    _attr_should_poll = False
     _attr_translation_key = "auto_volume"
+    _notification_feature = FEATURE_AAV
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the Advanced Auto Volume switch."""
@@ -390,12 +370,7 @@ class BraviaQuadAdvancedAutoVolumeSwitch(SwitchEntity):
         self._attr_is_on = client.aav == AAV_ON
         self._attr_device_info = get_device_info(entry)
 
-        # Register for AAV notifications
-        self._client.register_notification_callback(
-            FEATURE_AAV, self._on_aav_notification
-        )
-
-    async def _on_aav_notification(self, value: str) -> None:
+    async def _on_notification(self, value: str) -> None:
         """Handle Advanced Auto Volume state notification."""
         self._attr_is_on = value == AAV_ON
         self.async_write_ha_state()
