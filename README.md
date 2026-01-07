@@ -111,6 +111,32 @@ The integration will automatically test the connection by sending a power status
 - The device is accessible on your network
 - Port 33336 is not blocked by a firewall
 
+## Blueprints
+
+This integration includes a powerful Home Assistant Blueprint to help you automate your Bravia Theatre settings based on the currently selected source.
+
+### Bravia Theatre Source-Based Configuration
+
+This blueprint allows you to automatically adjust settings like **Voice Enhancer**, **Auto Volume**, **Sound Field**, **Night Mode**, **Volume**, and **Rear Level** for each input source.
+
+**Key Features:**
+- **Source-Specific Settings**: Configure different audio profiles for TV, HDMI, Spotify, Bluetooth, and Airplay.
+- **Night Mode Window**: Optionally define a time window for Night Mode to activate automatically during late hours.
+- **Custom Actions**: Run additional Home Assistant actions (e.g., changing lights or scene) when a specific source is selected.
+
+### Installation & Usage
+
+The easiest way to install this blueprint is by importing it directly into Home Assistant:
+
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FsteamEngineer%2Fbravia-quad-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fsource_based_config.yaml)
+
+**Manual Import:**
+1. In Home Assistant, go to **Settings** → **Automations & Scenes** → **Blueprints**.
+2. Click **Import Blueprint** (bottom right).
+3. Paste the following URL:
+   `https://github.com/steamEngineer/bravia-quad-homeassistant/blob/main/blueprints/source_based_config.yaml`
+4. Click **Preview**, then **Import**.
+
 ## Entities
 
 The integration creates the following entities under your Bravia Theatre device:
