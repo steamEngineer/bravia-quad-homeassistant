@@ -433,7 +433,7 @@ blueprint:
     bass_level_with_sub_section:
       name: Bass Level (w/ Subwoofer)
       collapsed: true
-      icon: mdi:Speaker
+      icon: mdi:speaker
       description: Control Bass Level for each source when a subwoofer is connected
       input:
         bl_with_sub_enabled:
@@ -491,7 +491,7 @@ blueprint:
     bass_level_no_sub_section:
       name: Bass Level (w/o Subwoofer)
       collapsed: true
-      icon: mdi:SpeakerOff
+      icon: mdi:speaker-off
       description: Control Bass Level for each source when NO subwoofer is connected
       input:
         bl_no_sub_enabled:
