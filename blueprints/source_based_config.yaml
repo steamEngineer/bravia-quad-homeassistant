@@ -1,0 +1,983 @@
+blueprint:
+  name: Bravia Theatre Source-Based Configuration
+  description: >
+    Automatically adjust settings like Voice Enhancer, Auto Volume, and Sound Field
+    based on the current source.
+
+    This version automatically finds the necessary entities once you select your Bravia device.
+  domain: automation
+  homeassistant:
+    min_version: "2024.6.0"
+  input:
+    bravia_quad_device:
+      name: Bravia Theatre Device
+      description: Select the Bravia Theatre device to configure.
+      selector:
+        device:
+          integration: bravia_quad
+
+    voice_enhancer_section:
+      name: Voice Enhancer
+      collapsed: true
+      icon: mdi:account-voice
+      description: Control Voice Enhancer for each source
+      input:
+        ve_tv:
+          name: TV (eARC)
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        ve_hdmi1:
+          name: HDMI In
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        ve_spotify:
+          name: Spotify
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        ve_bluetooth:
+          name: Bluetooth
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        ve_airplay:
+          name: Airplay
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+
+    auto_volume_section:
+      name: Auto Volume
+      collapsed: true
+      icon: mdi:volume-medium
+      description: >
+        Control Auto Volume for each source<br>*Sony recommends disabling this for
+        music sources ([Learn more](https://helpguide.sony.net/ht/a7000/v1/en/contents/TP1000070959.html))*
+      input:
+        av_tv:
+          name: TV (eARC)
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        av_hdmi1:
+          name: HDMI In
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        av_spotify:
+          name: Spotify
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        av_bluetooth:
+          name: Bluetooth
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        av_airplay:
+          name: Airplay
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+
+    sound_field_section:
+      name: Sound Field
+      collapsed: true
+      icon: mdi:surround-sound
+      description: Control Sound Field for each source
+      input:
+        sf_tv:
+          name: TV (eARC)
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        sf_hdmi1:
+          name: HDMI In
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        sf_spotify:
+          name: Spotify
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        sf_bluetooth:
+          name: Bluetooth
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        sf_airplay:
+          name: Airplay
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+
+    volume_section:
+      name: Volume
+      collapsed: true
+      icon: mdi:volume-high
+      description: "Control Main Volume for each source<br>*Range: 0-100 (-1 = No Change)*"
+      input:
+        vol_tv:
+          name: TV (eARC)
+          default: -1
+          selector:
+            number:
+              min: -1
+              max: 100
+              step: 1
+              mode: slider
+        vol_hdmi1:
+          name: HDMI In
+          default: -1
+          selector:
+            number:
+              min: -1
+              max: 100
+              step: 1
+              mode: slider
+        vol_spotify:
+          name: Spotify
+          default: -1
+          selector:
+            number:
+              min: -1
+              max: 100
+              step: 1
+              mode: slider
+        vol_bluetooth:
+          name: Bluetooth
+          default: -1
+          selector:
+            number:
+              min: -1
+              max: 100
+              step: 1
+              mode: slider
+        vol_airplay:
+          name: Airplay
+          default: -1
+          selector:
+            number:
+              min: -1
+              max: 100
+              step: 1
+              mode: slider
+
+    drc_section:
+      name: Dynamic Range Compressor
+      collapsed: true
+      icon: mdi:waveform
+      description: Control Dynamic Range Compressor for each source
+      input:
+        drc_tv:
+          name: TV (eARC)
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "Auto", value: "Auto"}
+                - {label: "On", value: "On"}
+                - {label: "Off", value: "Off"}
+                - {label: "No Change", value: "no_change"}
+        drc_hdmi1:
+          name: HDMI In
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "Auto", value: "Auto"}
+                - {label: "On", value: "On"}
+                - {label: "Off", value: "Off"}
+                - {label: "No Change", value: "no_change"}
+        drc_spotify:
+          name: Spotify
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "Auto", value: "Auto"}
+                - {label: "On", value: "On"}
+                - {label: "Off", value: "Off"}
+                - {label: "No Change", value: "no_change"}
+        drc_bluetooth:
+          name: Bluetooth
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "Auto", value: "Auto"}
+                - {label: "On", value: "On"}
+                - {label: "Off", value: "Off"}
+                - {label: "No Change", value: "no_change"}
+        drc_airplay:
+          name: Airplay
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "Auto", value: "Auto"}
+                - {label: "On", value: "On"}
+                - {label: "Off", value: "Off"}
+                - {label: "No Change", value: "no_change"}
+
+    night_mode_section:
+      name: Night Mode
+      collapsed: true
+      icon: mdi:weather-night
+      description: Control Night Mode for each source, with optional time window
+      input:
+        nm_use_time_window:
+          name: Use Time Window
+          description: If enabled, Night Mode will only turn ON during the specified time window.
+          default: false
+          selector:
+            boolean: {}
+        nm_start_time:
+          name: Start Time
+          description: When to start applying Night Mode (only if Time Window is enabled).
+          default: "22:00:00"
+          selector:
+            time: {}
+        nm_end_time:
+          name: End Time
+          description: When to stop applying Night Mode (only if Time Window is enabled).
+          default: "06:00:00"
+          selector:
+            time: {}
+        nm_tv:
+          name: TV (eARC)
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        nm_hdmi1:
+          name: HDMI In
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        nm_spotify:
+          name: Spotify
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        nm_bluetooth:
+          name: Bluetooth
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        nm_airplay:
+          name: Airplay
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+
+    rear_level_section:
+      name: Rear Level
+      collapsed: true
+      icon: mdi:speaker-wireless
+      description: "Control Rear Speaker Level for each source<br>*Range: -10 to 10 (-11 = No Change)*"
+      input:
+        rl_tv:
+          name: TV (eARC)
+          default: -11
+          selector:
+            number:
+              min: -11
+              max: 10
+              step: 1
+              mode: slider
+        rl_hdmi1:
+          name: HDMI In
+          default: -11
+          selector:
+            number:
+              min: -11
+              max: 10
+              step: 1
+              mode: slider
+        rl_spotify:
+          name: Spotify
+          default: -11
+          selector:
+            number:
+              min: -11
+              max: 10
+              step: 1
+              mode: slider
+        rl_bluetooth:
+          name: Bluetooth
+          default: -11
+          selector:
+            number:
+              min: -11
+              max: 10
+              step: 1
+              mode: slider
+        rl_airplay:
+          name: Airplay
+          default: -11
+          selector:
+            number:
+              min: -11
+              max: 10
+              step: 1
+              mode: slider
+
+    bass_level_with_sub_section:
+      name: Bass Level (w/ Subwoofer)
+      collapsed: true
+      icon: mdi:Speaker
+      description: Control Bass Level for each source when a subwoofer is connected
+      input:
+        bl_with_sub_enabled:
+          name: Enable
+          description: If enabled, this section will be used to control bass level.
+          default: false
+          selector:
+            boolean: {}
+        bl_sub_tv:
+          name: TV (eARC)
+          default: 0
+          selector:
+            number:
+              min: -10
+              max: 10
+              step: 1
+              mode: slider
+        bl_sub_hdmi1:
+          name: HDMI In
+          default: 0
+          selector:
+            number:
+              min: -10
+              max: 10
+              step: 1
+              mode: slider
+        bl_sub_spotify:
+          name: Spotify
+          default: 0
+          selector:
+            number:
+              min: -10
+              max: 10
+              step: 1
+              mode: slider
+        bl_sub_bluetooth:
+          name: Bluetooth
+          default: 0
+          selector:
+            number:
+              min: -10
+              max: 10
+              step: 1
+              mode: slider
+        bl_sub_airplay:
+          name: Airplay
+          default: 0
+          selector:
+            number:
+              min: -10
+              max: 10
+              step: 1
+              mode: slider
+
+    bass_level_no_sub_section:
+      name: Bass Level (w/o Subwoofer)
+      collapsed: true
+      icon: mdi:SpeakerOff
+      description: Control Bass Level for each source when NO subwoofer is connected
+      input:
+        bl_no_sub_enabled:
+          name: Enable
+          description: If enabled, this section will be used to control bass level.
+          default: false
+          selector:
+            boolean: {}
+        bl_no_tv:
+          name: TV (eARC)
+          default: "MID"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "MIN", value: "MIN"}
+                - {label: "MID", value: "MID"}
+                - {label: "MAX", value: "MAX"}
+        bl_no_hdmi1:
+          name: HDMI In
+          default: "MID"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "MIN", value: "MIN"}
+                - {label: "MID", value: "MID"}
+                - {label: "MAX", value: "MAX"}
+        bl_no_spotify:
+          name: Spotify
+          default: "MID"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "MIN", value: "MIN"}
+                - {label: "MID", value: "MID"}
+                - {label: "MAX", value: "MAX"}
+        bl_no_bluetooth:
+          name: Bluetooth
+          default: "MID"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "MIN", value: "MIN"}
+                - {label: "MID", value: "MID"}
+                - {label: "MAX", value: "MAX"}
+        bl_no_airplay:
+          name: Airplay
+          default: "MID"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "MIN", value: "MIN"}
+                - {label: "MID", value: "MID"}
+                - {label: "MAX", value: "MAX"}
+
+    hdmi_cec_section:
+      name: HDMI CEC
+      collapsed: true
+      icon: mdi:hdmi-port
+      description: Control HDMI CEC for each source
+      input:
+        cec_tv:
+          name: TV (eARC)
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        cec_hdmi1:
+          name: HDMI In
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        cec_spotify:
+          name: Spotify
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        cec_bluetooth:
+          name: Bluetooth
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+        cec_airplay:
+          name: Airplay
+          default: "no_change"
+          selector:
+            select:
+              mode: dropdown
+              options:
+                - {label: "On", value: "on"}
+                - {label: "Off", value: "off"}
+                - {label: "No Change", value: "no_change"}
+
+    custom_actions_section:
+      name: Custom Actions
+      collapsed: true
+      icon: mdi:script-text-outline
+      description: Perform custom actions when a source is selected
+      input:
+        actions_tv:
+          name: TV (eARC)
+          default: []
+          selector:
+            action: {}
+        actions_hdmi1:
+          name: HDMI In
+          default: []
+          selector:
+            action: {}
+        actions_spotify:
+          name: Spotify
+          default: []
+          selector:
+            action: {}
+        actions_bluetooth:
+          name: Bluetooth
+          default: []
+          selector:
+            action: {}
+        actions_airplay:
+          name: Airplay
+          default: []
+          selector:
+            action: {}
+
+variables:
+  # Use b_prefix to avoid potential naming conflicts in templates
+  b_device_id: !input bravia_quad_device
+
+  # Voice Enhancer variables
+  ve_spotify: !input ve_spotify
+  ve_tv: !input ve_tv
+  ve_hdmi1: !input ve_hdmi1
+  ve_bluetooth: !input ve_bluetooth
+  ve_airplay: !input ve_airplay
+
+  # Auto Volume variables
+  av_spotify: !input av_spotify
+  av_tv: !input av_tv
+  av_hdmi1: !input av_hdmi1
+  av_bluetooth: !input av_bluetooth
+  av_airplay: !input av_airplay
+
+  # Sound Field variables
+  sf_spotify: !input sf_spotify
+  sf_tv: !input sf_tv
+  sf_hdmi1: !input sf_hdmi1
+  sf_bluetooth: !input sf_bluetooth
+  sf_airplay: !input sf_airplay
+
+  # Volume variables
+  vol_spotify: !input vol_spotify
+  vol_tv: !input vol_tv
+  vol_hdmi1: !input vol_hdmi1
+  vol_bluetooth: !input vol_bluetooth
+  vol_airplay: !input vol_airplay
+
+  # Dynamic Range Compressor variables
+  drc_spotify: !input drc_spotify
+  drc_tv: !input drc_tv
+  drc_hdmi1: !input drc_hdmi1
+  drc_bluetooth: !input drc_bluetooth
+  drc_airplay: !input drc_airplay
+
+  # Night Mode variables
+  nm_use_window: !input nm_use_time_window
+  nm_start: !input nm_start_time
+  nm_end: !input nm_end_time
+  nm_spotify: !input nm_spotify
+  nm_tv: !input nm_tv
+  nm_hdmi1: !input nm_hdmi1
+  nm_bluetooth: !input nm_bluetooth
+  nm_airplay: !input nm_airplay
+
+  # Rear Level variables
+  rl_tv: !input rl_tv
+  rl_hdmi1: !input rl_hdmi1
+  rl_spotify: !input rl_spotify
+  rl_bluetooth: !input rl_bluetooth
+  rl_airplay: !input rl_airplay
+
+  # Bass Level variables (With Sub)
+  bl_sub_enabled: !input bl_with_sub_enabled
+  bl_sub_tv: !input bl_sub_tv
+  bl_sub_hdmi1: !input bl_sub_hdmi1
+  bl_sub_spotify: !input bl_sub_spotify
+  bl_sub_bluetooth: !input bl_sub_bluetooth
+  bl_sub_airplay: !input bl_sub_airplay
+
+  # Bass Level variables (No Sub)
+  bl_no_enabled: !input bl_no_sub_enabled
+  bl_no_tv: !input bl_no_tv
+  bl_no_hdmi1: !input bl_no_hdmi1
+  bl_no_spotify: !input bl_no_spotify
+  bl_no_bluetooth: !input bl_no_bluetooth
+  bl_no_airplay: !input bl_no_airplay
+
+  # HDMI CEC variables
+  cec_tv: !input cec_tv
+  cec_hdmi1: !input cec_hdmi1
+  cec_spotify: !input cec_spotify
+  cec_bluetooth: !input cec_bluetooth
+  cec_airplay: !input cec_airplay
+
+trigger:
+  - platform: event
+    event_type: state_changed
+    id: "state_changed"
+  - platform: homeassistant
+    event: start
+    id: "system_start"
+  - platform: event
+    event_type: automation_reloaded
+    id: "automation_reloaded"
+  - platform: time
+    at: !input nm_start_time
+    id: "time_event"
+  - platform: time
+    at: !input nm_end_time
+    id: "time_event"
+
+condition:
+  - condition: or
+    conditions:
+      - condition: template
+        value_template: >
+          {{ trigger.id == 'system_start' or
+             trigger.id == 'automation_reloaded' or
+             trigger.id == 'time_event' }}
+      - condition: and
+        conditions:
+          - condition: template
+            value_template: "{{ trigger.id == 'state_changed' }}"
+          - condition: template
+            value_template: >
+              {% set ent = trigger.event.data.entity_id %}
+              {{ device_id(ent) == b_device_id and ent.endswith('_source') }}
+
+action:
+  - variables:
+      all_entities: "{{ device_entities(b_device_id) }}"
+      source_entity: "{{ all_entities | select('search', 'select\\..*_source') | first | default(none) }}"
+      ve_entity: "{{ all_entities | select('search', 'switch\\..*_voice_enhancer') | first | default(none) }}"
+      av_entity: "{{ all_entities | select('search', 'switch\\..*auto_volume') | first | default(none) }}"
+      sf_entity: "{{ all_entities | select('search', 'switch\\..*_sound_field') | first | default(none) }}"
+      vol_entity: "{{ all_entities | select('search', 'number\\..*_volume') | first | default(none) }}"
+      drc_entity: "{{ all_entities | select('search', 'select\\..*dynamic_range_compressor') | first | default(none) }}"
+      nm_entity: "{{ all_entities | select('search', 'switch\\..*_night_mode') | first | default(none) }}"
+      rl_entity: "{{ all_entities | select('search', 'number\\..*_rear_level') | first | default(none) }}"
+      bl_number_entity: "{{ all_entities | select('search', 'number\\..*bass_level') | first | default(none) }}"
+      bl_select_entity: "{{ all_entities | select('search', 'select\\..*bass_level') | first | default(none) }}"
+      cec_entity: "{{ all_entities | select('search', 'switch\\..*_hdmi_cec') | first | default(none) }}"
+
+      current_source: "{{ states(source_entity) if source_entity is not none else 'unknown' }}"
+
+      # Determine if we should evaluate the window
+      is_night: >-
+        {% if not nm_use_window %}
+          true
+        {% else %}
+          {% set now_time = now().strftime('%H:%M:%S') %}
+          {% if nm_start < nm_end %}
+            {{ nm_start <= now_time < nm_end }}
+          {% else %}
+            {{ now_time >= nm_start or now_time < nm_end }}
+          {% endif %}
+        {% endif %}
+
+      target_ve: >-
+        {% if current_source == 'Spotify' %} {{ ve_spotify }}
+        {% elif current_source == 'TV (eARC)' %} {{ ve_tv }}
+        {% elif current_source == 'HDMI In' %} {{ ve_hdmi1 }}
+        {% elif current_source == 'Bluetooth' %} {{ ve_bluetooth }}
+        {% elif current_source == 'Airplay' %} {{ ve_airplay }}
+        {% else %} no_change
+        {% endif %}
+      target_av: >-
+        {% if current_source == 'Spotify' %} {{ av_spotify }}
+        {% elif current_source == 'TV (eARC)' %} {{ av_tv }}
+        {% elif current_source == 'HDMI In' %} {{ av_hdmi1 }}
+        {% elif current_source == 'Bluetooth' %} {{ av_bluetooth }}
+        {% elif current_source == 'Airplay' %} {{ av_airplay }}
+        {% else %} no_change
+        {% endif %}
+      target_sf: >-
+        {% if current_source == 'Spotify' %} {{ sf_spotify }}
+        {% elif current_source == 'TV (eARC)' %} {{ sf_tv }}
+        {% elif current_source == 'HDMI In' %} {{ sf_hdmi1 }}
+        {% elif current_source == 'Bluetooth' %} {{ sf_bluetooth }}
+        {% elif current_source == 'Airplay' %} {{ sf_airplay }}
+        {% else %} no_change
+        {% endif %}
+      target_vol: >-
+        {% if current_source == 'Spotify' %} {{ vol_spotify }}
+        {% elif current_source == 'TV (eARC)' %} {{ vol_tv }}
+        {% elif current_source == 'HDMI In' %} {{ vol_hdmi1 }}
+        {% elif current_source == 'Bluetooth' %} {{ vol_bluetooth }}
+        {% elif current_source == 'Airplay' %} {{ vol_airplay }}
+        {% else %} -1
+        {% endif %}
+      target_drc: >-
+        {% if current_source == 'Spotify' %} {{ drc_spotify }}
+        {% elif current_source == 'TV (eARC)' %} {{ drc_tv }}
+        {% elif current_source == 'HDMI In' %} {{ drc_hdmi1 }}
+        {% elif current_source == 'Bluetooth' %} {{ drc_bluetooth }}
+        {% elif current_source == 'Airplay' %} {{ drc_airplay }}
+        {% else %} no_change
+        {% endif %}
+      target_nm_config: >-
+        {% if current_source == 'Spotify' %} {{ nm_spotify }}
+        {% elif current_source == 'TV (eARC)' %} {{ nm_tv }}
+        {% elif current_source == 'HDMI In' %} {{ nm_hdmi1 }}
+        {% elif current_source == 'Bluetooth' %} {{ nm_bluetooth }}
+        {% elif current_source == 'Airplay' %} {{ nm_airplay }}
+        {% else %} no_change
+        {% endif %}
+      target_rl: >-
+        {% if current_source == 'Spotify' %} {{ rl_spotify }}
+        {% elif current_source == 'TV (eARC)' %} {{ rl_tv }}
+        {% elif current_source == 'HDMI In' %} {{ rl_hdmi1 }}
+        {% elif current_source == 'Bluetooth' %} {{ rl_bluetooth }}
+        {% elif current_source == 'Airplay' %} {{ rl_airplay }}
+        {% else %} -11
+        {% endif %}
+      target_bl_sub: >-
+        {% if current_source == 'Spotify' %} {{ bl_sub_spotify }}
+        {% elif current_source == 'TV (eARC)' %} {{ bl_sub_tv }}
+        {% elif current_source == 'HDMI In' %} {{ bl_sub_hdmi1 }}
+        {% elif current_source == 'Bluetooth' %} {{ bl_sub_bluetooth }}
+        {% elif current_source == 'Airplay' %} {{ bl_sub_airplay }}
+        {% else %} none
+        {% endif %}
+      target_bl_no: >-
+        {% if current_source == 'Spotify' %} {{ bl_no_spotify }}
+        {% elif current_source == 'TV (eARC)' %} {{ bl_no_tv }}
+        {% elif current_source == 'HDMI In' %} {{ bl_no_hdmi1 }}
+        {% elif current_source == 'Bluetooth' %} {{ bl_no_bluetooth }}
+        {% elif current_source == 'Airplay' %} {{ bl_no_airplay }}
+        {% else %} none
+        {% endif %}
+      target_cec: >-
+        {% if current_source == 'Spotify' %} {{ cec_spotify }}
+        {% elif current_source == 'TV (eARC)' %} {{ cec_tv }}
+        {% elif current_source == 'HDMI In' %} {{ cec_hdmi1 }}
+        {% elif current_source == 'Bluetooth' %} {{ cec_bluetooth }}
+        {% elif current_source == 'Airplay' %} {{ cec_airplay }}
+        {% else %} no_change
+        {% endif %}
+
+      # Final decision for Night Mode
+      target_nm: >-
+        {% set config = target_nm_config | trim %}
+        {% if config == 'on' %}
+          {{ 'on' if is_night else 'off' }}
+        {% else %}
+          {{ config }}
+        {% endif %}
+
+  - if:
+      - condition: template
+        value_template: "{{ ve_entity is not none and target_ve | trim != 'no_change' }}"
+    then:
+      - service: "switch.turn_{{ target_ve | trim }}"
+        target:
+          entity_id: "{{ ve_entity }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ av_entity is not none and target_av | trim != 'no_change' }}"
+    then:
+      - service: "switch.turn_{{ target_av | trim }}"
+        target:
+          entity_id: "{{ av_entity }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ sf_entity is not none and target_sf | trim != 'no_change' }}"
+    then:
+      - service: "switch.turn_{{ target_sf | trim }}"
+        target:
+          entity_id: "{{ sf_entity }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ vol_entity is not none and target_vol | int != -1 }}"
+    then:
+      - service: number.set_value
+        target:
+          entity_id: "{{ vol_entity }}"
+        data:
+          value: "{{ target_vol | int }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ drc_entity is not none and target_drc | trim != 'no_change' }}"
+    then:
+      - service: select.select_option
+        target:
+          entity_id: "{{ drc_entity }}"
+        data:
+          option: "{{ target_drc | trim }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ nm_entity is not none and target_nm | trim != 'no_change' }}"
+    then:
+      - service: "switch.turn_{{ target_nm | trim }}"
+        target:
+          entity_id: "{{ nm_entity }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ rl_entity is not none and target_rl | int != -11 }}"
+    then:
+      - service: number.set_value
+        target:
+          entity_id: "{{ rl_entity }}"
+        data:
+          value: "{{ target_rl | trim }}"
+
+  # Apply Bass Level (With Sub) if enabled and entity exists
+  - if:
+      - condition: template
+        value_template: "{{ bl_sub_enabled and bl_number_entity is not none and target_bl_sub | trim != 'none' }}"
+    then:
+      - service: number.set_value
+        target:
+          entity_id: "{{ bl_number_entity }}"
+        data:
+          value: "{{ target_bl_sub | trim }}"
+
+  # Apply Bass Level (No Sub) if enabled and entity exists
+  - if:
+      - condition: template
+        value_template: "{{ bl_no_enabled and bl_select_entity is not none and target_bl_no | trim != 'none' }}"
+    then:
+      - service: select.select_option
+        target:
+          entity_id: "{{ bl_select_entity }}"
+        data:
+          option: "{{ target_bl_no | trim }}"
+
+  # Apply HDMI CEC if needed
+  - if:
+      - condition: template
+        value_template: "{{ cec_entity is not none and target_cec | trim != 'no_change' }}"
+    then:
+      - service: "switch.turn_{{ target_cec | trim }}"
+        target:
+          entity_id: "{{ cec_entity }}"
+
+  # --- CUSTOM ACTIONS SECTION ---
+  - choose:
+      - conditions: "{{ current_source == 'TV (eARC)' }}"
+        sequence: !input actions_tv
+      - conditions: "{{ current_source == 'HDMI In' }}"
+        sequence: !input actions_hdmi1
+      - conditions: "{{ current_source == 'Spotify' }}"
+        sequence: !input actions_spotify
+      - conditions: "{{ current_source == 'Bluetooth' }}"
+        sequence: !input actions_bluetooth
+      - conditions: "{{ current_source == 'Airplay' }}"
+        sequence: !input actions_airplay
+
+mode: restart
+max_exceeded: silent
