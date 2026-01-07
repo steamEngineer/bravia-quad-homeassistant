@@ -434,7 +434,9 @@ blueprint:
       name: Bass Level (w/ Subwoofer)
       collapsed: true
       icon: mdi:speaker
-      description: Control Bass Level for each source when a subwoofer is connected
+      description: >
+        Control Bass Level for each source when a subwoofer is connected<br>*Range: -10
+        to 10 (-11 = No Change)*
       input:
         bl_with_sub_enabled:
           name: Enable
@@ -444,46 +446,46 @@ blueprint:
             boolean: {}
         bl_sub_tv:
           name: TV (eARC)
-          default: 0
+          default: -11
           selector:
             number:
-              min: -10
+              min: -11
               max: 10
               step: 1
               mode: slider
         bl_sub_hdmi1:
           name: HDMI In
-          default: 0
+          default: -11
           selector:
             number:
-              min: -10
+              min: -11
               max: 10
               step: 1
               mode: slider
         bl_sub_spotify:
           name: Spotify
-          default: 0
+          default: -11
           selector:
             number:
-              min: -10
+              min: -11
               max: 10
               step: 1
               mode: slider
         bl_sub_bluetooth:
           name: Bluetooth
-          default: 0
+          default: -11
           selector:
             number:
-              min: -10
+              min: -11
               max: 10
               step: 1
               mode: slider
         bl_sub_airplay:
           name: Airplay
-          default: 0
+          default: -11
           selector:
             number:
-              min: -10
+              min: -11
               max: 10
               step: 1
               mode: slider
@@ -502,7 +504,7 @@ blueprint:
             boolean: {}
         bl_no_tv:
           name: TV (eARC)
-          default: "MID"
+          default: "no_change"
           selector:
             select:
               mode: dropdown
@@ -510,9 +512,10 @@ blueprint:
                 - {label: "MIN", value: "MIN"}
                 - {label: "MID", value: "MID"}
                 - {label: "MAX", value: "MAX"}
+                - {label: "No Change", value: "no_change"}
         bl_no_hdmi1:
           name: HDMI In
-          default: "MID"
+          default: "no_change"
           selector:
             select:
               mode: dropdown
@@ -520,9 +523,10 @@ blueprint:
                 - {label: "MIN", value: "MIN"}
                 - {label: "MID", value: "MID"}
                 - {label: "MAX", value: "MAX"}
+                - {label: "No Change", value: "no_change"}
         bl_no_spotify:
           name: Spotify
-          default: "MID"
+          default: "no_change"
           selector:
             select:
               mode: dropdown
@@ -530,9 +534,10 @@ blueprint:
                 - {label: "MIN", value: "MIN"}
                 - {label: "MID", value: "MID"}
                 - {label: "MAX", value: "MAX"}
+                - {label: "No Change", value: "no_change"}
         bl_no_bluetooth:
           name: Bluetooth
-          default: "MID"
+          default: "no_change"
           selector:
             select:
               mode: dropdown
@@ -540,9 +545,10 @@ blueprint:
                 - {label: "MIN", value: "MIN"}
                 - {label: "MID", value: "MID"}
                 - {label: "MAX", value: "MAX"}
+                - {label: "No Change", value: "no_change"}
         bl_no_airplay:
           name: Airplay
-          default: "MID"
+          default: "no_change"
           selector:
             select:
               mode: dropdown
@@ -550,6 +556,7 @@ blueprint:
                 - {label: "MIN", value: "MIN"}
                 - {label: "MID", value: "MID"}
                 - {label: "MAX", value: "MAX"}
+                - {label: "No Change", value: "no_change"}
 
     hdmi_cec_section:
       name: HDMI CEC
@@ -845,7 +852,7 @@ action:
         {% elif current_source == 'HDMI In' %} {{ bl_sub_hdmi1 }}
         {% elif current_source == 'Bluetooth' %} {{ bl_sub_bluetooth }}
         {% elif current_source == 'Airplay' %} {{ bl_sub_airplay }}
-        {% else %} none
+        {% else %} -11
         {% endif %}
       target_bl_no: >-
         {% if current_source == 'Spotify' %} {{ bl_no_spotify }}
@@ -853,7 +860,7 @@ action:
         {% elif current_source == 'HDMI In' %} {{ bl_no_hdmi1 }}
         {% elif current_source == 'Bluetooth' %} {{ bl_no_bluetooth }}
         {% elif current_source == 'Airplay' %} {{ bl_no_airplay }}
-        {% else %} none
+        {% else %} no_change
         {% endif %}
       target_cec: >-
         {% if current_source == 'Spotify' %} {{ cec_spotify }}
@@ -938,7 +945,7 @@ action:
   # Apply Bass Level (With Sub) if enabled and entity exists
   - if:
       - condition: template
-        value_template: "{{ bl_sub_enabled and bl_number_entity is not none and target_bl_sub | trim != 'none' }}"
+        value_template: "{{ bl_sub_enabled and bl_number_entity is not none and target_bl_sub | int != -11 }}"
     then:
       - service: number.set_value
         target:
@@ -949,7 +956,7 @@ action:
   # Apply Bass Level (No Sub) if enabled and entity exists
   - if:
       - condition: template
-        value_template: "{{ bl_no_enabled and bl_select_entity is not none and target_bl_no | trim != 'none' }}"
+        value_template: "{{ bl_no_enabled and bl_select_entity is not none and target_bl_no | trim != 'no_change' }}"
     then:
       - service: select.select_option
         target:
