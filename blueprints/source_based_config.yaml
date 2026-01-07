@@ -435,8 +435,8 @@ blueprint:
       collapsed: true
       icon: mdi:speaker
       description: >
-        Control Bass Level for each source when a subwoofer is connected<br>*Range: -10
-        to 10 (-11 = No Change)*
+        Control Bass Level for each source when a subwoofer is connected<br>
+        *Range: -10 to 10 (-11 = No Change)*
       input:
         bl_with_sub_enabled:
           name: Enable
