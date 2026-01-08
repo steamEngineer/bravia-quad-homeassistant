@@ -44,6 +44,7 @@ from .const import (
     MIN_VOLUME,
     NIGHT_MODE_OFF,
     POWER_OFF,
+    POWER_ON,
     SOUND_FIELD_OFF,
     TCP_TIMEOUT,
     VOICE_ENHANCER_OFF,
@@ -87,6 +88,7 @@ class BraviaQuadClient:
         self._command_lock = asyncio.Lock()
         self._pending_responses: dict[int, asyncio.Future] = {}
         self._listener_task: asyncio.Task | None = None
+        self._background_tasks: set[asyncio.Task] = set()
 
     async def async_connect(self) -> None:
         """Connect to the Bravia Quad device."""
@@ -128,6 +130,13 @@ class BraviaQuadClient:
             if not future.done():
                 future.set_exception(ConnectionError("Disconnected"))
         self._pending_responses.clear()
+
+        # Cancel any background tasks
+        for task in self._background_tasks:
+            task.cancel()
+        if self._background_tasks:
+            await asyncio.gather(*self._background_tasks, return_exceptions=True)
+        self._background_tasks.clear()
 
         _LOGGER.info("Disconnected from Bravia Quad")
 
@@ -976,8 +985,20 @@ class BraviaQuadClient:
 
         self._update_internal_state(feature, value)
 
-        if msg_type == "notify":
+        # Dispatch callbacks for notifications and non-ACK results
+        if msg_type == "notify" or (
+            msg_type == "result"
+            and value is not None
+            and not (isinstance(value, str) and value.upper() == "ACK")
+        ):
             await self._dispatch_notification_callbacks(feature, value)
+
+        # Workaround for Bravia Quad failing to send input change notification on wake
+        if msg_type == "notify" and feature == FEATURE_POWER and value == POWER_ON:
+            _LOGGER.debug("Power on notification received, refreshing input state")
+            task = asyncio.create_task(self.async_get_input())
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
     def _update_internal_state(self, feature: str | None, value: Any) -> None:
         """Update cached state based on feature and value."""
