@@ -121,7 +121,7 @@ def mock_bravia_quad_client() -> Generator[MagicMock]:
         client.async_get_volume = AsyncMock(return_value=50)
         client.async_set_volume = AsyncMock(return_value=True)
         client.volume = 50
-        client.volume_transition_time = 0
+        client.volume_step_interval = 0
 
         # Input
         client.async_get_input = AsyncMock(return_value="tv")
