@@ -195,61 +195,61 @@ blueprint:
       icon: mdi:timer-outline
       description: >
         Control Volume Transition Duration for each source<br>
-        *Range: 0-10000ms (100ms steps), -1 = No Change*
+        *Range: 0-10000ms (100ms steps), -100 = No Change*
       input:
         vt_tv:
           name: TV (eARC)
           description: "Enter value in 100ms increments."
-          default: -1
+          default: -100
           selector:
             number:
-              min: -1
+              min: -100
               max: 10000
-              step: 1
+              step: 100
               mode: box
               unit_of_measurement: ms
         vt_hdmi1:
           name: HDMI In
           description: "Enter value in 100ms increments."
-          default: -1
+          default: -100
           selector:
             number:
-              min: -1
+              min: -100
               max: 10000
-              step: 1
+              step: 100
               mode: box
               unit_of_measurement: ms
         vt_spotify:
           name: Spotify
           description: "Enter value in 100ms increments."
-          default: -1
+          default: -100
           selector:
             number:
-              min: -1
+              min: -100
               max: 10000
-              step: 1
+              step: 100
               mode: box
               unit_of_measurement: ms
         vt_bluetooth:
           name: Bluetooth
           description: "Enter value in 100ms increments."
-          default: -1
+          default: -100
           selector:
             number:
-              min: -1
+              min: -100
               max: 10000
-              step: 1
+              step: 100
               mode: box
               unit_of_measurement: ms
         vt_airplay:
           name: Airplay
           description: "Enter value in 100ms increments."
-          default: -1
+          default: -100
           selector:
             number:
-              min: -1
+              min: -100
               max: 10000
-              step: 1
+              step: 100
               mode: box
               unit_of_measurement: ms
 
@@ -912,7 +912,7 @@ action:
         {% elif current_source == 'HDMI In' %} {{ vt_hdmi1 }}
         {% elif current_source == 'Bluetooth' %} {{ vt_bluetooth }}
         {% elif current_source == 'Airplay' %} {{ vt_airplay }}
-        {% else %} -1
+        {% else %} -100
         {% endif %}
       target_drc: >-
         {% if current_source == 'Spotify' %} {{ drc_spotify }}
@@ -998,7 +998,7 @@ action:
 
   - if:
       - condition: template
-        value_template: "{{ vt_entity is not none and target_vt | int != -1 }}"
+        value_template: "{{ vt_entity is not none and target_vt | int != -100 }}"
     then:
       - service: number.set_value
         target:
