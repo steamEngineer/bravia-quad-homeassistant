@@ -21,7 +21,7 @@ _This integration may also be compatible with other Bravia audio devices - see t
 - **Auto-Discovery**: Automatically discovers Bravia Theatre devices on your network using mDNS/zeroconf - no manual IP configuration needed
 - **Power Control**: Turn your Bravia Theatre system on and off
 - **Volume Control**: Adjust main volume from 0-100 via a number entity
-- **Smooth Volume Transitions**: Configure a transition time (0-10,000ms) to smoothly step volume up/down, avoiding jarring level changes
+- **Volume Step Interval**: Configure a delay (0-10,000ms) between volume steps to smoothly increment/decrement volume, avoiding jarring changes
 - **Rear Level Control**: Adjust rear speaker level from -10-10 via a number entity
 - **Source Selection**: Switch between inputs (TV/eARC, HDMI In, Spotify, Bluetooth, Airplay)
 - **Bass Level Control**: Automatically adapts based on subwoofer presence:
@@ -153,7 +153,7 @@ The integration creates the following entities under your Bravia Theatre device:
 |--------|------|-------------|---------------|
 | `switch.bravia_quad_*_power` | Switch | Control power on/off | on/off |
 | `number.bravia_quad_*_volume` | Number | Control main volume | 0-100 |
-| `number.bravia_quad_*_volume_transition` | Number | Smooth volume transition time | 0-10000 ms (100ms steps) |
+| `number.bravia_quad_*_volume_step_interval` | Number | Delay between volume steps | 0-10000 ms (1ms steps) |
 | `number.bravia_quad_*_rear_level` | Number | Control rear speaker level | -10-10 |
 | `number.bravia_quad_*_bass_level` | Number | Control bass level (with subwoofer) | -10-10 |
 | `select.bravia_quad_*_bass_level` | Select | Control bass level (without subwoofer) | MIN, MID, MAX |

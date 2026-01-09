@@ -17,7 +17,7 @@ from .const import (
     FEATURE_VOLUME,
     MAX_BASS_LEVEL,
     MAX_REAR_LEVEL,
-    MAX_VOLUME_TRANSITION,
+    MAX_VOLUME_STEP_INTERVAL,
     MIN_BASS_LEVEL,
     MIN_REAR_LEVEL,
 )
@@ -48,7 +48,7 @@ async def async_setup_entry(
     entities: list[NumberEntity] = [
         BraviaQuadVolumeNumber(client, entry),
         BraviaQuadRearLevelNumber(client, entry),
-        BraviaQuadVolumeTransitionNumber(client, entry),
+        BraviaQuadVolumeStepIntervalNumber(client, entry),
     ]
 
     # Only add bass level slider if subwoofer is detected
@@ -97,14 +97,14 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
         """Set the volume value."""
         target_volume = int(value)
         current_volume = int(self._attr_native_value or 0)
-        transition_ms = self._client.volume_transition_time
+        interval_ms = self._client.volume_step_interval
 
         # Cancel any existing transition
         if self._transition_task:
             self._transition_task.cancel()
             self._transition_task = None
 
-        if transition_ms <= 0 or current_volume == target_volume:
+        if interval_ms <= 0 or current_volume == target_volume:
             success = await self._client.async_set_volume(target_volume)
             if success:
                 self._attr_native_value = target_volume
@@ -115,7 +115,7 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
 
         # Start transition
         self._transition_task = self.hass.async_create_task(
-            self._async_volume_transition(current_volume, target_volume, transition_ms)
+            self._async_volume_transition(current_volume, target_volume, interval_ms)
         )
 
     async def async_will_remove_from_hass(self) -> None:
@@ -126,7 +126,7 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
         await super().async_will_remove_from_hass()
 
     async def _async_volume_transition(
-        self, start_volume: int, end_volume: int, transition_ms: int
+        self, start_volume: int, end_volume: int, interval_ms: int
     ) -> None:
         """Transition volume smoothly over time."""
         task = asyncio.current_task()
@@ -134,13 +134,17 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
         if steps == 0:
             return
 
-        # Calculate delay between steps
-        # We want to complete the transition in transition_ms
-        delay = transition_ms / 1000.0 / steps
+        # Use interval_ms as the delay between steps
+        delay = interval_ms / 1000.0
         step_increment = 1 if end_volume > start_volume else -1
 
         try:
             for i in range(1, steps + 1):
+                # Wait BEFORE sending the next step as requested:
+                # "volume is at 25 and I want it to go to 50, wait 223ms, send 26,
+                # wait 223ms, send 27 etc..."
+                await asyncio.sleep(delay)
+
                 next_volume = start_volume + (i * step_increment)
                 success = await self._client.async_set_volume(next_volume)
                 if success:
@@ -149,9 +153,6 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
                 else:
                     _LOGGER.warning("Failed to set volume step to %d", next_volume)
                     break
-
-                if i < steps:
-                    await asyncio.sleep(delay)
         except asyncio.CancelledError:
             _LOGGER.debug("Volume transition cancelled")
         finally:
@@ -265,23 +266,23 @@ class BraviaQuadBassLevelNumber(BraviaQuadNotificationMixin, NumberEntity):
             _LOGGER.exception("Failed to update bass level")
 
 
-class BraviaQuadVolumeTransitionNumber(RestoreNumber):
-    """Representation of a Bravia Quad volume transition time control."""
+class BraviaQuadVolumeStepIntervalNumber(RestoreNumber):
+    """Representation of a Bravia Quad volume step interval control."""
 
     _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_mode = NumberMode.BOX
-    _attr_native_max_value = MAX_VOLUME_TRANSITION
+    _attr_native_max_value = MAX_VOLUME_STEP_INTERVAL
     _attr_native_min_value = 0
-    _attr_native_step = 100
+    _attr_native_step = 1
     _attr_native_unit_of_measurement = "ms"
-    _attr_translation_key = "volume_transition"
+    _attr_translation_key = "volume_step_interval"
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
-        """Initialize the volume transition number entity."""
+        """Initialize the volume step interval number entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_volume_transition"
-        self._attr_native_value = client.volume_transition_time
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_volume_step_interval"
+        self._attr_native_value = client.volume_step_interval
         self._attr_device_info = get_device_info(entry)
 
     async def async_added_to_hass(self) -> None:
@@ -291,10 +292,10 @@ class BraviaQuadVolumeTransitionNumber(RestoreNumber):
             last_state := await self.async_get_last_number_data()
         ) is not None and last_state.native_value is not None:
             self._attr_native_value = last_state.native_value
-            self._client.volume_transition_time = int(last_state.native_value)
+            self._client.volume_step_interval = int(last_state.native_value)
 
     async def async_set_native_value(self, value: float) -> None:
-        """Set the volume transition time."""
-        self._client.volume_transition_time = int(value)
+        """Set the volume step interval."""
+        self._client.volume_step_interval = int(value)
         self._attr_native_value = value
         self.async_write_ha_state()

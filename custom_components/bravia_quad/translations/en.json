@@ -43,8 +43,8 @@
       "bass_level": {
         "name": "Bass level"
       },
-      "volume_transition": {
-        "name": "Volume transition time"
+      "volume_step_interval": {
+        "name": "Volume step interval"
       }
     },
     "select": {
