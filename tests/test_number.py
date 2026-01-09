@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.const import ATTR_ENTITY_ID, Platform
@@ -37,6 +37,7 @@ async def test_number_entities(
         "_volume": "50",
         "_rear_level": "0",
         "_bass_level_slider": "0",
+        "_volume_transition": "0",
     }
 
     for suffix, expected_state in expected_entities.items():
@@ -127,6 +128,77 @@ async def test_bass_level_number_set_value(
     )
 
     mock_bravia_quad_client.async_set_bass_level.assert_called_once_with(3)
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_volume_transition_number_set_value(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test setting the volume transition value."""
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_volume_transition")
+    assert entity_id is not None
+
+    # Verify initial state
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "0"
+
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: entity_id, "value": 500},
+        blocking=True,
+    )
+
+    assert mock_bravia_quad_client.volume_transition_time == 500
+    state = hass.states.get(entity_id)
+    assert state.state == "500.0"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_smooth_volume_transition(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test smooth volume transition logic."""
+    volume_id = get_entity_id_by_unique_id_suffix(entity_registry, "_volume")
+    transition_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, "_volume_transition"
+    )
+
+    # Set transition time to 100ms
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: transition_id, "value": 100},
+        blocking=True,
+    )
+    assert mock_bravia_quad_client.volume_transition_time == 100
+
+    # Set volume from 50 to 52 (2 steps)
+    # We use a small number of steps to keep test fast
+    mock_bravia_quad_client.async_set_volume.return_value = True
+
+    # We need to patch sleep to avoid waiting
+    with patch(
+        "custom_components.bravia_quad.number.asyncio.sleep", new_callable=AsyncMock
+    ):
+        await hass.services.async_call(
+            NUMBER_DOMAIN,
+            "set_value",
+            {ATTR_ENTITY_ID: volume_id, "value": 52},
+            blocking=True,
+        )
+        # Wait for the background task to complete
+        await hass.async_block_till_done()
+
+    # Should have called async_set_volume for each step: 51, 52
+    assert mock_bravia_quad_client.async_set_volume.call_count == 2
+    mock_bravia_quad_client.async_set_volume.assert_any_call(51)
+    mock_bravia_quad_client.async_set_volume.assert_any_call(52)
 
 
 @pytest.fixture
