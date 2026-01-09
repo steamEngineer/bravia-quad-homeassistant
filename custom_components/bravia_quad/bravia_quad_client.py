@@ -84,6 +84,7 @@ class BraviaQuadClient:
         self._auto_standby = AUTO_STANDBY_OFF
         self._drc = DRC_AUTO
         self._aav = AAV_OFF
+        self._volume_transition_time = 0
         self._command_id_counter = CMD_ID_INITIAL
         self._command_lock = asyncio.Lock()
         self._pending_responses: dict[int, asyncio.Future] = {}
@@ -880,6 +881,16 @@ class BraviaQuadClient:
     def aav(self) -> str:
         """Return current Advanced Auto Volume state."""
         return self._aav
+
+    @property
+    def volume_transition_time(self) -> int:
+        """Return the volume transition time in ms."""
+        return self._volume_transition_time
+
+    @volume_transition_time.setter
+    def volume_transition_time(self, value: int) -> None:
+        """Set the volume transition time in ms."""
+        self._volume_transition_time = value
 
     async def async_fetch_all_states(self) -> None:
         """Fetch all current states from the device."""

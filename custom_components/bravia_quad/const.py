@@ -7,10 +7,12 @@ DOMAIN = "bravia_quad"
 # Configuration keys
 CONF_HAS_SUBWOOFER = "has_subwoofer"
 CONF_MODEL = "model"
+CONF_VOLUME_TRANSITION = "volume_transition"
 
 # Default values
 DEFAULT_MODEL = "Bravia Theatre"
 DEFAULT_NAME = "Bravia Theatre"
+DEFAULT_VOLUME_TRANSITION = 0  # ms
 
 # Default port for Bravia Theatre TCP communication
 DEFAULT_PORT = 33336
@@ -29,6 +31,8 @@ CMD_ID_AUTO_STANDBY = 1
 # Device limits
 MAX_VOLUME = 100
 MIN_VOLUME = 0
+MAX_VOLUME_TRANSITION = 10000  # 10s
+DEFAULT_VOLUME_TRANSITION = 0  # ms
 MAX_REAR_LEVEL = 10
 MIN_REAR_LEVEL = -10
 MAX_BASS_LEVEL = 10
