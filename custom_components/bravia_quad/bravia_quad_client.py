@@ -84,6 +84,7 @@ class BraviaQuadClient:
         self._auto_standby = AUTO_STANDBY_OFF
         self._drc = DRC_AUTO
         self._aav = AAV_OFF
+        self._volume_step_interval = 0
         self._command_id_counter = CMD_ID_INITIAL
         self._command_lock = asyncio.Lock()
         self._pending_responses: dict[int, asyncio.Future] = {}
@@ -880,6 +881,16 @@ class BraviaQuadClient:
     def aav(self) -> str:
         """Return current Advanced Auto Volume state."""
         return self._aav
+
+    @property
+    def volume_step_interval(self) -> int:
+        """Return the volume step interval in ms."""
+        return self._volume_step_interval
+
+    @volume_step_interval.setter
+    def volume_step_interval(self, value: int) -> None:
+        """Set the volume step interval in ms."""
+        self._volume_step_interval = value
 
     async def async_fetch_all_states(self) -> None:
         """Fetch all current states from the device."""

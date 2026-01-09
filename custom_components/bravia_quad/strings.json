@@ -53,6 +53,9 @@
       },
       "bass_level": {
         "name": "Bass level"
+      },
+      "volume_step_interval": {
+        "name": "Volume step interval"
       }
     },
     "select": {
