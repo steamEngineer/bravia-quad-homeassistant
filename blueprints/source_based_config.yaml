@@ -834,18 +834,30 @@ condition:
 action:
   - variables:
       all_entities: "{{ device_entities(b_device_id) }}"
-      source_entity: "{{ all_entities | select('search', 'select\\..*_source') | first | default(none) }}"
-      ve_entity: "{{ all_entities | select('search', 'switch\\..*_voice_enhancer') | first | default(none) }}"
-      av_entity: "{{ all_entities | select('search', 'switch\\..*auto_volume') | first | default(none) }}"
-      sf_entity: "{{ all_entities | select('search', 'switch\\..*_sound_field') | first | default(none) }}"
-      vt_entity: "{{ all_entities | select('search', 'number\\..*_volume_transition') | first | default(none) }}"
-      vol_entity: "{{ all_entities | select('search', 'number\\..*_volume') | first | default(none) }}"
-      drc_entity: "{{ all_entities | select('search', 'select\\..*dynamic_range_compressor') | first | default(none) }}"
-      nm_entity: "{{ all_entities | select('search', 'switch\\..*_night_mode') | first | default(none) }}"
-      rl_entity: "{{ all_entities | select('search', 'number\\..*_rear_level') | first | default(none) }}"
-      bl_number_entity: "{{ all_entities | select('search', 'number\\..*bass_level') | first | default(none) }}"
-      bl_select_entity: "{{ all_entities | select('search', 'select\\..*bass_level') | first | default(none) }}"
-      cec_entity: "{{ all_entities | select('search', 'switch\\..*_hdmi_cec') | first | default(none) }}"
+      source_entity: >-
+        {{ all_entities | select('search', 'select\\..*_source$') | first | default(none) }}
+      ve_entity: >-
+        {{ all_entities | select('search', 'switch\\..*_voice_enhancer$') | first | default(none) }}
+      av_entity: >-
+        {{ all_entities | select('search', 'switch\\..*auto_volume$') | first | default(none) }}
+      sf_entity: >-
+        {{ all_entities | select('search', 'switch\\..*_sound_field$') | first | default(none) }}
+      vt_entity: >-
+        {{ all_entities | select('search', 'number\\..*_volume_transition_time$') | first | default(none) }}
+      vol_entity: >-
+        {{ all_entities | select('search', 'number\\..*_volume$') | first | default(none) }}
+      drc_entity: >-
+        {{ all_entities | select('search', 'select\\..*dynamic_range_compressor$') | first | default(none) }}
+      nm_entity: >-
+        {{ all_entities | select('search', 'switch\\..*_night_mode$') | first | default(none) }}
+      rl_entity: >-
+        {{ all_entities | select('search', 'number\\..*_rear_level$') | first | default(none) }}
+      bl_number_entity: >-
+        {{ all_entities | select('search', 'number\\..*bass_level$') | first | default(none) }}
+      bl_select_entity: >-
+        {{ all_entities | select('search', 'select\\..*bass_level$') | first | default(none) }}
+      cec_entity: >-
+        {{ all_entities | select('search', 'switch\\..*_hdmi_cec$') | first | default(none) }}
 
       current_source: "{{ states(source_entity) if source_entity is not none else 'unknown' }}"
 
