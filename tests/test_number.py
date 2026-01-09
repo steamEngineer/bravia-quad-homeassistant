@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
@@ -199,6 +200,76 @@ async def test_smooth_volume_transition(
     assert mock_bravia_quad_client.async_set_volume.call_count == 2
     mock_bravia_quad_client.async_set_volume.assert_any_call(51)
     mock_bravia_quad_client.async_set_volume.assert_any_call(52)
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_volume_transition_race_condition(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test race condition where multiple transitions are started."""
+    volume_id = get_entity_id_by_unique_id_suffix(entity_registry, "_volume")
+    transition_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, "_volume_transition"
+    )
+
+    # Set transition time to 1000ms
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: transition_id, "value": 1000},
+        blocking=True,
+    )
+
+    # Track how many transitions are active
+    active_transitions = 0
+    max_active_transitions = 0
+
+    async def mock_set_volume(val: int) -> bool:
+        nonlocal active_transitions, max_active_transitions
+        active_transitions += 1
+        max_active_transitions = max(max_active_transitions, active_transitions)
+        await asyncio.sleep(0.01)
+        active_transitions -= 1
+        return True
+
+    mock_bravia_quad_client.async_set_volume.side_effect = mock_set_volume
+
+    # Start first transition
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: volume_id, "value": 60},
+        blocking=True,
+    )
+    await asyncio.sleep(0.02)
+
+    # Start second transition immediately
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: volume_id, "value": 70},
+        blocking=True,
+    )
+    await asyncio.sleep(0.02)
+
+    # Start third transition
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: volume_id, "value": 80},
+        blocking=True,
+    )
+
+    # Wait for all transitions to complete
+    await hass.async_block_till_done()
+
+    # The bug causes Task B to NOT be cancelled by the third call
+    # because the first task's finally block cleared the reference.
+    # So Task B and Task C will run concurrently.
+
+    assert max_active_transitions == 1
 
 
 @pytest.fixture

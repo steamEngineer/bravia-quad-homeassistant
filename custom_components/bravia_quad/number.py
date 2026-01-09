@@ -122,6 +122,7 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
         self, start_volume: int, end_volume: int, transition_ms: int
     ) -> None:
         """Transition volume smoothly over time."""
+        task = asyncio.current_task()
         steps = abs(end_volume - start_volume)
         if steps == 0:
             return
@@ -147,7 +148,8 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
         except asyncio.CancelledError:
             _LOGGER.debug("Volume transition cancelled")
         finally:
-            self._transition_task = None
+            if self._transition_task is task:
+                self._transition_task = None
 
     async def async_update(self) -> None:
         """Update the volume value."""
