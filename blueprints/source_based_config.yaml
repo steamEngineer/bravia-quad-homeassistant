@@ -189,6 +189,70 @@ blueprint:
                 - {label: "Off", value: "off"}
                 - {label: "No Change", value: "no_change"}
 
+    volume_transition_section:
+      name: Volume Transition Duration
+      collapsed: true
+      icon: mdi:timer-outline
+      description: >
+        Control Volume Transition Duration for each source<br>
+        *Range: 0-10000ms (100ms steps), -1 = No Change*
+      input:
+        vt_tv:
+          name: TV (eARC)
+          description: "Enter value in 100ms increments."
+          default: -1
+          selector:
+            number:
+              min: -1
+              max: 10000
+              step: 1
+              mode: box
+              unit_of_measurement: ms
+        vt_hdmi1:
+          name: HDMI In
+          description: "Enter value in 100ms increments."
+          default: -1
+          selector:
+            number:
+              min: -1
+              max: 10000
+              step: 1
+              mode: box
+              unit_of_measurement: ms
+        vt_spotify:
+          name: Spotify
+          description: "Enter value in 100ms increments."
+          default: -1
+          selector:
+            number:
+              min: -1
+              max: 10000
+              step: 1
+              mode: box
+              unit_of_measurement: ms
+        vt_bluetooth:
+          name: Bluetooth
+          description: "Enter value in 100ms increments."
+          default: -1
+          selector:
+            number:
+              min: -1
+              max: 10000
+              step: 1
+              mode: box
+              unit_of_measurement: ms
+        vt_airplay:
+          name: Airplay
+          description: "Enter value in 100ms increments."
+          default: -1
+          selector:
+            number:
+              min: -1
+              max: 10000
+              step: 1
+              mode: box
+              unit_of_measurement: ms
+
     volume_section:
       name: Volume
       collapsed: true
@@ -679,6 +743,13 @@ variables:
   vol_bluetooth: !input vol_bluetooth
   vol_airplay: !input vol_airplay
 
+  # Volume Transition variables
+  vt_spotify: !input vt_spotify
+  vt_tv: !input vt_tv
+  vt_hdmi1: !input vt_hdmi1
+  vt_bluetooth: !input vt_bluetooth
+  vt_airplay: !input vt_airplay
+
   # Dynamic Range Compressor variables
   drc_spotify: !input drc_spotify
   drc_tv: !input drc_tv
@@ -767,6 +838,7 @@ action:
       ve_entity: "{{ all_entities | select('search', 'switch\\..*_voice_enhancer') | first | default(none) }}"
       av_entity: "{{ all_entities | select('search', 'switch\\..*auto_volume') | first | default(none) }}"
       sf_entity: "{{ all_entities | select('search', 'switch\\..*_sound_field') | first | default(none) }}"
+      vt_entity: "{{ all_entities | select('search', 'number\\..*_volume_transition') | first | default(none) }}"
       vol_entity: "{{ all_entities | select('search', 'number\\..*_volume') | first | default(none) }}"
       drc_entity: "{{ all_entities | select('search', 'select\\..*dynamic_range_compressor') | first | default(none) }}"
       nm_entity: "{{ all_entities | select('search', 'switch\\..*_night_mode') | first | default(none) }}"
@@ -820,6 +892,14 @@ action:
         {% elif current_source == 'HDMI In' %} {{ vol_hdmi1 }}
         {% elif current_source == 'Bluetooth' %} {{ vol_bluetooth }}
         {% elif current_source == 'Airplay' %} {{ vol_airplay }}
+        {% else %} -1
+        {% endif %}
+      target_vt: >-
+        {% if current_source == 'Spotify' %} {{ vt_spotify }}
+        {% elif current_source == 'TV (eARC)' %} {{ vt_tv }}
+        {% elif current_source == 'HDMI In' %} {{ vt_hdmi1 }}
+        {% elif current_source == 'Bluetooth' %} {{ vt_bluetooth }}
+        {% elif current_source == 'Airplay' %} {{ vt_airplay }}
         {% else %} -1
         {% endif %}
       target_drc: >-
@@ -903,6 +983,16 @@ action:
       - service: "switch.turn_{{ target_sf | trim }}"
         target:
           entity_id: "{{ sf_entity }}"
+
+  - if:
+      - condition: template
+        value_template: "{{ vt_entity is not none and target_vt | int != -1 }}"
+    then:
+      - service: number.set_value
+        target:
+          entity_id: "{{ vt_entity }}"
+        data:
+          value: "{{ target_vt | int }}"
 
   - if:
       - condition: template
