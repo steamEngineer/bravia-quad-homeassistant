@@ -39,13 +39,13 @@ _This integration may also be compatible with other Bravia audio devices - see t
 
 ## Device Compatibility
 
-The following table details device compatibility with this Home Assistant integration. Compatibility is based on whether devices use the same TCP/IP protocol (port 33336) as the BRAVIA Theatre Theatre.
+The following table details device compatibility with this Home Assistant integration. Compatibility is based on whether devices use the same TCP/IP protocol (port 33336) as the BRAVIA Theatre.
 
 | Device Name | Model | Connection Type | Compatibility |
 |-------------|-------|-----------------|---------------|
-| BRAVIA Theatre Quad | HT-A9M2 | WiFi | Compatible |
-| BRAVIA Theatre Bar 8 | HT-A8000 | WiFi | Untested |
-| BRAVIA Theatre Bar 9 | HT-A9000 | WiFi | Untested |
+| BRAVIA Theatre Quad | HT-A9M2 | WiFi/Ethernet | Compatible |
+| BRAVIA Theatre Bar 8 | HT-A8000 | WiFi/Ethernet | Untested |
+| BRAVIA Theatre Bar 9 | HT-A9000 | WiFi/Ethernet | Untested |
 | BRAVIA Theatre Bar 6 | HT-B600/BD60 | Bluetooth | Incompatible |
 | BRAVIA Theatre System 6 | HT-S60 | Bluetooth | Incompatible |
 | HT-AX7 | HT-AX7 | Bluetooth | Incompatible |
@@ -57,7 +57,7 @@ The following table details device compatibility with this Home Assistant integr
 
 Before setting up this integration, ensure **External control** is enabled on your Bravia device:
 
-1. Open the **Sony Home Entertainment Connect** app on your phone
+1. Open the **BRAVIA Connect** app on your phone
 2. Go to **Settings** → **Network settings**
 3. Enable **External control**
 
@@ -110,6 +110,39 @@ The integration will automatically test the connection by sending a power status
 - IP control is enabled on your Bravia Theatre device
 - The device is accessible on your network
 - Port 33336 is not blocked by a firewall
+
+## Blueprints
+
+This integration includes a powerful Home Assistant Blueprint to help you automate your Bravia Theatre settings based on the currently selected source.
+
+### Bravia Theatre Source-Based Configuration
+
+This blueprint allows you to automatically adjust settings like **Voice Enhancer**, **Auto Volume**, **Sound Field**, **Night Mode**, **Volume**, and **Rear Level** for each input source.
+
+**Key Features:**
+- **Source-Specific Settings**: Configure different audio profiles for TV, HDMI, Spotify, Bluetooth, and Airplay.
+- **Night Mode Window**: Optionally define a time window for Night Mode to activate automatically during late hours.
+- **Custom Actions**: Run additional Home Assistant actions (e.g., changing lights or scene) when a specific source is selected.
+
+<details>
+<summary> [GIF] Bravia reconfiguring on source change</summary>
+
+<img src="assets/pictures/source_based_config.gif" alt="Bravia Quad Device Page in Home Assistant" width="200">
+
+</details>
+
+### Installation & Usage
+
+The easiest way to install this blueprint is by importing it directly into Home Assistant:
+
+[![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FsteamEngineer%2Fbravia-quad-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fsource_based_config.yaml)
+
+**Manual Import:**
+1. In Home Assistant, go to **Settings** → **Automations & Scenes** → **Blueprints**.
+2. Click **Import Blueprint** (bottom right).
+3. Paste the following URL:
+   `https://github.com/steamEngineer/bravia-quad-homeassistant/blob/main/blueprints/source_based_config.yaml`
+4. Click **Preview**, then **Import**.
 
 ## Entities
 
