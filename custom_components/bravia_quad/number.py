@@ -118,6 +118,13 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
             self._async_volume_transition(current_volume, target_volume, transition_ms)
         )
 
+    async def async_will_remove_from_hass(self) -> None:
+        """Cancel any ongoing transition when entity is removed."""
+        if self._transition_task:
+            self._transition_task.cancel()
+            self._transition_task = None
+        await super().async_will_remove_from_hass()
+
     async def _async_volume_transition(
         self, start_volume: int, end_volume: int, transition_ms: int
     ) -> None:

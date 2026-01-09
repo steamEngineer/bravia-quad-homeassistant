@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
@@ -295,3 +296,70 @@ async def test_bass_level_not_created_without_subwoofer(
     # Bass level slider should NOT exist when subwoofer is not present
     entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_bass_level_slider")
     assert entity_id is None
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_volume_transition_cancellation_on_remove(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test volume transition is cancelled when entity is removed."""
+    volume_id = get_entity_id_by_unique_id_suffix(entity_registry, "_volume")
+    transition_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, "_volume_transition"
+    )
+
+    # Set transition time to 1000ms
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: transition_id, "value": 1000},
+        blocking=True,
+    )
+
+    # Track if transition was cancelled
+    cancelled = False
+
+    async def mock_set_volume(val: int) -> bool:
+        nonlocal cancelled
+        try:
+            await asyncio.sleep(1)
+        except asyncio.CancelledError:
+            cancelled = True
+            raise
+        else:
+            return True
+
+    mock_bravia_quad_client.async_set_volume.side_effect = mock_set_volume
+
+    # Start transition
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: volume_id, "value": 60},
+        blocking=False,
+    )
+
+    # Give it a moment to start the task
+    await asyncio.sleep(0.05)
+
+    # Get the entity object
+    # In Home Assistant tests, we can access entities via the component
+    component = hass.data["number"]
+    entity = next(ent for ent in component.entities if ent.entity_id == volume_id)
+
+    assert entity._transition_task is not None  # noqa: SLF001
+    task = entity._transition_task  # noqa: SLF001
+
+    # Remove the entity (simulating removal from HA)
+    await entity.async_will_remove_from_hass()
+
+    # Wait for the task to be cancelled
+    with contextlib.suppress(asyncio.CancelledError):
+        await asyncio.wait_for(task, timeout=0.1)
+
+    # The task should be cancelled
+    assert task.cancelled() or task.done()
+    assert entity._transition_task is None  # noqa: SLF001
+    assert cancelled is True
