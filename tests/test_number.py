@@ -365,3 +365,250 @@ async def test_volume_step_interval_cancellation_on_remove(
     assert task.cancelled() or task.done()
     assert entity._transition_task is None  # noqa: SLF001
     assert cancelled is True
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_volume_slider_does_not_update_during_transition(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test that slider doesn't update from notifications during transition."""
+    volume_id = get_entity_id_by_unique_id_suffix(entity_registry, "_volume")
+    interval_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, "_volume_step_interval"
+    )
+    assert volume_id is not None
+    assert interval_id is not None
+
+    # Set interval to 100ms
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: interval_id, "value": 100},
+        blocking=True,
+    )
+
+    # Get the entity object to access internal state and notification handler
+    component = hass.data["number"]
+    entity = next(ent for ent in component.entities if ent.entity_id == volume_id)
+
+    # Control when volume steps complete
+    step_event = asyncio.Event()
+
+    async def slow_set_volume(val: int) -> bool:
+        await step_event.wait()
+        step_event.clear()
+        return True
+
+    mock_bravia_quad_client.async_set_volume.side_effect = slow_set_volume
+
+    # Start transition from 50 to 53 (3 steps)
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: volume_id, "value": 53},
+        blocking=True,
+    )
+
+    # The slider should immediately show target value
+    state = hass.states.get(volume_id)
+    assert state is not None
+    assert state.state == "53"
+
+    # Verify transition is in progress
+    assert entity._transition_in_progress is True  # noqa: SLF001
+
+    # Simulate device sending back notification with intermediate value
+    # This should be ignored during transition
+    await entity._on_notification(51)  # noqa: SLF001
+
+    # State should still be target value, not the notification value
+    state = hass.states.get(volume_id)
+    assert state is not None
+    assert state.state == "53"
+
+    # Complete all steps
+    for _ in range(3):
+        step_event.set()
+        await asyncio.sleep(0.15)  # Wait for sleep + step
+
+    await hass.async_block_till_done()
+
+    # Transition should be complete
+    assert entity._transition_in_progress is False  # noqa: SLF001
+
+    # Now notifications should update the state
+    await entity._on_notification(55)  # noqa: SLF001
+    state = hass.states.get(volume_id)
+    assert state is not None
+    assert state.state == "55"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_volume_transition_sets_target_immediately(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test that slider shows target value immediately when transition starts."""
+    volume_id = get_entity_id_by_unique_id_suffix(entity_registry, "_volume")
+    interval_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, "_volume_step_interval"
+    )
+    assert volume_id is not None
+    assert interval_id is not None
+
+    # Set interval to 500ms (long enough to observe)
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: interval_id, "value": 500},
+        blocking=True,
+    )
+
+    # Block volume commands so transition stays active
+    volume_blocked = asyncio.Event()
+
+    async def blocked_set_volume(val: int) -> bool:
+        await volume_blocked.wait()
+        return True
+
+    mock_bravia_quad_client.async_set_volume.side_effect = blocked_set_volume
+
+    # Initial state is 50
+    state = hass.states.get(volume_id)
+    assert state is not None
+    assert state.state == "50"
+
+    # Start transition to 60
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: volume_id, "value": 60},
+        blocking=True,
+    )
+
+    # State should immediately be 60 (the target), not 50
+    state = hass.states.get(volume_id)
+    assert state is not None
+    assert state.state == "60"
+
+    # Unblock and cleanup
+    volume_blocked.set()
+    await hass.async_block_till_done()
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_volume_transition_flag_reset_on_cancel(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test transition_in_progress flag is reset when transition is cancelled."""
+    volume_id = get_entity_id_by_unique_id_suffix(entity_registry, "_volume")
+    interval_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, "_volume_step_interval"
+    )
+    assert volume_id is not None
+    assert interval_id is not None
+
+    # Set interval to 500ms
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: interval_id, "value": 500},
+        blocking=True,
+    )
+
+    # Block volume commands
+    volume_blocked = asyncio.Event()
+
+    async def blocked_set_volume(val: int) -> bool:
+        await volume_blocked.wait()
+        return True
+
+    mock_bravia_quad_client.async_set_volume.side_effect = blocked_set_volume
+
+    # Get the entity object
+    component = hass.data["number"]
+    entity = next(ent for ent in component.entities if ent.entity_id == volume_id)
+
+    # Start first transition
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: volume_id, "value": 60},
+        blocking=True,
+    )
+
+    assert entity._transition_in_progress is True  # noqa: SLF001
+
+    # Start second transition (should cancel the first)
+    mock_bravia_quad_client.async_set_volume.reset_mock()
+    mock_bravia_quad_client.async_set_volume.return_value = True
+    mock_bravia_quad_client.async_set_volume.side_effect = None
+
+    # This new call with interval=0 should just set directly
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: interval_id, "value": 0},
+        blocking=True,
+    )
+
+    await hass.services.async_call(
+        NUMBER_DOMAIN,
+        "set_value",
+        {ATTR_ENTITY_ID: volume_id, "value": 70},
+        blocking=True,
+    )
+
+    # With interval=0, no transition should be in progress
+    assert entity._transition_in_progress is False  # noqa: SLF001
+
+    # Cleanup
+    volume_blocked.set()
+    await hass.async_block_till_done()
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_volume_notification_accepted_after_transition(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test notifications are accepted after transition completes."""
+    volume_id = get_entity_id_by_unique_id_suffix(entity_registry, "_volume")
+    assert volume_id is not None
+
+    # Set interval directly on the mock client
+    mock_bravia_quad_client.volume_step_interval = 10
+    mock_bravia_quad_client.async_set_volume.return_value = True
+
+    # Get the entity object
+    component = hass.data["number"]
+    entity = next(ent for ent in component.entities if ent.entity_id == volume_id)
+
+    # Start transition from 50 to 52 (2 steps)
+    with patch(
+        "custom_components.bravia_quad.number.asyncio.sleep", new_callable=AsyncMock
+    ):
+        await hass.services.async_call(
+            NUMBER_DOMAIN,
+            "set_value",
+            {ATTR_ENTITY_ID: volume_id, "value": 52},
+            blocking=True,
+        )
+        # Wait for the transition task to complete within the patch context
+        if entity._transition_task:  # noqa: SLF001
+            await entity._transition_task  # noqa: SLF001
+
+    # Transition should be complete
+    assert entity._transition_in_progress is False  # noqa: SLF001
+
+    # Now a notification should update the state
+    await entity._on_notification(45)  # noqa: SLF001
+    state = hass.states.get(volume_id)
+    assert state is not None
+    assert state.state == "45"
