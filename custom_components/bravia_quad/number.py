@@ -77,17 +77,17 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
         self._attr_native_value = client.volume
         self._attr_device_info = get_device_info(entry)
         self._transition_task: asyncio.Task | None = None
+        self._transition_in_progress = False
 
     async def _on_notification(self, value: Any) -> None:
         """Handle volume notification."""
+        # Skip UI updates during transition to prevent jerky slider movement
+        if self._transition_in_progress:
+            return
+
         try:
             volume = int(value)
             if 0 <= volume <= MAX_VOLUME:
-                # If we're transitioning and the device reports a volume change,
-                # we might want to let the transition continue, but if it matches
-                # our target, we're done. Actually, for simplicity, let's just
-                # update the internal value and if it wasn't us, the user might
-                # see a jump.
                 self._attr_native_value = volume
                 self.async_write_ha_state()
         except (ValueError, TypeError):
@@ -113,7 +113,11 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
                 _LOGGER.error("Failed to set volume to %d", target_volume)
             return
 
-        # Start transition
+        # Start transition - set target value immediately for smooth UI
+        self._attr_native_value = target_volume
+        self.async_write_ha_state()
+        self._transition_in_progress = True
+
         self._transition_task = self.hass.async_create_task(
             self._async_volume_transition(current_volume, target_volume, interval_ms)
         )
@@ -123,6 +127,7 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
         if self._transition_task:
             self._transition_task.cancel()
             self._transition_task = None
+        self._transition_in_progress = False
         await super().async_will_remove_from_hass()
 
     async def _async_volume_transition(
@@ -132,6 +137,7 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
         task = asyncio.current_task()
         steps = abs(end_volume - start_volume)
         if steps == 0:
+            self._transition_in_progress = False
             return
 
         # Use interval_ms as the delay between steps
@@ -147,15 +153,13 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
 
                 next_volume = start_volume + (i * step_increment)
                 success = await self._client.async_set_volume(next_volume)
-                if success:
-                    self._attr_native_value = next_volume
-                    self.async_write_ha_state()
-                else:
+                if not success:
                     _LOGGER.warning("Failed to set volume step to %d", next_volume)
                     break
         except asyncio.CancelledError:
             _LOGGER.debug("Volume transition cancelled")
         finally:
+            self._transition_in_progress = False
             if self._transition_task is task:
                 self._transition_task = None
 
