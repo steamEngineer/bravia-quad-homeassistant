@@ -1,21 +1,37 @@
+---
 name: Release Drafter
 
+# yamllint disable-line rule:truthy
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      prerelease:
+        description: "Create a pre-release (beta)"
+        required: false
+        type: boolean
+        default: false
+      prerelease_identifier:
+        description: "Pre-release identifier"
+        required: false
+        type: choice
+        default: "beta"
+        options:
+          - beta
+          - alpha
+          - rc
 
 jobs:
   update_release_draft:
     name: ✏️ Draft release
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
       - name: 🚀 Run Release Drafter
         uses: release-drafter/release-drafter@v6.1.0
         with:
-          config-name: release-drafter.yml
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          prerelease-identifier: ${{ github.event.inputs.prerelease_identifier }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
