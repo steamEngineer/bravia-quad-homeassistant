@@ -56,7 +56,7 @@ class SelectTestCase(NamedTuple):
 
     entity_suffix: str
     feature: str
-    test_values: list[tuple[str, str]]
+    test_values: list[str]
 
 
 # Expected notification features by platform
@@ -99,16 +99,8 @@ NUMBER_TEST_CASES = [
 ]
 
 SELECT_TEST_CASES = [
-    SelectTestCase(
-        "_input",
-        FEATURE_INPUT,
-        [("hdmi1", "HDMI In"), ("bluetooth", "Bluetooth"), ("tv", "TV (eARC)")],
-    ),
-    SelectTestCase(
-        "_drc",
-        FEATURE_DRC,
-        [("on", "On"), ("off", "Off"), ("auto", "Auto")],
-    ),
+    SelectTestCase("_input", FEATURE_INPUT, ["hdmi1", "bluetooth", "tv"]),
+    SelectTestCase("_drc", FEATURE_DRC, ["on", "off", "auto"]),
 ]
 
 
@@ -284,11 +276,9 @@ async def test_select_notification_updates_state(
     callback = _get_registered_callback(mock_bravia_quad_client, test_case.feature)
     assert callback is not None, f"Callback for {test_case.feature} not registered"
 
-    for notification_value, expected_state in test_case.test_values:
-        await callback(notification_value)
+    for value in test_case.test_values:
+        await callback(value)
         await hass.async_block_till_done()
 
         state = hass.states.get(entity_id)
-        assert state.state == expected_state, (
-            f"Expected '{expected_state}' after '{notification_value}' notification"
-        )
+        assert state.state == value, f"Expected '{value}' after '{value}' notification"

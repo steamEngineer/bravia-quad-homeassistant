@@ -20,7 +20,6 @@ from .const import (
     CMD_ID_POWER,
     CMD_ID_VOLUME,
     DEFAULT_PORT,
-    DRC_AUTO,
     FEATURE_AAV,
     FEATURE_AUTO_STANDBY,
     FEATURE_BASS_LEVEL,
@@ -55,8 +54,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
-# Default bass level (MID)
-DEFAULT_BASS_LEVEL = 1
+# Default values
+DEFAULT_BASS_LEVEL = 1  # MID
+DEFAULT_DRC = "auto"
 
 
 class BraviaQuadClient:
@@ -82,7 +82,7 @@ class BraviaQuadClient:
         self._night_mode = NIGHT_MODE_OFF
         self._hdmi_cec = HDMI_CEC_OFF
         self._auto_standby = AUTO_STANDBY_OFF
-        self._drc = DRC_AUTO
+        self._drc = DEFAULT_DRC
         self._aav = AAV_OFF
         self._volume_step_interval = 0
         self._command_id_counter = CMD_ID_INITIAL
@@ -557,7 +557,7 @@ class BraviaQuadClient:
             and response.get("type") == "result"
             and response.get("feature") == FEATURE_DRC
         ):
-            self._drc = response.get("value", DRC_AUTO)
+            self._drc = response.get("value", DEFAULT_DRC)
             return self._drc
         return self._drc
 

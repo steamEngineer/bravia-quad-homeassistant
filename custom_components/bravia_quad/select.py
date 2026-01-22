@@ -11,16 +11,13 @@ from homeassistant.helpers import entity_registry as er
 
 from .const import (
     BASS_LEVEL_OPTIONS,
-    BASS_LEVEL_VALUES_TO_OPTIONS,
     CONF_HAS_SUBWOOFER,
     DOMAIN,
     DRC_OPTIONS,
-    DRC_VALUES_TO_OPTIONS,
     FEATURE_BASS_LEVEL,
     FEATURE_DRC,
     FEATURE_INPUT,
     INPUT_OPTIONS,
-    INPUT_VALUES_TO_OPTIONS,
 )
 from .helpers import BraviaQuadNotificationMixin, get_device_info
 
@@ -32,6 +29,11 @@ if TYPE_CHECKING:
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
+
+# Reverse mapping for bass level (int -> API value)
+BASS_LEVEL_VALUES_TO_OPTIONS: dict[int, str] = {
+    v: k for k, v in BASS_LEVEL_OPTIONS.items()
+}
 
 
 async def async_setup_entry(
@@ -69,32 +71,28 @@ class BraviaQuadInputSelect(BraviaQuadNotificationMixin, SelectEntity):
         """Initialize the input select entity."""
         self._client = client
         self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_input"
-        self._attr_options = list(INPUT_OPTIONS.keys())
+        self._attr_options = INPUT_OPTIONS
         current_input_value = client.input
-        self._attr_current_option = INPUT_VALUES_TO_OPTIONS.get(
-            current_input_value, next(iter(INPUT_OPTIONS.keys()), "TV (eARC)")
+        self._attr_current_option = (
+            current_input_value if current_input_value in INPUT_OPTIONS else "tv"
         )
         self._attr_device_info = get_device_info(entry)
 
     async def _on_notification(self, value: str) -> None:
         """Handle input notification."""
-        # Convert value (e.g., "tv") to display option (e.g., "TV (eARC)")
-        option = INPUT_VALUES_TO_OPTIONS.get(value)
-        if option:
-            self._attr_current_option = option
+        if value in INPUT_OPTIONS:
+            self._attr_current_option = value
             self.async_write_ha_state()
         else:
             _LOGGER.warning("Unknown input value received: %s", value)
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        # Convert display option (e.g., "TV (eARC)") to value (e.g., "tv")
-        input_value = INPUT_OPTIONS.get(option)
-        if not input_value:
+        if option not in INPUT_OPTIONS:
             _LOGGER.error("Invalid input option: %s", option)
             return
 
-        success = await self._client.async_set_input(input_value)
+        success = await self._client.async_set_input(option)
         if success:
             self._attr_current_option = option
             self.async_write_ha_state()
@@ -105,10 +103,8 @@ class BraviaQuadInputSelect(BraviaQuadNotificationMixin, SelectEntity):
         """Update the current input."""
         try:
             input_value = await self._client.async_get_input()
-            # Convert value to display option
-            option = INPUT_VALUES_TO_OPTIONS.get(input_value)
-            if option:
-                self._attr_current_option = option
+            if input_value in INPUT_OPTIONS:
+                self._attr_current_option = input_value
             else:
                 _LOGGER.warning("Unknown input value: %s", input_value)
         except (OSError, TimeoutError):
@@ -136,7 +132,7 @@ class BraviaQuadBassLevelSelect(BraviaQuadNotificationMixin, SelectEntity):
         self._attr_options = list(BASS_LEVEL_OPTIONS.keys())
         current_bass_value = client.bass_level
         self._attr_current_option = BASS_LEVEL_VALUES_TO_OPTIONS.get(
-            current_bass_value, "MID"
+            current_bass_value, "mid"
         )
         self._attr_device_info = get_device_info(entry)
 
@@ -144,7 +140,7 @@ class BraviaQuadBassLevelSelect(BraviaQuadNotificationMixin, SelectEntity):
         """Handle bass level notification."""
         try:
             bass_level = int(value)
-            # Convert value (0-2) to display option (MIN/MID/MAX)
+            # Convert value (0-2) to option key (min/mid/max)
             option = BASS_LEVEL_VALUES_TO_OPTIONS.get(bass_level)
             if option:
                 self._attr_current_option = option
@@ -185,7 +181,6 @@ class BraviaQuadBassLevelSelect(BraviaQuadNotificationMixin, SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        # Convert display option (e.g., "MID") to value (e.g., 1)
         bass_level = BASS_LEVEL_OPTIONS.get(option)
         if bass_level is None:
             _LOGGER.error("Invalid bass level option: %s", option)
@@ -202,7 +197,7 @@ class BraviaQuadBassLevelSelect(BraviaQuadNotificationMixin, SelectEntity):
         """Update the current bass level."""
         try:
             bass_level_value = await self._client.async_get_bass_level()
-            # Convert value to display option
+            # Convert value to option key
             option = BASS_LEVEL_VALUES_TO_OPTIONS.get(bass_level_value)
             if option:
                 self._attr_current_option = option
@@ -225,31 +220,29 @@ class BraviaQuadDynamicRangeCompressorSelect(BraviaQuadNotificationMixin, Select
         """Initialize the Dynamic Range Compressor select entity."""
         self._client = client
         self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_drc"
-        self._attr_options = list(DRC_OPTIONS.keys())
+        self._attr_options = DRC_OPTIONS
         # Initialize current option from client's current DRC state
         current_drc_value = client.drc
-        self._attr_current_option = DRC_VALUES_TO_OPTIONS.get(current_drc_value, "Auto")
+        self._attr_current_option = (
+            current_drc_value if current_drc_value in DRC_OPTIONS else "auto"
+        )
         self._attr_device_info = get_device_info(entry)
 
     async def _on_notification(self, value: str) -> None:
         """Handle Dynamic Range Compressor notification."""
-        # Convert value (e.g., "auto") to display option (e.g., "Auto")
-        option = DRC_VALUES_TO_OPTIONS.get(value)
-        if option:
-            self._attr_current_option = option
+        if value in DRC_OPTIONS:
+            self._attr_current_option = value
             self.async_write_ha_state()
         else:
             _LOGGER.warning("Unknown DRC value received: %s", value)
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
-        # Convert display option (e.g., "Auto") to value (e.g., "auto")
-        drc_value = DRC_OPTIONS.get(option)
-        if not drc_value:
+        if option not in DRC_OPTIONS:
             _LOGGER.error("Invalid DRC option: %s", option)
             return
 
-        success = await self._client.async_set_drc(drc_value)
+        success = await self._client.async_set_drc(option)
         if success:
             self._attr_current_option = option
             self.async_write_ha_state()
@@ -260,10 +253,8 @@ class BraviaQuadDynamicRangeCompressorSelect(BraviaQuadNotificationMixin, Select
         """Update the current DRC state."""
         try:
             drc_value = await self._client.async_get_drc()
-            # Convert value to display option
-            option = DRC_VALUES_TO_OPTIONS.get(drc_value)
-            if option:
-                self._attr_current_option = option
+            if drc_value in DRC_OPTIONS:
+                self._attr_current_option = drc_value
             else:
                 _LOGGER.warning("Unknown DRC value: %s", drc_value)
         except (OSError, TimeoutError):

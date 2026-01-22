@@ -29,12 +29,13 @@ class InputSelectTestCase(NamedTuple):
     expected_value: str
 
 
+# Options are now the API values directly (used as translation keys)
 INPUT_SELECT_TEST_CASES = [
-    InputSelectTestCase("HDMI In", "hdmi1"),
-    InputSelectTestCase("Spotify", "spotify"),
-    InputSelectTestCase("Bluetooth", "bluetooth"),
-    InputSelectTestCase("Airplay", "airplay2"),
-    InputSelectTestCase("TV (eARC)", "tv"),
+    InputSelectTestCase("hdmi1", "hdmi1"),
+    InputSelectTestCase("spotify", "spotify"),
+    InputSelectTestCase("bluetooth", "bluetooth"),
+    InputSelectTestCase("airplay2", "airplay2"),
+    InputSelectTestCase("tv", "tv"),
 ]
 
 
@@ -76,8 +77,8 @@ async def test_select_entities(
 
     state = hass.states.get(entity_id)
     assert state is not None
-    # Mock returns "tv" which maps to "TV (eARC)"
-    assert state.state == "TV (eARC)"
+    # Mock returns "tv" - state is now the API value
+    assert state.state == "tv"
 
 
 @pytest.mark.usefixtures("init_integration")
@@ -93,14 +94,14 @@ async def test_input_select_option(
     # Verify initial state
     state = hass.states.get(entity_id)
     assert state is not None
-    assert state.state == "TV (eARC)"  # Mock returns "tv" which maps to "TV (eARC)"
+    assert state.state == "tv"  # Mock returns "tv"
 
     mock_bravia_quad_client.async_set_input.return_value = True
 
     await hass.services.async_call(
         SELECT_DOMAIN,
         "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "HDMI In"},
+        {ATTR_ENTITY_ID: entity_id, "option": "hdmi1"},
         blocking=True,
     )
 
@@ -110,7 +111,7 @@ async def test_input_select_option(
 @pytest.mark.parametrize(
     ("option", "expected_value"),
     INPUT_SELECT_TEST_CASES,
-    ids=[tc.option.lower().replace(" ", "_") for tc in INPUT_SELECT_TEST_CASES],
+    ids=[tc.option for tc in INPUT_SELECT_TEST_CASES],
 )
 @pytest.mark.usefixtures("init_integration")
 async def test_input_select_options_parametrized(
@@ -151,7 +152,7 @@ async def test_input_select_spotify(
     await hass.services.async_call(
         SELECT_DOMAIN,
         "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "Spotify"},
+        {ATTR_ENTITY_ID: entity_id, "option": "spotify"},
         blocking=True,
     )
 
@@ -173,7 +174,7 @@ async def test_input_select_bluetooth(
     await hass.services.async_call(
         SELECT_DOMAIN,
         "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "Bluetooth"},
+        {ATTR_ENTITY_ID: entity_id, "option": "bluetooth"},
         blocking=True,
     )
 
@@ -195,7 +196,7 @@ async def test_input_select_airplay(
     await hass.services.async_call(
         SELECT_DOMAIN,
         "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "Airplay"},
+        {ATTR_ENTITY_ID: entity_id, "option": "airplay2"},
         blocking=True,
     )
 
@@ -222,7 +223,7 @@ async def test_input_select_fails(
     await hass.services.async_call(
         SELECT_DOMAIN,
         "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "HDMI In"},
+        {ATTR_ENTITY_ID: entity_id, "option": "hdmi1"},
         blocking=True,
     )
 
@@ -253,7 +254,7 @@ async def test_input_notification_unknown_value(
     # State should remain unchanged
     state = hass.states.get(entity_id)
     assert state is not None
-    assert state.state == "TV (eARC)"
+    assert state.state == "tv"
 
 
 # =============================================================================
@@ -272,16 +273,16 @@ async def test_drc_select_entity_exists(
 
     state = hass.states.get(entity_id)
     assert state is not None
-    # Default mock value maps to "Auto"
-    assert state.state == "Auto"
+    # Default mock value is "auto"
+    assert state.state == "auto"
 
 
 @pytest.mark.parametrize(
     ("option", "expected_value"),
     [
-        ("Auto", "auto"),
-        ("On", "on"),
-        ("Off", "off"),
+        ("auto", "auto"),
+        ("on", "on"),
+        ("off", "off"),
     ],
     ids=["auto", "on", "off"],
 )
@@ -327,7 +328,7 @@ async def test_drc_select_fails(
     await hass.services.async_call(
         SELECT_DOMAIN,
         "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "On"},
+        {ATTR_ENTITY_ID: entity_id, "option": "on"},
         blocking=True,
     )
 
@@ -363,7 +364,7 @@ async def test_drc_notification_updates_state(
 
     state = hass.states.get(entity_id)
     assert state is not None
-    assert state.state == "On"
+    assert state.state == "on"
 
 
 @pytest.mark.usefixtures("init_integration")
@@ -420,8 +421,8 @@ async def test_bass_level_select_created_without_subwoofer(
 
     state = hass.states.get(entity_id)
     assert state is not None
-    # Default mock bass_level=0 maps to "MIN"
-    assert state.state == "MIN"
+    # Default mock bass_level=0 maps to "min"
+    assert state.state == "min"
 
 
 async def test_bass_level_select_not_created_with_subwoofer(
@@ -444,9 +445,9 @@ async def test_bass_level_select_not_created_with_subwoofer(
 @pytest.mark.parametrize(
     ("option", "expected_value"),
     [
-        ("MIN", 0),
-        ("MID", 1),
-        ("MAX", 2),
+        ("min", 0),
+        ("mid", 1),
+        ("max", 2),
     ],
     ids=["min", "mid", "max"],
 )
@@ -504,7 +505,7 @@ async def test_bass_level_select_fails(
     await hass.services.async_call(
         SELECT_DOMAIN,
         "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "MAX"},
+        {ATTR_ENTITY_ID: entity_id, "option": "max"},
         blocking=True,
     )
 
@@ -540,12 +541,12 @@ async def test_bass_level_notification_updates_state(
 
     assert bass_callback is not None, "Bass level callback not found"
 
-    # Trigger callback with "2" (MAX)
+    # Trigger callback with "2" (max)
     await bass_callback("2")
 
     state = hass.states.get(entity_id)
     assert state is not None
-    assert state.state == "MAX"
+    assert state.state == "max"
 
 
 async def test_bass_level_notification_invalid_value(
