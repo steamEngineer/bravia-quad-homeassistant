@@ -75,6 +75,21 @@
         }
       }
     },
+    "media_player": {
+      "bravia_quad": {
+        "state_attributes": {
+          "source": {
+            "state": {
+              "tv": "TV (eARC)",
+              "hdmi1": "HDMI",
+              "spotify": "Spotify",
+              "bluetooth": "Bluetooth",
+              "airplay2": "AirPlay"
+            }
+          }
+        }
+      }
+    },
     "switch": {
       "power": {
         "name": "Power"

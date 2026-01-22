@@ -71,7 +71,7 @@ async def test_media_player_entity_created(
 
     # Verify initial attributes
     assert state.attributes[ATTR_MEDIA_VOLUME_LEVEL] == 0.5  # 50/100
-    assert state.attributes[ATTR_INPUT_SOURCE] == "TV (eARC)"
+    assert state.attributes[ATTR_INPUT_SOURCE] == "tv"
 
 
 @pytest.mark.usefixtures("init_integration")
@@ -203,7 +203,7 @@ async def test_media_player_select_source(
         SERVICE_SELECT_SOURCE,
         {
             ATTR_ENTITY_ID: entity_id,
-            ATTR_INPUT_SOURCE: "HDMI In",
+            ATTR_INPUT_SOURCE: "hdmi1",
         },
         blocking=True,
     )
@@ -212,7 +212,7 @@ async def test_media_player_select_source(
 
     # Verify state updated
     state = hass.states.get(entity_id)
-    assert state.attributes[ATTR_INPUT_SOURCE] == "HDMI In"
+    assert state.attributes[ATTR_INPUT_SOURCE] == "hdmi1"
 
 
 @pytest.mark.usefixtures("init_integration")
@@ -230,7 +230,7 @@ async def test_media_player_select_source_spotify(
         SERVICE_SELECT_SOURCE,
         {
             ATTR_ENTITY_ID: entity_id,
-            ATTR_INPUT_SOURCE: "Spotify",
+            ATTR_INPUT_SOURCE: "spotify",
         },
         blocking=True,
     )
@@ -246,7 +246,7 @@ async def test_media_player_source_list(
     entity_id = _get_media_player_entity_id(hass)
     state = hass.states.get(entity_id)
 
-    expected_sources = ["TV (eARC)", "HDMI In", "Spotify", "Bluetooth", "Airplay"]
+    expected_sources = ["tv", "hdmi1", "spotify", "bluetooth", "airplay2"]
     assert state.attributes["source_list"] == expected_sources
 
 
