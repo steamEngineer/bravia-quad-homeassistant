@@ -50,7 +50,6 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
     """Representation of a Bravia Quad soundbar as a media player."""
 
     _attr_device_class = MediaPlayerDeviceClass.SPEAKER
-    _attr_entity_registry_enabled_default = False
     _attr_has_entity_name = True
     _attr_name = None
     _attr_should_poll = False
