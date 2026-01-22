@@ -35,10 +35,7 @@
     },
     "switch": {
       "power": {
-        "default": "mdi:power-off",
-        "state": {
-          "on": "mdi:power"
-        }
+        "default": "mdi:power"
       },
       "hdmi_cec": {
         "default": "mdi:hdmi-port"
@@ -47,10 +44,7 @@
         "default": "mdi:power-sleep"
       },
       "voice_enhancer": {
-        "default": "mdi:account-voice-off",
-        "state": {
-          "on": "mdi:account-voice"
-        }
+        "default": "mdi:account-voice"
       },
       "sound_field": {
         "default": "mdi:surround-sound"
