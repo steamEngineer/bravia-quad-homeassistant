@@ -83,43 +83,15 @@ HDMI_CEC_OFF = "off"
 AUTO_STANDBY_ON = "on"
 AUTO_STANDBY_OFF = "off"
 
-# Dynamic Range Compressor states
-DRC_AUTO = "auto"
-DRC_ON = "on"
-DRC_OFF = "off"
-
 # Advanced Auto Volume states
 AAV_ON = "on"
 AAV_OFF = "off"
 
-# Input options mapping (display name -> value)
-INPUT_OPTIONS = {
-    "TV (eARC)": "tv",
-    "HDMI In": "hdmi1",
-    "Spotify": "spotify",
-    "Bluetooth": "bluetooth",
-    "Airplay": "airplay2",
-}
+# Input options (API values used as translation keys)
+INPUT_OPTIONS: list[str] = ["tv", "hdmi1", "spotify", "bluetooth", "airplay2"]
 
-# Reverse mapping (value -> display name)
-INPUT_VALUES_TO_OPTIONS = {v: k for k, v in INPUT_OPTIONS.items()}
+# Bass level options for non-subwoofer mode (API value -> int)
+BASS_LEVEL_OPTIONS: dict[str, int] = {"min": 0, "mid": 1, "max": 2}
 
-# Bass Level options mapping for non-subwoofer mode (display name -> value)
-BASS_LEVEL_OPTIONS = {
-    "MIN": 0,
-    "MID": 1,
-    "MAX": 2,
-}
-
-# Reverse mapping (value -> display name)
-BASS_LEVEL_VALUES_TO_OPTIONS = {v: k for k, v in BASS_LEVEL_OPTIONS.items()}
-
-# Dynamic Range Compressor options mapping (display name -> value)
-DRC_OPTIONS = {
-    "Auto": "auto",
-    "On": "on",
-    "Off": "off",
-}
-
-# Reverse mapping (value -> display name)
-DRC_VALUES_TO_OPTIONS = {v: k for k, v in DRC_OPTIONS.items()}
+# DRC options (API values used as translation keys)
+DRC_OPTIONS: list[str] = ["auto", "on", "off"]

@@ -49,13 +49,30 @@
     },
     "select": {
       "input": {
-        "name": "Source"
+        "name": "Source",
+        "state": {
+          "tv": "TV (eARC)",
+          "hdmi1": "HDMI",
+          "spotify": "Spotify",
+          "bluetooth": "Bluetooth",
+          "airplay2": "AirPlay"
+        }
       },
       "bass_level": {
-        "name": "Bass level"
+        "name": "Bass level",
+        "state": {
+          "min": "Min",
+          "mid": "Mid",
+          "max": "Max"
+        }
       },
       "drc": {
-        "name": "Dynamic Range Compressor"
+        "name": "Dynamic Range Compressor",
+        "state": {
+          "auto": "Auto",
+          "on": "On",
+          "off": "Off"
+        }
       }
     },
     "switch": {
