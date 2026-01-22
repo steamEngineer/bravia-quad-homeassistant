@@ -11,13 +11,14 @@ import pytest
 from homeassistant.const import ATTR_ENTITY_ID, Platform
 from homeassistant.helpers import entity_registry as er
 
+from pytest_homeassistant_custom_component.common import MockConfigEntry
+
 from .conftest import get_entity_id_by_unique_id_suffix
 
 if TYPE_CHECKING:
     from unittest.mock import MagicMock
 
     from homeassistant.core import HomeAssistant
-    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 NUMBER_DOMAIN = "number"
 
@@ -36,11 +37,11 @@ async def test_number_entities(
     """Test number entities are created correctly."""
     # Verify expected number entities exist (with subwoofer)
     expected_entities = {
-        "_volume": "50",
         "_rear_level": "0",
         "_bass_level_slider": "0",
         "_volume_step_interval": "0",
     }
+    disabled_entities = ["_volume"]
 
     for suffix, expected_state in expected_entities.items():
         entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
@@ -50,8 +51,14 @@ async def test_number_entities(
         assert state is not None, f"State for {entity_id} not found"
         assert state.state == expected_state, f"Expected {expected_state} for {suffix}"
 
+    for suffix in disabled_entities:
+        entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
+        assert entity_id is not None, f"Entity with suffix {suffix} not found"
+        state = hass.states.get(entity_id)
+        assert state is None, f"Expected {suffix} to be disabled"
 
-@pytest.mark.usefixtures("init_integration")
+
+@pytest.mark.usefixtures("init_integration_all")
 async def test_volume_number_set_value(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -161,7 +168,7 @@ async def test_volume_step_interval_number_set_value(
     assert state.state == "500.0"
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_volume_step_interval_logic(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -210,7 +217,7 @@ async def test_volume_step_interval_logic(
     mock_bravia_quad_client.async_set_volume.assert_any_call(52)
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_volume_step_interval_race_condition(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -301,7 +308,7 @@ async def test_bass_level_not_created_without_subwoofer(
     assert entity_id is None
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_volume_step_interval_cancellation_on_remove(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -367,7 +374,7 @@ async def test_volume_step_interval_cancellation_on_remove(
     assert cancelled is True
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_volume_slider_does_not_update_during_transition(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -445,7 +452,7 @@ async def test_volume_slider_does_not_update_during_transition(
     assert state.state == "55"
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_volume_transition_sets_target_immediately(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -499,7 +506,7 @@ async def test_volume_transition_sets_target_immediately(
     await hass.async_block_till_done()
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_volume_transition_flag_reset_on_cancel(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -572,7 +579,7 @@ async def test_volume_transition_flag_reset_on_cancel(
     await hass.async_block_till_done()
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_volume_notification_accepted_after_transition(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,

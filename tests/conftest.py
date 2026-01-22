@@ -31,6 +31,18 @@ def get_entity_id_by_unique_id_suffix(
     return None
 
 
+async def enable_entity(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    entity_registry: er.EntityRegistry,
+    entity_id: str,
+) -> None:
+    """Enable a disabled entity and reload the integration."""
+    entity_registry.async_update_entity(entity_id, disabled_by=None)
+    await hass.config_entries.async_reload(mock_config_entry.entry_id)
+    await hass.async_block_till_done()
+
+
 @pytest.fixture(autouse=True)
 def auto_enable_custom_integrations(
     enable_custom_integrations: None,
@@ -196,6 +208,37 @@ async def init_integration(
 
     with patch("custom_components.bravia_quad.PLATFORMS", platforms):
         await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    return mock_config_entry
+
+
+@pytest.fixture
+async def init_integration_all(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_bravia_quad_client: MagicMock,
+    platforms: list[Platform],
+) -> MockConfigEntry:
+    """Set up the Bravia Quad integration with all entities enabled."""
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.bravia_quad.PLATFORMS", platforms):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Enable all disabled entities
+    entity_registry = er.async_get(hass)
+    entities_to_enable = [
+        entry.entity_id
+        for entry in entity_registry.entities.values()
+        if entry.disabled_by is not None
+    ]
+
+    if entities_to_enable:
+        for entity_id in entities_to_enable:
+            entity_registry.async_update_entity(entity_id, disabled_by=None)
+        await hass.config_entries.async_reload(mock_config_entry.entry_id)
         await hass.async_block_till_done()
 
     return mock_config_entry

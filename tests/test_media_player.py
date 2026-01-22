@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import patch
 
 import pytest
 from homeassistant.components.media_player import (
@@ -20,7 +19,6 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
 )
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_SUPPORTED_FEATURES, Platform
-from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.bravia_quad.const import DOMAIN
 
@@ -37,33 +35,6 @@ def platforms() -> list[Platform]:
     return [Platform.MEDIA_PLAYER]
 
 
-@pytest.fixture
-async def init_integration_with_media_player(
-    hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
-    mock_bravia_quad_client: MagicMock,
-    entity_registry: er.EntityRegistry,
-    platforms: list[Platform],
-) -> MockConfigEntry:
-    """Set up the integration with the media player entity enabled."""
-    mock_config_entry.add_to_hass(hass)
-
-    with patch("custom_components.bravia_quad.PLATFORMS", platforms):
-        await hass.config_entries.async_setup(mock_config_entry.entry_id)
-        await hass.async_block_till_done()
-
-    # Enable the disabled media player entity
-    for entry in entity_registry.entities.values():
-        if entry.platform == DOMAIN and entry.domain == MEDIA_PLAYER_DOMAIN:
-            entity_registry.async_update_entity(entry.entity_id, disabled_by=None)
-            break
-
-    await hass.config_entries.async_reload(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    return mock_config_entry
-
-
 def _get_media_player_entity_id(hass: HomeAssistant) -> str:
     """Get the media player entity ID."""
     entity_ids = [
@@ -76,7 +47,7 @@ def _get_media_player_entity_id(hass: HomeAssistant) -> str:
     return entity_ids[0]
 
 
-@pytest.mark.usefixtures("init_integration_with_media_player")
+@pytest.mark.usefixtures("init_integration")
 async def test_media_player_entity_created(
     hass: HomeAssistant,
     entity_registry: er.EntityRegistry,
@@ -103,7 +74,7 @@ async def test_media_player_entity_created(
     assert state.attributes[ATTR_INPUT_SOURCE] == "TV (eARC)"
 
 
-@pytest.mark.usefixtures("init_integration_with_media_player")
+@pytest.mark.usefixtures("init_integration")
 async def test_media_player_turn_on(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -123,7 +94,7 @@ async def test_media_player_turn_on(
     mock_bravia_quad_client.async_set_power.assert_called_once_with("on")
 
 
-@pytest.mark.usefixtures("init_integration_with_media_player")
+@pytest.mark.usefixtures("init_integration")
 async def test_media_player_turn_off(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -147,7 +118,7 @@ async def test_media_player_turn_off(
     assert state.state == MediaPlayerState.OFF
 
 
-@pytest.mark.usefixtures("init_integration_with_media_player")
+@pytest.mark.usefixtures("init_integration")
 async def test_media_player_set_volume(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -175,7 +146,7 @@ async def test_media_player_set_volume(
     assert state.attributes[ATTR_MEDIA_VOLUME_LEVEL] == 0.75
 
 
-@pytest.mark.usefixtures("init_integration_with_media_player")
+@pytest.mark.usefixtures("init_integration")
 async def test_media_player_volume_up(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -196,7 +167,7 @@ async def test_media_player_volume_up(
     mock_bravia_quad_client.async_set_volume.assert_called_once_with(51)
 
 
-@pytest.mark.usefixtures("init_integration_with_media_player")
+@pytest.mark.usefixtures("init_integration")
 async def test_media_player_volume_down(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -217,7 +188,7 @@ async def test_media_player_volume_down(
     mock_bravia_quad_client.async_set_volume.assert_called_once_with(49)
 
 
-@pytest.mark.usefixtures("init_integration_with_media_player")
+@pytest.mark.usefixtures("init_integration")
 async def test_media_player_select_source(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -244,7 +215,7 @@ async def test_media_player_select_source(
     assert state.attributes[ATTR_INPUT_SOURCE] == "HDMI In"
 
 
-@pytest.mark.usefixtures("init_integration_with_media_player")
+@pytest.mark.usefixtures("init_integration")
 async def test_media_player_select_source_spotify(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -267,7 +238,7 @@ async def test_media_player_select_source_spotify(
     mock_bravia_quad_client.async_set_input.assert_called_once_with("spotify")
 
 
-@pytest.mark.usefixtures("init_integration_with_media_player")
+@pytest.mark.usefixtures("init_integration")
 async def test_media_player_source_list(
     hass: HomeAssistant,
 ) -> None:
@@ -279,7 +250,7 @@ async def test_media_player_source_list(
     assert state.attributes["source_list"] == expected_sources
 
 
-@pytest.mark.usefixtures("init_integration_with_media_player")
+@pytest.mark.usefixtures("init_integration")
 async def test_media_player_notification_callbacks_registered(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -296,7 +267,7 @@ async def test_media_player_notification_callbacks_registered(
     assert "main.input" in registered_features
 
 
-@pytest.mark.usefixtures("init_integration_with_media_player")
+@pytest.mark.usefixtures("init_integration")
 async def test_media_player_off_state(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
