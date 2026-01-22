@@ -1,0 +1,93 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configuration Bravia Theatre",
+        "description": "Entrez l'adresse IP de votre appareil Bravia Theatre.",
+        "data": {
+          "host": "Adresse IP",
+          "name": "Nom"
+        }
+      },
+      "zeroconf_confirm": {
+        "title": "Bravia Theatre découvert",
+        "description": "Voulez-vous configurer {name} ?\n\nAssurez-vous que le **contrôle externe** est activé dans l'application Sony Home Entertainment Connect sous **Paramètres > Paramètres réseau**."
+      }
+    },
+    "error": {
+      "cannot_connect": "Impossible de se connecter à l'appareil Bravia Theatre. Veuillez vérifier :\n- L'adresse IP est correcte\n- Le contrôle IP est activé sur l'appareil\n- Le port 33336 est accessible",
+      "unknown": "Une erreur inattendue s'est produite"
+    },
+    "abort": {
+      "already_configured": "L'appareil est déjà configuré",
+      "not_bravia_theatre": "L'appareil découvert n'est pas une enceinte Bravia Theatre",
+      "cannot_connect": "Impossible de se connecter à l'appareil"
+    }
+  },
+  "entity": {
+    "button": {
+      "detect_subwoofer": {
+        "name": "Détecter le caisson de basses"
+      },
+      "bluetooth_pairing": {
+        "name": "Appairage Bluetooth"
+      }
+    },
+    "number": {
+      "volume": {
+        "name": "Volume"
+      },
+      "rear_level": {
+        "name": "Niveau arrière"
+      },
+      "bass_level": {
+        "name": "Niveau des basses"
+      },
+      "volume_step_interval": {
+        "name": "Pas du volume"
+      }
+    },
+    "select": {
+      "input": {
+        "name": "Source"
+      },
+      "bass_level": {
+        "name": "Niveau des basses"
+      },
+      "drc": {
+        "name": "DRC audio"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "Alimentation"
+      },
+      "hdmi_cec": {
+        "name": "HDMI CEC"
+      },
+      "auto_standby": {
+        "name": "Veille automatique"
+      },
+      "voice_enhancer": {
+        "name": "Mode voix"
+      },
+      "sound_field": {
+        "name": "Champ sonore"
+      },
+      "night_mode": {
+        "name": "Mode nocturne"
+      },
+      "auto_volume": {
+        "name": "Volume automatique"
+      }
+    }
+  },
+  "exceptions": {
+    "reload_failed": {
+      "message": "Le rechargement de l'intégration a échoué. Veuillez recharger manuellement via Paramètres > Appareils et services > Bravia Theatre > Recharger"
+    },
+    "detection_failed": {
+      "message": "Échec de la détection du caisson de basses en raison d'une erreur de connexion. Veuillez réessayer."
+    }
+  }
+}
