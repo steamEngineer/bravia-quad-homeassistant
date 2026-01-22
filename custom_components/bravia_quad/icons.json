@@ -1,0 +1,66 @@
+{
+  "entity": {
+    "button": {
+      "detect_subwoofer": {
+        "default": "mdi:speaker-wireless"
+      },
+      "bluetooth_pairing": {
+        "default": "mdi:bluetooth"
+      }
+    },
+    "number": {
+      "volume": {
+        "default": "mdi:volume-high"
+      },
+      "rear_level": {
+        "default": "mdi:volume-source"
+      },
+      "bass_level": {
+        "default": "mdi:speaker"
+      },
+      "volume_step_interval": {
+        "default": "mdi:timer-outline"
+      }
+    },
+    "select": {
+      "input": {
+        "default": "mdi:import"
+      },
+      "bass_level": {
+        "default": "mdi:speaker"
+      },
+      "drc": {
+        "default": "mdi:tune-vertical"
+      }
+    },
+    "switch": {
+      "power": {
+        "default": "mdi:power-off",
+        "state": {
+          "on": "mdi:power"
+        }
+      },
+      "hdmi_cec": {
+        "default": "mdi:hdmi-port"
+      },
+      "auto_standby": {
+        "default": "mdi:power-sleep"
+      },
+      "voice_enhancer": {
+        "default": "mdi:account-voice-off",
+        "state": {
+          "on": "mdi:account-voice"
+        }
+      },
+      "sound_field": {
+        "default": "mdi:surround-sound"
+      },
+      "night_mode": {
+        "default": "mdi:weather-night"
+      },
+      "auto_volume": {
+        "default": "mdi:volume-equal"
+      }
+    }
+  }
+}

@@ -45,7 +45,6 @@ class BraviaQuadDetectSubwooferButton(ButtonEntity):
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_has_entity_name = True
-    _attr_icon = "mdi:speaker-wireless"
     _attr_should_poll = False
     _attr_translation_key = "detect_subwoofer"
 
@@ -133,7 +132,6 @@ class BraviaQuadBluetoothPairingButton(ButtonEntity):
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
     _attr_has_entity_name = True
-    _attr_icon = "mdi:bluetooth"
     _attr_should_poll = False
     _attr_translation_key = "bluetooth_pairing"
 
