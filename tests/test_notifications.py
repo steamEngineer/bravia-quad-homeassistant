@@ -113,23 +113,25 @@ SELECT_TEST_CASES = [
 
 
 def _get_registered_callback(mock_client: MagicMock, feature: str) -> Callable | None:
-    """Get the callback registered for a specific feature."""
+    """Get the callback registered for a specific feature.
+
+    Returns the last registered callback for the feature, which is important
+    when init_integration_all reloads the integration after enabling entities.
+    """
+    callback = None
     for call_args in mock_client.register_notification_callback.call_args_list:
         if call_args[0][0] == feature:
-            return call_args[0][1]
-    return None
-
-
-# --- Callback Registration Tests ---
+            callback = call_args[0][1]
+    return callback
 
 
 @pytest.fixture
 def platforms() -> list[Platform]:
     """Return all platforms to test notification registration."""
-    return [Platform.NUMBER, Platform.SELECT, Platform.SWITCH]
+    return [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SELECT, Platform.SWITCH]
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_callbacks_registered_on_setup(
     mock_bravia_quad_client: MagicMock,
 ) -> None:
@@ -145,7 +147,7 @@ async def test_callbacks_registered_on_setup(
         assert feature in registered_features, f"Feature {feature} not registered"
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_callbacks_unregistered_on_unload(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -179,7 +181,7 @@ async def test_callbacks_unregistered_on_unload(
     SWITCH_TEST_CASES,
     ids=[tc.entity_suffix.lstrip("_") for tc in SWITCH_TEST_CASES],
 )
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_switch_notification_updates_state(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -232,7 +234,7 @@ def _get_entity_id_by_unique_id_suffix_and_platform(
     NUMBER_TEST_CASES,
     ids=[tc.entity_suffix.lstrip("_") for tc in NUMBER_TEST_CASES],
 )
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_number_notification_updates_state(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -268,7 +270,7 @@ async def test_number_notification_updates_state(
     SELECT_TEST_CASES,
     ids=[tc.entity_suffix.lstrip("_") for tc in SELECT_TEST_CASES],
 )
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_select_notification_updates_state(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,

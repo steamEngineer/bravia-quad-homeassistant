@@ -61,6 +61,7 @@ async def async_setup_entry(
 class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
     """Representation of a Bravia Quad volume control."""
 
+    _attr_entity_registry_enabled_default = False
     _attr_has_entity_name = True
     _attr_mode = NumberMode.SLIDER
     _attr_native_max_value = MAX_VOLUME

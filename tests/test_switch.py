@@ -37,7 +37,6 @@ async def test_switch_entities(
     """Test switch entities are created correctly."""
     # Verify all expected switch entities exist with correct unique_ids
     expected_entities = {
-        "_power": "on",  # Default power state
         "_hdmi_cec": "off",
         "_auto_standby": "off",
         "_voice_enhancer": "off",
@@ -45,6 +44,7 @@ async def test_switch_entities(
         "_night_mode": "off",
         "_advanced_auto_volume": "off",
     }
+    disabled_entities = ["_power"]
 
     for suffix, expected_state in expected_entities.items():
         entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
@@ -54,8 +54,14 @@ async def test_switch_entities(
         assert state is not None, f"State for {entity_id} not found"
         assert state.state == expected_state, f"Expected {expected_state} for {suffix}"
 
+    for suffix in disabled_entities:
+        entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
+        assert entity_id is not None, f"Entity with suffix {suffix} not found"
+        state = hass.states.get(entity_id)
+        assert state is None, f"Expected {suffix} to be disabled"
 
-@pytest.mark.usefixtures("init_integration")
+
+@pytest.mark.usefixtures("init_integration_all")
 async def test_power_switch_turn_on(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -83,7 +89,7 @@ async def test_power_switch_turn_on(
     mock_bravia_quad_client.async_set_power.assert_called_once_with("on")
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_power_switch_turn_off(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,

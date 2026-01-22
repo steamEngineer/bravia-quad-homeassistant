@@ -71,16 +71,27 @@ async def test_select_entities(
 ) -> None:
     """Test select entities are created correctly."""
     # Verify expected select entities exist
-    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_input")
-    assert entity_id is not None, "Input select entity not found"
+    expected_entities = {
+        "_drc": "Auto",
+    }
+    disabled_entities = ["_input"]
 
-    state = hass.states.get(entity_id)
-    assert state is not None
-    # Mock returns "tv" which maps to "TV (eARC)"
-    assert state.state == "TV (eARC)"
+    for suffix, expected_state in expected_entities.items():
+        entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
+        assert entity_id is not None, f"Entity with suffix {suffix} not found"
+
+        state = hass.states.get(entity_id)
+        assert state is not None, f"State for {entity_id} not found"
+        assert state.state == expected_state, f"Expected {expected_state} for {suffix}"
+
+    for suffix in disabled_entities:
+        entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
+        assert entity_id is not None, f"Entity with suffix {suffix} not found"
+        state = hass.states.get(entity_id)
+        assert state is None, f"Expected {suffix} to be disabled"
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_input_select_option(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -112,7 +123,7 @@ async def test_input_select_option(
     INPUT_SELECT_TEST_CASES,
     ids=[tc.option.lower().replace(" ", "_") for tc in INPUT_SELECT_TEST_CASES],
 )
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_input_select_options_parametrized(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -136,7 +147,7 @@ async def test_input_select_options_parametrized(
     mock_bravia_quad_client.async_set_input.assert_called_once_with(expected_value)
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_input_select_spotify(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -158,7 +169,7 @@ async def test_input_select_spotify(
     mock_bravia_quad_client.async_set_input.assert_called_once_with("spotify")
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_input_select_bluetooth(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -180,7 +191,7 @@ async def test_input_select_bluetooth(
     mock_bravia_quad_client.async_set_input.assert_called_once_with("bluetooth")
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_input_select_airplay(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -202,7 +213,7 @@ async def test_input_select_airplay(
     mock_bravia_quad_client.async_set_input.assert_called_once_with("airplay2")
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_input_select_fails(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -232,7 +243,7 @@ async def test_input_select_fails(
     assert state.state == initial_state.state
 
 
-@pytest.mark.usefixtures("init_integration")
+@pytest.mark.usefixtures("init_integration_all")
 async def test_input_notification_unknown_value(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
