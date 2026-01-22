@@ -19,7 +19,6 @@ from .const import (
     FEATURE_POWER,
     FEATURE_VOLUME,
     INPUT_OPTIONS,
-    INPUT_VALUES_TO_OPTIONS,
     MAX_VOLUME,
     POWER_OFF,
     POWER_ON,
@@ -53,6 +52,7 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
     _attr_has_entity_name = True
     _attr_name = None
     _attr_should_poll = False
+    _attr_translation_key = "bravia_quad"
     _attr_supported_features = (
         MediaPlayerEntityFeature.TURN_ON
         | MediaPlayerEntityFeature.TURN_OFF
@@ -66,7 +66,7 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
         self._client = client
         self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}"
         self._attr_device_info = get_device_info(entry)
-        self._attr_source_list = list(INPUT_OPTIONS.keys())
+        self._attr_source_list = list(INPUT_OPTIONS.values())
         self._update_state_from_client()
 
         # Volume transition handling
@@ -85,8 +85,10 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
         # Volume (0-100 -> 0.0-1.0)
         self._attr_volume_level = self._client.volume / MAX_VOLUME
 
-        # Source
-        self._attr_source = INPUT_VALUES_TO_OPTIONS.get(self._client.input, "TV (eARC)")
+        # Source (use raw API value)
+        self._attr_source = (
+            self._client.input if self._client.input in INPUT_OPTIONS.values() else "tv"
+        )
 
     async def _on_power_notification(self, value: str) -> None:
         """Handle power state notification."""
@@ -112,9 +114,8 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
 
     async def _on_input_notification(self, value: str) -> None:
         """Handle input notification."""
-        option = INPUT_VALUES_TO_OPTIONS.get(value)
-        if option:
-            self._attr_source = option
+        if value in INPUT_OPTIONS.values():
+            self._attr_source = value
             self.async_write_ha_state()
         else:
             _LOGGER.warning("Unknown input value received: %s", value)
@@ -220,12 +221,11 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
 
     async def async_select_source(self, source: str) -> None:
         """Select input source."""
-        input_value = INPUT_OPTIONS.get(source)
-        if not input_value:
+        if source not in INPUT_OPTIONS.values():
             _LOGGER.error("Invalid source: %s", source)
             return
 
-        success = await self._client.async_set_input(input_value)
+        success = await self._client.async_set_input(source)
         if success:
             self._attr_source = source
             self.async_write_ha_state()
