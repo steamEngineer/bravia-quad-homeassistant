@@ -13,7 +13,7 @@
         "default": "mdi:volume-high"
       },
       "rear_level": {
-        "default": "mdi:volume-source"
+        "default": "mdi:speaker-multiple"
       },
       "bass_level": {
         "default": "mdi:speaker"
