@@ -64,7 +64,7 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the media player."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}"
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_media_player"
         self._attr_device_info = get_device_info(entry)
         self._attr_source_list = list(INPUT_OPTIONS.values())
         self._update_state_from_client()
