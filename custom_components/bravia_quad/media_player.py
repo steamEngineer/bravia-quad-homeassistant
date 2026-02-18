@@ -136,7 +136,8 @@ class BraviaQuadMediaPlayer(VolumeTransitionMixin, MediaPlayerEntity):
         """Set volume level (0.0 to 1.0)."""
         clamped = min(max(volume, 0.0), 1.0)
         target_volume = round(clamped * MAX_VOLUME)
-        current_volume = round((self._attr_volume_level or 0) * MAX_VOLUME)
+        previous_level = self._attr_volume_level
+        current_volume = round((previous_level or 0) * MAX_VOLUME)
 
         # Set optimistic UI state immediately for smooth slider feedback
         self._attr_volume_level = target_volume / MAX_VOLUME
@@ -147,6 +148,9 @@ class BraviaQuadMediaPlayer(VolumeTransitionMixin, MediaPlayerEntity):
         )
 
         if not success:
+            # Restore previous state since the device didn't change
+            self._attr_volume_level = previous_level
+            self.async_write_ha_state()
             _LOGGER.error("Failed to set volume to %d", target_volume)
 
     async def async_volume_up(self) -> None:

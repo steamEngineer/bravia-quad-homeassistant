@@ -96,7 +96,8 @@ class BraviaQuadVolumeNumber(
     async def async_set_native_value(self, value: float) -> None:
         """Set the volume value."""
         target_volume = int(value)
-        current_volume = int(self._attr_native_value or 0)
+        previous_value = self._attr_native_value
+        current_volume = int(previous_value or 0)
 
         # Set optimistic UI state immediately for smooth slider feedback
         self._attr_native_value = target_volume
@@ -107,6 +108,9 @@ class BraviaQuadVolumeNumber(
         )
 
         if not success:
+            # Restore previous state since the device didn't change
+            self._attr_native_value = previous_value
+            self.async_write_ha_state()
             _LOGGER.error("Failed to set volume to %d", target_volume)
 
     async def async_will_remove_from_hass(self) -> None:
