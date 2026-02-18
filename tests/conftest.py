@@ -36,11 +36,13 @@ async def enable_entity(
     mock_config_entry: MockConfigEntry,
     entity_registry: er.EntityRegistry,
     entity_id: str,
+    platforms: list[Platform],
 ) -> None:
     """Enable a disabled entity and reload the integration."""
     entity_registry.async_update_entity(entity_id, disabled_by=None)
-    await hass.config_entries.async_reload(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
+    with patch("custom_components.bravia_quad.PLATFORMS", platforms):
+        await hass.config_entries.async_reload(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
 
 
 @pytest.fixture(autouse=True)
@@ -238,7 +240,8 @@ async def init_integration_all(
     if entities_to_enable:
         for entity_id in entities_to_enable:
             entity_registry.async_update_entity(entity_id, disabled_by=None)
-        await hass.config_entries.async_reload(mock_config_entry.entry_id)
-        await hass.async_block_till_done()
+        with patch("custom_components.bravia_quad.PLATFORMS", platforms):
+            await hass.config_entries.async_reload(mock_config_entry.entry_id)
+            await hass.async_block_till_done()
 
     return mock_config_entry
