@@ -82,7 +82,7 @@ class BraviaQuadVolumeNumber(
 
     async def _on_notification(self, value: Any) -> None:
         """Handle volume notification."""
-        if self.volume_transition_in_progress:
+        if self.should_suppress_volume_notification():
             return
 
         try:
@@ -98,14 +98,15 @@ class BraviaQuadVolumeNumber(
         target_volume = int(value)
         current_volume = int(self._attr_native_value or 0)
 
+        # Set optimistic UI state immediately for smooth slider feedback
+        self._attr_native_value = target_volume
+        self.async_write_ha_state()
+
         success = await self._async_set_volume_with_transition(
             current_volume, target_volume
         )
 
-        if success:
-            self._attr_native_value = target_volume
-            self.async_write_ha_state()
-        else:
+        if not success:
             _LOGGER.error("Failed to set volume to %d", target_volume)
 
     async def async_will_remove_from_hass(self) -> None:

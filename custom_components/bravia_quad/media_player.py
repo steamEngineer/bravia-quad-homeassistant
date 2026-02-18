@@ -95,7 +95,7 @@ class BraviaQuadMediaPlayer(VolumeTransitionMixin, MediaPlayerEntity):
 
     async def _on_volume_notification(self, value: Any) -> None:
         """Handle volume notification."""
-        if self.volume_transition_in_progress:
+        if self.should_suppress_volume_notification():
             return
 
         try:
