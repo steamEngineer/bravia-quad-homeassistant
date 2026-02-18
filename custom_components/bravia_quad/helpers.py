@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import TYPE_CHECKING
 
 from homeassistant.const import CONF_MAC, CONF_NAME
@@ -182,6 +183,12 @@ class BraviaQuadNotificationMixin:
         )
 
 
+# Grace period (seconds) after a transition ends during which device
+# notifications are still suppressed.  This prevents stale in-flight
+# notifications from snapping the slider back to an intermediate value.
+TRANSITION_NOTIFICATION_GRACE_PERIOD = 0.5
+
+
 class VolumeTransitionMixin:
     """
     Mixin that provides smooth volume transition logic.
@@ -190,6 +197,11 @@ class VolumeTransitionMixin:
     - self._client: BraviaQuadClient (with async_set_volume, volume_step_interval)
     - self.hass: HomeAssistant
     - self.async_write_ha_state(): method
+
+    Device notifications are suppressed while a transition is running **and**
+    for a short grace period after it finishes so that stale notifications
+    (still in-flight from the device) do not snap the slider back.  User
+    actions (e.g. moving the slider) are never blocked.
     """
 
     _client: BraviaQuadClient
@@ -199,18 +211,35 @@ class VolumeTransitionMixin:
         self._transition_task: asyncio.Task[None] | None = None
         self._transition_in_progress: bool = False
         self._transition_generation: int = 0
+        self._notification_suppressed_until: float = 0.0
 
     @property
     def volume_transition_in_progress(self) -> bool:
         """Return whether a volume transition is in progress."""
         return self._transition_in_progress
 
+    def should_suppress_volume_notification(self) -> bool:
+        """
+        Return True when device notifications should be ignored.
+
+        Notifications are suppressed while a transition is active and
+        for a short grace period afterwards so that stale in-flight
+        notifications from the device do not snap the UI back.
+        """
+        if self._transition_in_progress:
+            return True
+        return time.monotonic() < self._notification_suppressed_until
+
     def _cancel_volume_transition(self) -> None:
         """Cancel any in-progress volume transition."""
         if self._transition_task:
             self._transition_task.cancel()
             self._transition_task = None
-        self._transition_in_progress = False
+        if self._transition_in_progress:
+            self._transition_in_progress = False
+            self._notification_suppressed_until = (
+                time.monotonic() + TRANSITION_NOTIFICATION_GRACE_PERIOD
+            )
 
     async def _async_set_volume_with_transition(
         self,
@@ -274,4 +303,7 @@ class VolumeTransitionMixin:
         finally:
             if self._transition_generation == generation:
                 self._transition_in_progress = False
+                self._notification_suppressed_until = (
+                    time.monotonic() + TRANSITION_NOTIFICATION_GRACE_PERIOD
+                )
                 self._transition_task = None
