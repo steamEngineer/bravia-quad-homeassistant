@@ -8,7 +8,6 @@ import pytest
 from homeassistant.components.media_player import (
     ATTR_INPUT_SOURCE,
     ATTR_MEDIA_VOLUME_LEVEL,
-    DOMAIN as MEDIA_PLAYER_DOMAIN,
     SERVICE_SELECT_SOURCE,
     SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
@@ -17,6 +16,9 @@ from homeassistant.components.media_player import (
     SERVICE_VOLUME_UP,
     MediaPlayerEntityFeature,
     MediaPlayerState,
+)
+from homeassistant.components.media_player import (
+    DOMAIN as MEDIA_PLAYER_DOMAIN,
 )
 from homeassistant.const import ATTR_ENTITY_ID, ATTR_SUPPORTED_FEATURES, Platform
 
@@ -40,8 +42,9 @@ def _get_media_player_entity_id(hass: HomeAssistant) -> str:
     entity_ids = [
         entity_id
         for entity_id in hass.states.async_entity_ids(MEDIA_PLAYER_DOMAIN)
-        if entity_id.startswith(f"{MEDIA_PLAYER_DOMAIN}.{DOMAIN}")
-        or entity_id.startswith(f"{MEDIA_PLAYER_DOMAIN}.bravia")
+        if entity_id.startswith(
+            (f"{MEDIA_PLAYER_DOMAIN}.{DOMAIN}", f"{MEDIA_PLAYER_DOMAIN}.bravia")
+        )
     ]
     assert len(entity_ids) == 1, f"Expected 1 media player entity, found {entity_ids}"
     return entity_ids[0]
@@ -257,10 +260,10 @@ async def test_media_player_notification_callbacks_registered(
 ) -> None:
     """Test that notification callbacks are registered for all features."""
     # Verify callbacks were registered for power, volume, and input
-    registered_features = [
-        call[0][0]
-        for call in mock_bravia_quad_client.register_notification_callback.call_args_list
-    ]
+    callback_calls = (
+        mock_bravia_quad_client.register_notification_callback.call_args_list
+    )
+    registered_features = [call[0][0] for call in callback_calls]
 
     assert "main.power" in registered_features
     assert "main.volumestep" in registered_features

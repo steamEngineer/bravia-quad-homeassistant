@@ -73,7 +73,7 @@ async def test_select_entities(
     """Test select entities are created correctly."""
     # Verify expected select entities exist
     expected_entities = {
-        "_drc": "Auto",
+        "_drc": "auto",
     }
     disabled_entities = ["_input"]
 
