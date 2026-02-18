@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -23,7 +22,7 @@ from .const import (
     POWER_OFF,
     POWER_ON,
 )
-from .helpers import get_device_info
+from .helpers import VolumeTransitionMixin, get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -45,7 +44,7 @@ async def async_setup_entry(
     async_add_entities([BraviaQuadMediaPlayer(client, entry)])
 
 
-class BraviaQuadMediaPlayer(MediaPlayerEntity):
+class BraviaQuadMediaPlayer(VolumeTransitionMixin, MediaPlayerEntity):
     """Representation of a Bravia Quad soundbar as a media player."""
 
     _attr_device_class = MediaPlayerDeviceClass.SPEAKER
@@ -68,11 +67,7 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
         self._attr_device_info = get_device_info(entry)
         self._attr_source_list = list(INPUT_OPTIONS)
         self._update_state_from_client()
-
-        # Volume transition handling
-        self._transition_task: asyncio.Task[None] | None = None
-        self._transition_in_progress = False
-        self._transition_generation = 0
+        self._init_volume_transition()
 
     def _update_state_from_client(self) -> None:
         """Update local state from client cached values."""
@@ -100,8 +95,7 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
 
     async def _on_volume_notification(self, value: Any) -> None:
         """Handle volume notification."""
-        # Skip UI updates during transition to prevent jerky slider movement
-        if self._transition_in_progress:
+        if self.volume_transition_in_progress:
             return
 
         try:
@@ -140,70 +134,24 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
 
     async def async_set_volume_level(self, volume: float) -> None:
         """Set volume level (0.0 to 1.0)."""
-        target_volume = int(volume * MAX_VOLUME)
-        current_volume = int((self._attr_volume_level or 0) * MAX_VOLUME)
-        interval_ms = self._client.volume_step_interval
+        clamped = min(max(volume, 0.0), 1.0)
+        target_volume = round(clamped * MAX_VOLUME)
+        current_volume = round((self._attr_volume_level or 0) * MAX_VOLUME)
 
-        # Cancel any existing transition
-        if self._transition_task:
-            self._transition_task.cancel()
-            self._transition_task = None
-
-        if interval_ms <= 0 or current_volume == target_volume:
-            self._transition_in_progress = False
-            success = await self._client.async_set_volume(target_volume)
-            if success:
-                self._attr_volume_level = volume
-                self.async_write_ha_state()
-            else:
-                _LOGGER.error("Failed to set volume to %d", target_volume)
-            return
-
-        # Start smooth transition - set target value immediately for smooth UI
-        self._attr_volume_level = volume
+        # Set optimistic UI state immediately for smooth slider feedback
+        self._attr_volume_level = target_volume / MAX_VOLUME
         self.async_write_ha_state()
-        self._transition_in_progress = True
 
-        # Increment generation before starting task so the task can capture it
-        self._transition_generation += 1
-        generation = self._transition_generation
-
-        self._transition_task = self.hass.async_create_task(
-            self._async_volume_transition(
-                current_volume, target_volume, interval_ms, generation
-            )
+        success = await self._async_set_volume_with_transition(
+            current_volume, target_volume
         )
 
-    async def _async_volume_transition(
-        self, start_volume: int, end_volume: int, interval_ms: int, generation: int
-    ) -> None:
-        """Transition volume smoothly over time."""
-        steps = abs(end_volume - start_volume)
-        if steps == 0:
-            self._transition_in_progress = False
-            return
-
-        delay = interval_ms / 1000.0
-        step_increment = 1 if end_volume > start_volume else -1
-
-        try:
-            for i in range(1, steps + 1):
-                await asyncio.sleep(delay)
-                next_volume = start_volume + (i * step_increment)
-                success = await self._client.async_set_volume(next_volume)
-                if not success:
-                    _LOGGER.warning("Failed to set volume step to %d", next_volume)
-                    break
-        except asyncio.CancelledError:
-            _LOGGER.debug("Volume transition cancelled")
-        finally:
-            if self._transition_generation == generation:
-                self._transition_in_progress = False
-                self._transition_task = None
+        if not success:
+            _LOGGER.error("Failed to set volume to %d", target_volume)
 
     async def async_volume_up(self) -> None:
         """Volume up the soundbar."""
-        current_volume = int((self._attr_volume_level or 0) * MAX_VOLUME)
+        current_volume = round((self._attr_volume_level or 0) * MAX_VOLUME)
         new_volume = min(current_volume + 1, MAX_VOLUME)
         success = await self._client.async_set_volume(new_volume)
         if success:
@@ -212,7 +160,7 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
 
     async def async_volume_down(self) -> None:
         """Volume down the soundbar."""
-        current_volume = int((self._attr_volume_level or 0) * MAX_VOLUME)
+        current_volume = round((self._attr_volume_level or 0) * MAX_VOLUME)
         new_volume = max(current_volume - 1, 0)
         success = await self._client.async_set_volume(new_volume)
         if success:
@@ -256,8 +204,5 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
         self._client.unregister_notification_callback(
             FEATURE_INPUT, self._on_input_notification
         )
-        if self._transition_task:
-            self._transition_task.cancel()
-            self._transition_task = None
-        self._transition_in_progress = False
+        self._cancel_volume_transition()
         await super().async_will_remove_from_hass()

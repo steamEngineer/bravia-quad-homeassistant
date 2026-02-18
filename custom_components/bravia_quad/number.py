@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import TYPE_CHECKING, Any
 
@@ -21,7 +20,7 @@ from .const import (
     MIN_BASS_LEVEL,
     MIN_REAR_LEVEL,
 )
-from .helpers import BraviaQuadNotificationMixin, get_device_info
+from .helpers import BraviaQuadNotificationMixin, VolumeTransitionMixin, get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -58,7 +57,9 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
+class BraviaQuadVolumeNumber(
+    VolumeTransitionMixin, BraviaQuadNotificationMixin, NumberEntity
+):
     """Representation of a Bravia Quad volume control."""
 
     _attr_entity_registry_enabled_default = False
@@ -77,14 +78,11 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
         self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_volume"
         self._attr_native_value = client.volume
         self._attr_device_info = get_device_info(entry)
-        self._transition_task: asyncio.Task[None] | None = None
-        self._transition_in_progress = False
-        self._transition_generation = 0
+        self._init_volume_transition()
 
     async def _on_notification(self, value: Any) -> None:
         """Handle volume notification."""
-        # Skip UI updates during transition to prevent jerky slider movement
-        if self._transition_in_progress:
+        if self.volume_transition_in_progress:
             return
 
         try:
@@ -99,79 +97,21 @@ class BraviaQuadVolumeNumber(BraviaQuadNotificationMixin, NumberEntity):
         """Set the volume value."""
         target_volume = int(value)
         current_volume = int(self._attr_native_value or 0)
-        interval_ms = self._client.volume_step_interval
 
-        # Cancel any existing transition
-        if self._transition_task:
-            self._transition_task.cancel()
-            self._transition_task = None
-
-        if interval_ms <= 0 or current_volume == target_volume:
-            self._transition_in_progress = False
-            success = await self._client.async_set_volume(target_volume)
-            if success:
-                self._attr_native_value = target_volume
-                self.async_write_ha_state()
-            else:
-                _LOGGER.error("Failed to set volume to %d", target_volume)
-            return
-
-        # Start transition - set target value immediately for smooth UI
-        self._attr_native_value = target_volume
-        self.async_write_ha_state()
-        self._transition_in_progress = True
-
-        # Increment generation before starting task so the task can capture it
-        self._transition_generation += 1
-        generation = self._transition_generation
-
-        self._transition_task = self.hass.async_create_task(
-            self._async_volume_transition(
-                current_volume, target_volume, interval_ms, generation
-            )
+        success = await self._async_set_volume_with_transition(
+            current_volume, target_volume
         )
+
+        if success:
+            self._attr_native_value = target_volume
+            self.async_write_ha_state()
+        else:
+            _LOGGER.error("Failed to set volume to %d", target_volume)
 
     async def async_will_remove_from_hass(self) -> None:
         """Cancel any ongoing transition when entity is removed."""
-        if self._transition_task:
-            self._transition_task.cancel()
-            self._transition_task = None
-        self._transition_in_progress = False
+        self._cancel_volume_transition()
         await super().async_will_remove_from_hass()
-
-    async def _async_volume_transition(
-        self, start_volume: int, end_volume: int, interval_ms: int, generation: int
-    ) -> None:
-        """Transition volume smoothly over time."""
-        steps = abs(end_volume - start_volume)
-        if steps == 0:
-            self._transition_in_progress = False
-            return
-
-        # Use interval_ms as the delay between steps
-        delay = interval_ms / 1000.0
-        step_increment = 1 if end_volume > start_volume else -1
-
-        try:
-            for i in range(1, steps + 1):
-                # Wait BEFORE sending the next step as requested:
-                # "volume is at 25 and I want it to go to 50, wait 223ms, send 26,
-                # wait 223ms, send 27 etc..."
-                await asyncio.sleep(delay)
-
-                next_volume = start_volume + (i * step_increment)
-                success = await self._client.async_set_volume(next_volume)
-                if not success:
-                    _LOGGER.warning("Failed to set volume step to %d", next_volume)
-                    break
-        except asyncio.CancelledError:
-            _LOGGER.debug("Volume transition cancelled")
-        finally:
-            # Only reset flag if this is still the active transition generation
-            # (avoids race condition when a new transition cancels this one)
-            if self._transition_generation == generation:
-                self._transition_in_progress = False
-                self._transition_task = None
 
     async def async_update(self) -> None:
         """Update the volume value."""

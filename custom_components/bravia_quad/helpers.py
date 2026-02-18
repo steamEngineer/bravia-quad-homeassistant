@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import TYPE_CHECKING
 
@@ -179,3 +180,98 @@ class BraviaQuadNotificationMixin:
         self._client.unregister_notification_callback(
             self._notification_feature, self._on_notification
         )
+
+
+class VolumeTransitionMixin:
+    """
+    Mixin that provides smooth volume transition logic.
+
+    Subclasses must have:
+    - self._client: BraviaQuadClient (with async_set_volume, volume_step_interval)
+    - self.hass: HomeAssistant
+    - self.async_write_ha_state(): method
+    """
+
+    _client: BraviaQuadClient
+
+    def _init_volume_transition(self) -> None:
+        """Initialize volume transition state. Call from __init__."""
+        self._transition_task: asyncio.Task[None] | None = None
+        self._transition_in_progress: bool = False
+        self._transition_generation: int = 0
+
+    @property
+    def volume_transition_in_progress(self) -> bool:
+        """Return whether a volume transition is in progress."""
+        return self._transition_in_progress
+
+    def _cancel_volume_transition(self) -> None:
+        """Cancel any in-progress volume transition."""
+        if self._transition_task:
+            self._transition_task.cancel()
+            self._transition_task = None
+        self._transition_in_progress = False
+
+    async def _async_set_volume_with_transition(
+        self,
+        current_volume: int,
+        target_volume: int,
+    ) -> bool:
+        """
+        Set volume, using smooth transition if interval is configured.
+
+        Returns True if the volume was set immediately (no transition),
+        False if a background transition was started.
+        Callers should update their own state attributes accordingly.
+        """
+        interval_ms = self._client.volume_step_interval
+
+        # Cancel any existing transition
+        self._cancel_volume_transition()
+
+        if interval_ms <= 0 or current_volume == target_volume:
+            self._transition_in_progress = False
+            return await self._client.async_set_volume(target_volume)
+
+        # Start background transition
+        self._transition_in_progress = True
+        self._transition_generation += 1
+        generation = self._transition_generation
+
+        self._transition_task = self.hass.async_create_task(  # type: ignore[attr-defined]
+            self._async_volume_transition(
+                current_volume, target_volume, interval_ms, generation
+            )
+        )
+        return True
+
+    async def _async_volume_transition(
+        self,
+        start_volume: int,
+        end_volume: int,
+        interval_ms: int,
+        generation: int,
+    ) -> None:
+        """Transition volume smoothly one step at a time."""
+        steps = abs(end_volume - start_volume)
+        if steps == 0:
+            self._transition_in_progress = False
+            return
+
+        delay = interval_ms / 1000.0
+        step_increment = 1 if end_volume > start_volume else -1
+
+        try:
+            for i in range(1, steps + 1):
+                await asyncio.sleep(delay)
+                next_volume = start_volume + (i * step_increment)
+                success = await self._client.async_set_volume(next_volume)
+                if not success:
+                    _LOGGER.warning("Failed to set volume step to %d", next_volume)
+                    break
+        except asyncio.CancelledError:
+            _LOGGER.debug("Volume transition cancelled")
+        finally:
+            if self._transition_generation == generation:
+                self._transition_in_progress = False
+                self._transition_task = None
