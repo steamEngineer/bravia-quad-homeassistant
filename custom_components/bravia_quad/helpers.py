@@ -205,6 +205,7 @@ class VolumeTransitionMixin:
     """
 
     _client: BraviaQuadClient
+    hass: HomeAssistant
 
     def _init_volume_transition(self) -> None:
         """Initialize volume transition state. Call from __init__."""
@@ -268,7 +269,7 @@ class VolumeTransitionMixin:
         self._transition_generation += 1
         generation = self._transition_generation
 
-        self._transition_task = self.hass.async_create_task(  # type: ignore[attr-defined]
+        self._transition_task = self.hass.async_create_task(
             self._async_volume_transition(
                 current_volume, target_volume, interval_ms, generation
             )
