@@ -193,7 +193,7 @@ async def test_volume_step_interval_logic(
 
     # We need to patch sleep to avoid waiting
     with patch(
-        "custom_components.bravia_quad.number.asyncio.sleep", new_callable=AsyncMock
+        "custom_components.bravia_quad.helpers.asyncio.sleep", new_callable=AsyncMock
     ) as mock_sleep:
         await hass.services.async_call(
             NUMBER_DOMAIN,
@@ -598,7 +598,7 @@ async def test_volume_notification_accepted_after_transition(
 
     # Start transition from 50 to 52 (2 steps)
     with patch(
-        "custom_components.bravia_quad.number.asyncio.sleep", new_callable=AsyncMock
+        "custom_components.bravia_quad.helpers.asyncio.sleep", new_callable=AsyncMock
     ):
         await hass.services.async_call(
             NUMBER_DOMAIN,
