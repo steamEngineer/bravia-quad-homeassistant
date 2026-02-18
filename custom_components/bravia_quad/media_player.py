@@ -66,7 +66,7 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
         self._client = client
         self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_media_player"
         self._attr_device_info = get_device_info(entry)
-        self._attr_source_list = list(INPUT_OPTIONS.values())
+        self._attr_source_list = list(INPUT_OPTIONS)
         self._update_state_from_client()
 
         # Volume transition handling
@@ -87,7 +87,7 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
 
         # Source (use raw API value)
         self._attr_source = (
-            self._client.input if self._client.input in INPUT_OPTIONS.values() else "tv"
+            self._client.input if self._client.input in INPUT_OPTIONS else "tv"
         )
 
     async def _on_power_notification(self, value: str) -> None:
@@ -114,7 +114,7 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
 
     async def _on_input_notification(self, value: str) -> None:
         """Handle input notification."""
-        if value in INPUT_OPTIONS.values():
+        if value in INPUT_OPTIONS:
             self._attr_source = value
             self.async_write_ha_state()
         else:
@@ -221,7 +221,7 @@ class BraviaQuadMediaPlayer(MediaPlayerEntity):
 
     async def async_select_source(self, source: str) -> None:
         """Select input source."""
-        if source not in INPUT_OPTIONS.values():
+        if source not in INPUT_OPTIONS:
             _LOGGER.error("Invalid source: %s", source)
             return
 
