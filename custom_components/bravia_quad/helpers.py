@@ -249,9 +249,10 @@ class VolumeTransitionMixin:
         """
         Set volume, using smooth transition if interval is configured.
 
-        Returns True if the volume was set immediately (no transition),
-        False if a background transition was started.
-        Callers should update their own state attributes accordingly.
+        Returns True if the volume was set successfully (immediate) or a
+        background transition was started.  Returns False only when an
+        immediate set_volume call fails.
+        Callers should set optimistic state before calling this method.
         """
         interval_ms = self._client.volume_step_interval
 
