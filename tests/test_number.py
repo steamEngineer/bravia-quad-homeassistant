@@ -423,7 +423,7 @@ async def test_volume_slider_does_not_update_during_transition(
     assert state.state == "53"
 
     # Verify transition is in progress
-    assert entity._transition_in_progress is True  # noqa: SLF001
+    assert entity.should_suppress_volume_notification() is True
 
     # Simulate device sending back notification with intermediate value
     # This should be ignored during transition
@@ -443,6 +443,9 @@ async def test_volume_slider_does_not_update_during_transition(
 
     # Transition should be complete
     assert entity._transition_in_progress is False  # noqa: SLF001
+
+    # Advance past the grace period so notifications are accepted again
+    entity._notification_suppressed_until = 0.0  # noqa: SLF001
 
     # Now notifications should update the state
     await entity._on_notification(55)  # noqa: SLF001
@@ -550,6 +553,9 @@ async def test_volume_transition_flag_reset_on_cancel(
 
     assert entity._transition_in_progress is True  # noqa: SLF001
 
+    # Notifications should be suppressed during active transition
+    assert entity.should_suppress_volume_notification() is True
+
     # Start second transition (should cancel the first)
     mock_bravia_quad_client.async_set_volume.reset_mock()
     mock_bravia_quad_client.async_set_volume.return_value = True
@@ -612,6 +618,12 @@ async def test_volume_notification_accepted_after_transition(
 
     # Transition should be complete
     assert entity._transition_in_progress is False  # noqa: SLF001
+
+    # Notifications should still be suppressed during grace period
+    assert entity.should_suppress_volume_notification() is True
+
+    # Advance past the grace period
+    entity._notification_suppressed_until = 0.0  # noqa: SLF001
 
     # Now a notification should update the state
     await entity._on_notification(45)  # noqa: SLF001
