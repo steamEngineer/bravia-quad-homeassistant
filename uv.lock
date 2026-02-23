@@ -601,7 +601,7 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.8.0" },
     { name = "homeassistant", specifier = ">=2025.12.2" },
-    { name = "pycares", specifier = "<5.0.0" },
+    { name = "pycares", specifier = "<5.0.2" },
     { name = "voluptuous", specifier = ">=0.13.0" },
 ]
 
