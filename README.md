@@ -392,7 +392,7 @@ mDNS (multicast DNS) and zeroconf discovery rely on Layer 2 network traffic (mul
 
 | Script | Description |
 |--------|-------------|
-| `scripts/setup` | Sets up development environment with uv (installs dependencies + pre-commit hooks) |
+| `scripts/setup` | Sets up development environment with uv (installs dependencies + prek hooks) |
 | `scripts/develop` | Starts Home Assistant with the integration in debug mode |
 | `scripts/lint` | Runs Ruff to format and lint the code |
 
@@ -401,11 +401,12 @@ mDNS (multicast DNS) and zeroconf discovery rely on Layer 2 network traffic (mul
 This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
 
 ```bash
-# Install dependencies and set up pre-commit hooks
+# Install dependencies and set up prek hooks
 ./scripts/setup
 
 # Or manually with uv
 uv sync --dev
+uv run prek install --install-hooks
 
 # Run tests
 uv run pytest
