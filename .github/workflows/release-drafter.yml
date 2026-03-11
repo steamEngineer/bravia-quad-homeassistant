@@ -8,17 +8,13 @@ on:
       - main
   workflow_dispatch:
     inputs:
-      prerelease:
-        description: "Create a pre-release (beta)"
-        required: false
-        type: boolean
-        default: false
-      prerelease_identifier:
-        description: "Pre-release identifier"
+      release_type:
+        description: "Release type"
         required: false
         type: choice
-        default: "beta"
+        default: "stable"
         options:
+          - stable
           - beta
           - alpha
           - rc
@@ -30,10 +26,17 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: 🚀 Run Release Drafter
+      - name: 🚀 Run Release Drafter (stable)
+        if: github.event_name != 'workflow_dispatch' || inputs.release_type == 'stable'
+        uses: release-drafter/release-drafter@v6.4.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🚀 Run Release Drafter (pre-release)
+        if: github.event_name == 'workflow_dispatch' && inputs.release_type != 'stable'
         uses: release-drafter/release-drafter@v6.4.0
         with:
-          prerelease: ${{ inputs.prerelease }}
-          prerelease-identifier: ${{ inputs.prerelease_identifier }}
+          prerelease: true
+          prerelease-identifier: ${{ inputs.release_type }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
