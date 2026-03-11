@@ -26,8 +26,64 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: 🚀 Run Release Drafter (stable)
+      - name: ⤵️ Checkout repository
         if: github.event_name != 'workflow_dispatch' || inputs.release_type == 'stable'
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: 🔢 Resolve stable version
+        id: stable_version
+        if: github.event_name != 'workflow_dispatch' || inputs.release_type == 'stable'
+        shell: bash
+        run: |
+          python3 <<'PY' >> "$GITHUB_OUTPUT"
+          import re
+          import subprocess
+
+          prerelease_pattern = re.compile(r"^v(\d+)\.(\d+)\.(\d+)-(alpha|beta|rc)\.\d+$")
+          stable_pattern = re.compile(r"^v(\d+)\.(\d+)\.(\d+)$")
+
+          tags = subprocess.run(
+              ["git", "tag", "--sort=-version:refname"],
+              capture_output=True,
+              check=True,
+              text=True,
+          ).stdout.splitlines()
+
+          latest_stable: tuple[int, int, int] | None = None
+          latest_prerelease_base: tuple[int, int, int] | None = None
+
+          for tag in tags:
+              if latest_stable is None and (match := stable_pattern.match(tag)):
+                  latest_stable = tuple(int(part) for part in match.groups())
+              if latest_prerelease_base is None and (match := prerelease_pattern.match(tag)):
+                  latest_prerelease_base = tuple(int(part) for part in match.groups()[:3])
+              if latest_stable is not None and latest_prerelease_base is not None:
+                  break
+
+          if latest_prerelease_base and (
+              latest_stable is None or latest_prerelease_base > latest_stable
+          ):
+              version = ".".join(str(part) for part in latest_prerelease_base)
+              print(f"version={version}")
+          PY
+
+      - name: 🚀 Run Release Drafter (stable from prerelease line)
+        if: >-
+          (github.event_name != 'workflow_dispatch' || inputs.release_type == 'stable')
+          && steps.stable_version.outputs.version != ''
+        uses: release-drafter/release-drafter@v6.4.0
+        with:
+          version: ${{ steps.stable_version.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🚀 Run Release Drafter (stable default)
+        if: >-
+          (github.event_name != 'workflow_dispatch' || inputs.release_type == 'stable')
+          && steps.stable_version.outputs.version == ''
         uses: release-drafter/release-drafter@v6.4.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
