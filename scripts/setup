@@ -16,7 +16,7 @@ fi
 # Create venv and install dev dependencies from pyproject.toml
 uv sync --all-extras --dev
 
-# Install prek hooks and hook environments
-uv run prek install --install-hooks
+# Install prek hooks and replace any legacy pre-commit hook
+uv run prek install --overwrite --install-hooks
 
 echo "Setup complete! Activate with: source .venv/bin/activate"
