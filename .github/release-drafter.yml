@@ -44,6 +44,7 @@ categories:
 change-template: "- $TITLE @$AUTHOR (#$NUMBER)"
 name-template: "v$RESOLVED_VERSION"
 tag-template: "v$RESOLVED_VERSION"
+include-pre-releases: true
 version-resolver:
   major:
     labels:
