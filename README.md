@@ -406,7 +406,7 @@ This project uses [uv](https://docs.astral.sh/uv/) for dependency management.
 
 # Or manually with uv
 uv sync --dev
-uv run prek install --install-hooks
+uv run prek install --overwrite --install-hooks
 
 # Run tests
 uv run pytest
