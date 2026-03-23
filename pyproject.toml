@@ -7,7 +7,7 @@ license = "MIT"
 requires-python = ">=3.13.2"
 dependencies = [
     "homeassistant>=2025.12.2",
-    "pycares<5.0.0",  # pycares 5.0.0 is incompatible with aiodns 3.5.0 (upstream bug)
+    "pycares<5.0.2",  # pycares 5.0.0 is incompatible with aiodns 3.5.0 (upstream bug)
     "aiohttp>=3.8.0",
     "voluptuous>=0.13.0",
 ]
