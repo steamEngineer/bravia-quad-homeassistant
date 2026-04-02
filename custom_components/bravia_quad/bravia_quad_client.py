@@ -26,6 +26,7 @@ from .const import (
     FEATURE_DRC,
     FEATURE_HDMI_CEC,
     FEATURE_INPUT,
+    FEATURE_MUTE,
     FEATURE_NIGHT_MODE,
     FEATURE_POWER,
     FEATURE_REAR_LEVEL,
@@ -41,6 +42,7 @@ from .const import (
     MIN_BASS_LEVEL_NO_SUB,
     MIN_REAR_LEVEL,
     MIN_VOLUME,
+    MUTE_OFF,
     NIGHT_MODE_OFF,
     POWER_OFF,
     POWER_ON,
@@ -84,6 +86,7 @@ class BraviaQuadClient:
         self._auto_standby = AUTO_STANDBY_OFF
         self._drc = DEFAULT_DRC
         self._aav = AAV_OFF
+        self._mute = MUTE_OFF
         self._volume_step_interval = 0
         self._command_id_counter = CMD_ID_INITIAL
         self._command_lock = asyncio.Lock()
@@ -598,6 +601,43 @@ class BraviaQuadClient:
             return self._aav
         return self._aav
 
+    async def async_set_mute(self, state: str) -> bool:
+        """Set mute state (on/off)."""
+        command = {
+            "id": self._get_next_command_id(),
+            "type": "set",
+            "feature": FEATURE_MUTE,
+            "value": state,
+        }
+        response = await self.async_send_command(command)
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("value") == "ACK"
+        ):
+            self._mute = state
+            return True
+        return False
+
+    async def async_get_mute(self) -> str:
+        """Get current mute state."""
+        command = {
+            "id": self._get_next_command_id(),
+            "type": "get",
+            "feature": FEATURE_MUTE,
+        }
+        response = await self.async_send_command(command)
+
+        if (
+            response
+            and response.get("type") == "result"
+            and response.get("feature") == FEATURE_MUTE
+        ):
+            self._mute = response.get("value", MUTE_OFF)
+            return self._mute
+        return self._mute
+
     async def async_set_rear_level(self, level: int) -> bool:
         """Set rear level (-10 to 10)."""
         if level < MIN_REAR_LEVEL or level > MAX_REAR_LEVEL:
@@ -883,6 +923,11 @@ class BraviaQuadClient:
         return self._aav
 
     @property
+    def mute(self) -> str:
+        """Return current mute state."""
+        return self._mute
+
+    @property
     def volume_step_interval(self) -> int:
         """Return the volume step interval in ms."""
         return self._volume_step_interval
@@ -909,6 +954,7 @@ class BraviaQuadClient:
             self.async_get_auto_standby,
             self.async_get_drc,
             self.async_get_aav,
+            self.async_get_mute,
         ]
 
         for fetch in fetchers:
@@ -921,7 +967,7 @@ class BraviaQuadClient:
             "State fetch complete - Power: %s, Volume: %d, Input: %s, "
             "Rear Level: %d, Bass Level: %d, Voice Enhancer: %s, "
             "Sound Field: %s, Night Mode: %s, HDMI CEC: %s, "
-            "Auto Standby: %s, DRC: %s, AAV: %s",
+            "Auto Standby: %s, DRC: %s, AAV: %s, Mute: %s",
             self._power_state,
             self._volume,
             self._input,
@@ -934,6 +980,7 @@ class BraviaQuadClient:
             self._auto_standby,
             self._drc,
             self._aav,
+            self._mute,
         )
 
     def _get_next_command_id(self) -> int:
@@ -1032,6 +1079,7 @@ class BraviaQuadClient:
             FEATURE_AUTO_STANDBY: self._update_auto_standby_state,
             FEATURE_DRC: self._update_drc_state,
             FEATURE_AAV: self._update_aav_state,
+            FEATURE_MUTE: self._update_mute_state,
         }
 
         handler = feature_handlers.get(feature)
@@ -1092,6 +1140,10 @@ class BraviaQuadClient:
     def _update_aav_state(self, value: Any) -> None:
         """Update Advanced Auto Volume state from value."""
         self._aav = str(value)
+
+    def _update_mute_state(self, value: Any) -> None:
+        """Update mute state from value."""
+        self._mute = str(value)
 
     async def _dispatch_notification_callbacks(
         self, feature: str | None, value: Any

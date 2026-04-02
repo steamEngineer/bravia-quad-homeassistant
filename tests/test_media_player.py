@@ -8,10 +8,12 @@ import pytest
 from homeassistant.components.media_player import (
     ATTR_INPUT_SOURCE,
     ATTR_MEDIA_VOLUME_LEVEL,
+    ATTR_MEDIA_VOLUME_MUTED,
     SERVICE_SELECT_SOURCE,
     SERVICE_TURN_OFF,
     SERVICE_TURN_ON,
     SERVICE_VOLUME_DOWN,
+    SERVICE_VOLUME_MUTE,
     SERVICE_VOLUME_SET,
     SERVICE_VOLUME_UP,
     MediaPlayerEntityFeature,
@@ -68,12 +70,14 @@ async def test_media_player_entity_created(
         | MediaPlayerEntityFeature.TURN_OFF
         | MediaPlayerEntityFeature.VOLUME_SET
         | MediaPlayerEntityFeature.VOLUME_STEP
+        | MediaPlayerEntityFeature.VOLUME_MUTE
         | MediaPlayerEntityFeature.SELECT_SOURCE
     )
     assert state.attributes[ATTR_SUPPORTED_FEATURES] == expected_features
 
     # Verify initial attributes
     assert state.attributes[ATTR_MEDIA_VOLUME_LEVEL] == 0.5  # 50/100
+    assert state.attributes[ATTR_MEDIA_VOLUME_MUTED] is False
     assert state.attributes[ATTR_INPUT_SOURCE] == "tv"
 
 
@@ -268,6 +272,7 @@ async def test_media_player_notification_callbacks_registered(
     assert "main.power" in registered_features
     assert "main.volumestep" in registered_features
     assert "main.input" in registered_features
+    assert "main.mute" in registered_features
 
 
 @pytest.mark.usefixtures("init_integration")
@@ -293,3 +298,90 @@ async def test_media_player_off_state(
 
     state = hass.states.get(entity_id)
     assert state.state == MediaPlayerState.OFF
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_media_player_mute(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+) -> None:
+    """Test muting the media player."""
+    entity_id = _get_media_player_entity_id(hass)
+
+    mock_bravia_quad_client.async_set_mute.return_value = True
+
+    await hass.services.async_call(
+        MEDIA_PLAYER_DOMAIN,
+        SERVICE_VOLUME_MUTE,
+        {
+            ATTR_ENTITY_ID: entity_id,
+            ATTR_MEDIA_VOLUME_MUTED: True,
+        },
+        blocking=True,
+    )
+
+    mock_bravia_quad_client.async_set_mute.assert_called_once_with("on")
+
+    # Verify state updated
+    state = hass.states.get(entity_id)
+    assert state.attributes[ATTR_MEDIA_VOLUME_MUTED] is True
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_media_player_unmute(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+) -> None:
+    """Test unmuting the media player."""
+    entity_id = _get_media_player_entity_id(hass)
+
+    mock_bravia_quad_client.async_set_mute.return_value = True
+
+    await hass.services.async_call(
+        MEDIA_PLAYER_DOMAIN,
+        SERVICE_VOLUME_MUTE,
+        {
+            ATTR_ENTITY_ID: entity_id,
+            ATTR_MEDIA_VOLUME_MUTED: False,
+        },
+        blocking=True,
+    )
+
+    mock_bravia_quad_client.async_set_mute.assert_called_once_with("off")
+
+    # Verify state updated
+    state = hass.states.get(entity_id)
+    assert state.attributes[ATTR_MEDIA_VOLUME_MUTED] is False
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_media_player_mute_notification(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+) -> None:
+    """Test mute notification updates state."""
+    entity_id = _get_media_player_entity_id(hass)
+
+    # Find the mute notification callback
+    callback_calls = (
+        mock_bravia_quad_client.register_notification_callback.call_args_list
+    )
+    mute_callback = None
+    for call in callback_calls:
+        if call[0][0] == "main.mute":
+            mute_callback = call[0][1]
+            break
+
+    assert mute_callback is not None
+
+    # Simulate mute notification from device
+    await mute_callback("on")
+
+    state = hass.states.get(entity_id)
+    assert state.attributes[ATTR_MEDIA_VOLUME_MUTED] is True
+
+    # Simulate unmute notification
+    await mute_callback("off")
+
+    state = hass.states.get(entity_id)
+    assert state.attributes[ATTR_MEDIA_VOLUME_MUTED] is False
