@@ -182,6 +182,11 @@ def mock_bravia_quad_client() -> Generator[MagicMock]:
         client.async_set_aav = AsyncMock(return_value=True)
         client.aav = "off"
 
+        # Mute
+        client.async_get_mute = AsyncMock(return_value="off")
+        client.async_set_mute = AsyncMock(return_value=True)
+        client.mute = "off"
+
         # Send command (for bluetooth pairing)
         client.async_send_command = AsyncMock(return_value={"value": "ACK"})
 

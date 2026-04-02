@@ -58,6 +58,7 @@ FEATURE_HDMI_CEC = "hdmi.cec"
 FEATURE_AUTO_STANDBY = "system.autostandby"
 FEATURE_DRC = "audio.drangecomp"
 FEATURE_AAV = "audio.aav"
+FEATURE_MUTE = "main.mute"
 
 # Power states
 POWER_ON = "on"
@@ -86,6 +87,10 @@ AUTO_STANDBY_OFF = "off"
 # Advanced Auto Volume states
 AAV_ON = "on"
 AAV_OFF = "off"
+
+# Mute states
+MUTE_ON = "on"
+MUTE_OFF = "off"
 
 # Input options (API values used as translation keys)
 INPUT_OPTIONS: list[str] = ["tv", "hdmi1", "spotify", "bluetooth", "airplay2"]
