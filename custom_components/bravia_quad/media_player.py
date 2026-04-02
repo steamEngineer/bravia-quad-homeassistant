@@ -15,10 +15,13 @@ from homeassistant.components.media_player import (
 from .const import (
     DOMAIN,
     FEATURE_INPUT,
+    FEATURE_MUTE,
     FEATURE_POWER,
     FEATURE_VOLUME,
     INPUT_OPTIONS,
     MAX_VOLUME,
+    MUTE_OFF,
+    MUTE_ON,
     POWER_OFF,
     POWER_ON,
 )
@@ -57,6 +60,7 @@ class BraviaQuadMediaPlayer(VolumeTransitionMixin, MediaPlayerEntity):
         | MediaPlayerEntityFeature.TURN_OFF
         | MediaPlayerEntityFeature.VOLUME_SET
         | MediaPlayerEntityFeature.VOLUME_STEP
+        | MediaPlayerEntityFeature.VOLUME_MUTE
         | MediaPlayerEntityFeature.SELECT_SOURCE
     )
 
@@ -79,6 +83,9 @@ class BraviaQuadMediaPlayer(VolumeTransitionMixin, MediaPlayerEntity):
 
         # Volume (0-100 -> 0.0-1.0)
         self._attr_volume_level = self._client.volume / MAX_VOLUME
+
+        # Mute
+        self._attr_is_volume_muted = self._client.mute == MUTE_ON
 
         # Source (use raw API value)
         self._attr_source = (
@@ -105,6 +112,11 @@ class BraviaQuadMediaPlayer(VolumeTransitionMixin, MediaPlayerEntity):
                 self.async_write_ha_state()
         except (ValueError, TypeError):
             _LOGGER.warning("Invalid volume notification value: %s", value)
+
+    async def _on_mute_notification(self, value: str) -> None:
+        """Handle mute state notification."""
+        self._attr_is_volume_muted = value == MUTE_ON
+        self.async_write_ha_state()
 
     async def _on_input_notification(self, value: str) -> None:
         """Handle input notification."""
@@ -184,6 +196,16 @@ class BraviaQuadMediaPlayer(VolumeTransitionMixin, MediaPlayerEntity):
         else:
             _LOGGER.error("Failed to set source to %s", source)
 
+    async def async_mute_volume(self, mute: bool) -> None:  # noqa: FBT001
+        """Mute or unmute the soundbar."""
+        state = MUTE_ON if mute else MUTE_OFF
+        success = await self._client.async_set_mute(state)
+        if success:
+            self._attr_is_volume_muted = mute
+            self.async_write_ha_state()
+        else:
+            _LOGGER.error("Failed to set mute to %s", state)
+
     async def async_added_to_hass(self) -> None:
         """Register notification callbacks when entity is added."""
         await super().async_added_to_hass()
@@ -196,6 +218,9 @@ class BraviaQuadMediaPlayer(VolumeTransitionMixin, MediaPlayerEntity):
         self._client.register_notification_callback(
             FEATURE_INPUT, self._on_input_notification
         )
+        self._client.register_notification_callback(
+            FEATURE_MUTE, self._on_mute_notification
+        )
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister callbacks and cancel any ongoing transition."""
@@ -207,6 +232,9 @@ class BraviaQuadMediaPlayer(VolumeTransitionMixin, MediaPlayerEntity):
         )
         self._client.unregister_notification_callback(
             FEATURE_INPUT, self._on_input_notification
+        )
+        self._client.unregister_notification_callback(
+            FEATURE_MUTE, self._on_mute_notification
         )
         self._cancel_volume_transition()
         await super().async_will_remove_from_hass()
