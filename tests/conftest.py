@@ -103,6 +103,70 @@ def mock_setup_entry() -> Generator[None]:
         yield
 
 
+def _setup_feature_mocks(client: MagicMock) -> None:
+    """Configure feature-specific mock attributes on the client."""
+    # Power
+    client.async_get_power = AsyncMock(return_value="on")
+    client.async_set_power = AsyncMock(return_value=True)
+    client.power_state = "on"
+
+    # Volume
+    client.async_get_volume = AsyncMock(return_value=50)
+    client.async_set_volume = AsyncMock(return_value=True)
+    client.volume = 50
+    client.volume_step_interval = 0
+
+    # Input
+    client.async_get_input = AsyncMock(return_value="tv")
+    client.async_set_input = AsyncMock(return_value=True)
+    client.input = "tv"
+
+    # Rear level
+    client.async_get_rear_level = AsyncMock(return_value=0)
+    client.async_set_rear_level = AsyncMock(return_value=True)
+    client.rear_level = 0
+
+    # Bass level
+    client.async_get_bass_level = AsyncMock(return_value=0)
+    client.async_set_bass_level = AsyncMock(return_value=True)
+    client.bass_level = 0
+
+    # Voice enhancer
+    client.async_get_voice_enhancer = AsyncMock(return_value="upoff")
+    client.async_set_voice_enhancer = AsyncMock(return_value=True)
+    client.voice_enhancer = "upoff"
+
+    # Sound field
+    client.async_get_sound_field = AsyncMock(return_value="off")
+    client.async_set_sound_field = AsyncMock(return_value=True)
+    client.sound_field = "off"
+
+    # Night mode
+    client.async_get_night_mode = AsyncMock(return_value="off")
+    client.async_set_night_mode = AsyncMock(return_value=True)
+    client.night_mode = "off"
+
+    # HDMI CEC
+    client.async_get_hdmi_cec = AsyncMock(return_value="off")
+    client.async_set_hdmi_cec = AsyncMock(return_value=True)
+    client.hdmi_cec = "off"
+
+    # Auto standby
+    client.async_get_auto_standby = AsyncMock(return_value="off")
+    client.async_set_auto_standby = AsyncMock(return_value=True)
+    client.auto_standby = "off"
+
+    # Advanced Auto Volume
+    client.async_get_aav = AsyncMock(return_value="off")
+    client.async_set_aav = AsyncMock(return_value=True)
+    client.aav = "off"
+
+    # Mute
+    client.async_get_mute = AsyncMock(return_value="off")
+    client.async_set_mute = AsyncMock(return_value=True)
+    client.mute = "off"
+
+
 @pytest.fixture
 def mock_bravia_quad_client() -> Generator[MagicMock]:
     """Return a mocked BraviaQuadClient."""
@@ -126,66 +190,7 @@ def mock_bravia_quad_client() -> Generator[MagicMock]:
         client.async_listen_for_notifications = AsyncMock()
         client.async_fetch_all_states = AsyncMock()
 
-        # Power
-        client.async_get_power = AsyncMock(return_value="on")
-        client.async_set_power = AsyncMock(return_value=True)
-        client.power_state = "on"
-
-        # Volume
-        client.async_get_volume = AsyncMock(return_value=50)
-        client.async_set_volume = AsyncMock(return_value=True)
-        client.volume = 50
-        client.volume_step_interval = 0
-
-        # Input
-        client.async_get_input = AsyncMock(return_value="tv")
-        client.async_set_input = AsyncMock(return_value=True)
-        client.input = "tv"
-
-        # Rear level
-        client.async_get_rear_level = AsyncMock(return_value=0)
-        client.async_set_rear_level = AsyncMock(return_value=True)
-        client.rear_level = 0
-
-        # Bass level
-        client.async_get_bass_level = AsyncMock(return_value=0)
-        client.async_set_bass_level = AsyncMock(return_value=True)
-        client.bass_level = 0
-
-        # Voice enhancer
-        client.async_get_voice_enhancer = AsyncMock(return_value="upoff")
-        client.async_set_voice_enhancer = AsyncMock(return_value=True)
-        client.voice_enhancer = "upoff"
-
-        # Sound field
-        client.async_get_sound_field = AsyncMock(return_value="off")
-        client.async_set_sound_field = AsyncMock(return_value=True)
-        client.sound_field = "off"
-
-        # Night mode
-        client.async_get_night_mode = AsyncMock(return_value="off")
-        client.async_set_night_mode = AsyncMock(return_value=True)
-        client.night_mode = "off"
-
-        # HDMI CEC
-        client.async_get_hdmi_cec = AsyncMock(return_value="off")
-        client.async_set_hdmi_cec = AsyncMock(return_value=True)
-        client.hdmi_cec = "off"
-
-        # Auto standby
-        client.async_get_auto_standby = AsyncMock(return_value="off")
-        client.async_set_auto_standby = AsyncMock(return_value=True)
-        client.auto_standby = "off"
-
-        # Advanced Auto Volume
-        client.async_get_aav = AsyncMock(return_value="off")
-        client.async_set_aav = AsyncMock(return_value=True)
-        client.aav = "off"
-
-        # Mute
-        client.async_get_mute = AsyncMock(return_value="off")
-        client.async_set_mute = AsyncMock(return_value=True)
-        client.mute = "off"
+        _setup_feature_mocks(client)
 
         # Send command (for bluetooth pairing)
         client.async_send_command = AsyncMock(return_value={"value": "ACK"})
@@ -193,6 +198,11 @@ def mock_bravia_quad_client() -> Generator[MagicMock]:
         # Notification callbacks
         client.register_notification_callback = MagicMock()
         client.unregister_notification_callback = MagicMock()
+
+        # Availability
+        client.register_availability_callback = MagicMock()
+        client.unregister_availability_callback = MagicMock()
+        client.is_connected = True
 
         yield client
 
