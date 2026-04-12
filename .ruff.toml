@@ -29,7 +29,10 @@ max-complexity = 25
 "tests/*" = [
     "ARG001",  # Allow unused function arguments (fixtures need to be referenced)
     "D",       # Don't require docstrings in tests
+    "FBT001",  # Allow boolean positional args in test helper signatures
+    "FBT003",  # Allow boolean positional values in test assertions and mock calls
     "PLR2004", # Allow magic values in tests (common for test assertions)
     "S101",    # Allow assert statements in tests (pytest uses them)
+    "SLF001",  # Allow private member access in tests (needed to set up internal state)
     "TC002",   # Allow runtime imports in tests (needed for entity_registry, MockConfigEntry, etc.)
 ]

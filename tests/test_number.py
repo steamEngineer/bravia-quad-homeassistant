@@ -357,8 +357,8 @@ async def test_volume_step_interval_cancellation_on_remove(
     component = hass.data["number"]
     entity = next(ent for ent in component.entities if ent.entity_id == volume_id)
 
-    assert entity._transition_task is not None  # noqa: SLF001
-    task = entity._transition_task  # noqa: SLF001
+    assert entity._transition_task is not None
+    task = entity._transition_task
 
     # Remove the entity (simulating removal from HA)
     await entity.async_will_remove_from_hass()
@@ -369,7 +369,7 @@ async def test_volume_step_interval_cancellation_on_remove(
 
     # The task should be cancelled
     assert task.cancelled() or task.done()
-    assert entity._transition_task is None  # noqa: SLF001
+    assert entity._transition_task is None
     assert cancelled is True
 
 
@@ -427,7 +427,7 @@ async def test_volume_slider_does_not_update_during_transition(
 
     # Simulate device sending back notification with intermediate value
     # This should be ignored during transition
-    await entity._on_notification(51)  # noqa: SLF001
+    await entity._on_notification(51)
 
     # State should still be target value, not the notification value
     state = hass.states.get(volume_id)
@@ -442,13 +442,13 @@ async def test_volume_slider_does_not_update_during_transition(
     await hass.async_block_till_done()
 
     # Transition should be complete
-    assert entity._transition_in_progress is False  # noqa: SLF001
+    assert entity._transition_in_progress is False
 
     # Advance past the grace period so notifications are accepted again
-    entity._notification_suppressed_until = 0.0  # noqa: SLF001
+    entity._notification_suppressed_until = 0.0
 
     # Now notifications should update the state
-    await entity._on_notification(55)  # noqa: SLF001
+    await entity._on_notification(55)
     state = hass.states.get(volume_id)
     assert state is not None
     assert state.state == "55"
@@ -551,7 +551,7 @@ async def test_volume_transition_flag_reset_on_cancel(
         blocking=True,
     )
 
-    assert entity._transition_in_progress is True  # noqa: SLF001
+    assert entity._transition_in_progress is True
 
     # Notifications should be suppressed during active transition
     assert entity.should_suppress_volume_notification() is True
@@ -577,7 +577,7 @@ async def test_volume_transition_flag_reset_on_cancel(
     )
 
     # With interval=0, no transition should be in progress
-    assert entity._transition_in_progress is False  # noqa: SLF001
+    assert entity._transition_in_progress is False
 
     # Cleanup
     volume_blocked.set()
@@ -613,20 +613,20 @@ async def test_volume_notification_accepted_after_transition(
             blocking=True,
         )
         # Wait for the transition task to complete within the patch context
-        if entity._transition_task:  # noqa: SLF001
-            await entity._transition_task  # noqa: SLF001
+        if entity._transition_task:
+            await entity._transition_task
 
     # Transition should be complete
-    assert entity._transition_in_progress is False  # noqa: SLF001
+    assert entity._transition_in_progress is False
 
     # Notifications should still be suppressed during grace period
     assert entity.should_suppress_volume_notification() is True
 
     # Advance past the grace period
-    entity._notification_suppressed_until = 0.0  # noqa: SLF001
+    entity._notification_suppressed_until = 0.0
 
     # Now a notification should update the state
-    await entity._on_notification(45)  # noqa: SLF001
+    await entity._on_notification(45)
     state = hass.states.get(volume_id)
     assert state is not None
     assert state.state == "45"
