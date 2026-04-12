@@ -25,7 +25,7 @@ from .const import (
     POWER_OFF,
     POWER_ON,
 )
-from .helpers import VolumeTransitionMixin, get_device_info
+from .helpers import BraviaQuadAvailabilityMixin, VolumeTransitionMixin, get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -47,7 +47,9 @@ async def async_setup_entry(
     async_add_entities([BraviaQuadMediaPlayer(client, entry)])
 
 
-class BraviaQuadMediaPlayer(VolumeTransitionMixin, MediaPlayerEntity):
+class BraviaQuadMediaPlayer(
+    BraviaQuadAvailabilityMixin, VolumeTransitionMixin, MediaPlayerEntity
+):
     """Representation of a Bravia Quad soundbar as a media player."""
 
     _attr_device_class = MediaPlayerDeviceClass.SPEAKER

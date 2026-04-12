@@ -12,7 +12,7 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 
 from .const import CONF_HAS_SUBWOOFER, DOMAIN
-from .helpers import get_device_info
+from .helpers import BraviaQuadAvailabilityMixin, get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -40,7 +40,7 @@ async def async_setup_entry(
     async_add_entities(entities)
 
 
-class BraviaQuadDetectSubwooferButton(ButtonEntity):
+class BraviaQuadDetectSubwooferButton(BraviaQuadAvailabilityMixin, ButtonEntity):
     """Button to detect subwoofer presence."""
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
@@ -127,7 +127,7 @@ class BraviaQuadDetectSubwooferButton(ButtonEntity):
                 )
 
 
-class BraviaQuadBluetoothPairingButton(ButtonEntity):
+class BraviaQuadBluetoothPairingButton(BraviaQuadAvailabilityMixin, ButtonEntity):
     """Button to trigger Bluetooth pairing mode."""
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC

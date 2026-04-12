@@ -25,11 +25,22 @@ keep-runtime-typing = true
 max-complexity = 25
 
 [lint.per-file-ignores]
-"scripts/*" = ["T20"]  # Allow print statements in scripts
+"scripts/*" = [
+    "D",       # Don't require docstrings in scripts
+    "FBT001",  # Allow boolean positional args in scripts
+    "PLR0915", # Allow many statements in scripts (long procedural flows)
+    "PLW2901", # Allow loop variable reassignment in scripts
+    "S101",    # Allow assert statements in scripts
+    "SLF001",  # Allow private member access in scripts
+    "T20",     # Allow print statements in scripts
+]
 "tests/*" = [
     "ARG001",  # Allow unused function arguments (fixtures need to be referenced)
     "D",       # Don't require docstrings in tests
+    "FBT001",  # Allow boolean positional args in test helper signatures
+    "FBT003",  # Allow boolean positional values in test assertions and mock calls
     "PLR2004", # Allow magic values in tests (common for test assertions)
     "S101",    # Allow assert statements in tests (pytest uses them)
+    "SLF001",  # Allow private member access in tests (needed to set up internal state)
     "TC002",   # Allow runtime imports in tests (needed for entity_registry, MockConfigEntry, etc.)
 ]
