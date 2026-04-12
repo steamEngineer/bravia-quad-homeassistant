@@ -151,7 +151,40 @@ def get_device_info(entry: ConfigEntry) -> DeviceInfo:
     )
 
 
-class BraviaQuadNotificationMixin:
+class BraviaQuadAvailabilityMixin:
+    """
+    Mixin that tracks connection availability for Bravia Quad entities.
+
+    Subclasses must define:
+    - _client: BraviaQuadClient instance
+
+    Provides an `available` property that reflects the TCP connection state
+    and automatically updates HA when the connection drops or recovers.
+    """
+
+    _client: BraviaQuadClient
+
+    @property
+    def available(self) -> bool:
+        """Return True if entity is available."""
+        return self._client.is_connected
+
+    def _on_availability_changed(self, _available: bool) -> None:  # noqa: FBT001
+        """Handle connection availability change."""
+        self.async_write_ha_state()  # type: ignore[attr-defined]
+
+    async def async_added_to_hass(self) -> None:
+        """Register availability callback when entity is added."""
+        await super().async_added_to_hass()  # type: ignore[misc]
+        self._client.register_availability_callback(self._on_availability_changed)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unregister availability callback when entity is removed."""
+        await super().async_will_remove_from_hass()  # type: ignore[misc]
+        self._client.unregister_availability_callback(self._on_availability_changed)
+
+
+class BraviaQuadNotificationMixin(BraviaQuadAvailabilityMixin):
     """
     Mixin for entities that subscribe to Bravia Quad notifications.
 
@@ -161,7 +194,6 @@ class BraviaQuadNotificationMixin:
     - _on_notification: async callback method to handle notifications
     """
 
-    _client: BraviaQuadClient
     _notification_feature: str
 
     async def _on_notification(self, value: str) -> None:
@@ -170,14 +202,14 @@ class BraviaQuadNotificationMixin:
 
     async def async_added_to_hass(self) -> None:
         """Register notification callback when entity is added."""
-        await super().async_added_to_hass()  # type: ignore[misc]
+        await super().async_added_to_hass()
         self._client.register_notification_callback(
             self._notification_feature, self._on_notification
         )
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister notification callback when entity is removed."""
-        await super().async_will_remove_from_hass()  # type: ignore[misc]
+        await super().async_will_remove_from_hass()
         self._client.unregister_notification_callback(
             self._notification_feature, self._on_notification
         )
