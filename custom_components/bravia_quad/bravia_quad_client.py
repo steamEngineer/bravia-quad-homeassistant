@@ -60,19 +60,6 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_BASS_LEVEL = 1  # MID
 DEFAULT_DRC = "auto"
 
-# Reconnection parameters
-RECONNECT_DELAY_INITIAL = 1.0  # seconds
-RECONNECT_DELAY_MAX = 60.0  # seconds
-RECONNECT_DELAY_MULTIPLIER = 2.0
-
-
-class _ReconnectNeededError(Exception):
-    """Internal signal that the notification loop should retry connection."""
-
-    def __init__(self, next_delay: float) -> None:
-        super().__init__()
-        self.next_delay = next_delay
-
 
 class BraviaQuadClient:
     """Client for Bravia Quad TCP communication."""
@@ -107,7 +94,6 @@ class BraviaQuadClient:
         self._listener_task: asyncio.Task | None = None
         self._background_tasks: set[asyncio.Task] = set()
         self._availability_callbacks: set[Callable[[bool], None]] = set()
-        self._pending_available_notify = False
 
     async def async_connect(self) -> None:
         """Connect to the Bravia Quad device."""
@@ -862,29 +848,38 @@ class BraviaQuadClient:
         self._listener_task = asyncio.create_task(self._notification_loop())
 
     async def _notification_loop(self) -> None:
-        """Listen for notifications from the device and reconnect on failure."""
+        """Listen for notifications from the device."""
         self._listening = True
-        reconnect_delay = RECONNECT_DELAY_INITIAL
         _LOGGER.info("Starting notification listener")
 
         try:
             while self._listening:
                 try:
-                    # Reconnect if disconnected
-                    if not self._connected:
-                        await self._async_attempt_reconnect(reconnect_delay)
-                        # Don't reset backoff here — wait for a
-                        # successful data read to confirm the
-                        # connection is truly alive.
-                        continue
+                    if not self._connected or not self._reader:
+                        _LOGGER.warning(
+                            "Connection lost, stopping notification listener"
+                        )
+                        await self._async_mark_disconnected()
+                        return
 
-                    reconnect_delay = await self._async_read_and_process(
-                        reconnect_delay
-                    )
-                except _ReconnectNeededError as exc:
-                    reconnect_delay = exc.next_delay
+                    data = await asyncio.wait_for(self._reader.read(1024), timeout=1.0)
+
+                    if not data:
+                        _LOGGER.warning("Connection closed by device (EOF)")
+                        await self._async_mark_disconnected()
+                        return
+
+                    response_str = data.decode("utf-8", errors="replace").strip()
+                    if response_str:
+                        messages = self._decode_json_stream(response_str)
+                        for message in messages:
+                            await self._process_incoming_message(message)
                 except TimeoutError:
                     continue
+                except OSError:
+                    _LOGGER.warning("Connection error in notification listener")
+                    await self._async_mark_disconnected()
+                    return
                 except asyncio.CancelledError:
                     raise
         except asyncio.CancelledError:
@@ -893,102 +888,6 @@ class BraviaQuadClient:
         finally:
             self._listening = False
             _LOGGER.info("Notification listener stopped")
-
-    async def _async_attempt_reconnect(self, delay: float) -> None:
-        """Try to reconnect; raise _ReconnectNeededError on failure."""
-        try:
-            await self.async_connect()
-            # Don't notify availability yet — wait until the first
-            # successful data read confirms the connection is alive.
-            self._pending_available_notify = True
-            # Send a single lightweight test command so the device has
-            # something to respond to.  The notification loop will read
-            # the reply and confirm the connection before we fetch the
-            # full state.
-            await self._async_send_test_probe()
-            _LOGGER.info("Reconnected to Bravia Quad (confirming...)")
-        except (OSError, ConnectionError, TimeoutError):
-            _LOGGER.debug(
-                "Reconnection attempt failed, retrying in %.1f seconds",
-                delay,
-            )
-            await asyncio.sleep(delay)
-            raise _ReconnectNeededError(
-                min(delay * RECONNECT_DELAY_MULTIPLIER, RECONNECT_DELAY_MAX)
-            ) from None
-
-    async def _async_send_test_probe(self) -> None:
-        """Send a fire-and-forget power-status query to elicit a response."""
-        if not self._writer:
-            return
-        probe = (
-            json.dumps(
-                {
-                    "id": self._get_next_command_id(),
-                    "type": "get",
-                    "feature": FEATURE_POWER,
-                }
-            )
-            + "\n"
-        )
-        self._writer.write(probe.encode())
-        await self._writer.drain()
-
-    async def _async_read_and_process(self, reconnect_delay: float) -> float:
-        """
-        Read data from the device and process messages.
-
-        Returns the (possibly reset) reconnect delay.  Raises
-        ``_ReconnectNeededError`` when the connection is lost.
-        """
-        if not self._reader:
-            await self._async_mark_disconnected()
-            raise _ReconnectNeededError(reconnect_delay)
-
-        try:
-            data = await asyncio.wait_for(self._reader.read(1024), timeout=1.0)
-        except OSError:
-            _LOGGER.warning("Connection error in notification listener")
-            await self._async_mark_disconnected()
-            await asyncio.sleep(reconnect_delay)
-            raise _ReconnectNeededError(
-                min(
-                    reconnect_delay * RECONNECT_DELAY_MULTIPLIER,
-                    RECONNECT_DELAY_MAX,
-                )
-            ) from None
-
-        if not data:
-            # EOF - remote closed connection
-            _LOGGER.warning("Connection closed by device (EOF)")
-            await self._async_mark_disconnected()
-            await asyncio.sleep(reconnect_delay)
-            raise _ReconnectNeededError(
-                min(
-                    reconnect_delay * RECONNECT_DELAY_MULTIPLIER,
-                    RECONNECT_DELAY_MAX,
-                )
-            )
-
-        response_str = data.decode("utf-8", errors="replace").strip()
-        if response_str:
-            messages = self._decode_json_stream(response_str)
-            for message in messages:
-                await self._process_incoming_message(message)
-
-        # Connection confirmed — notify entities if this is the
-        # first successful read after a reconnect.
-        if self._pending_available_notify:
-            self._pending_available_notify = False
-            _LOGGER.info("Reconnection confirmed by device response")
-            self._notify_availability(available=True)
-            # Now that the device has actually responded, fetch full state.
-            task = asyncio.create_task(self.async_fetch_all_states())
-            self._background_tasks.add(task)
-            task.add_done_callback(self._background_tasks.discard)
-
-        # Reset backoff on successful data read
-        return RECONNECT_DELAY_INITIAL
 
     @property
     def is_connected(self) -> bool:
@@ -1091,17 +990,10 @@ class BraviaQuadClient:
         ]
 
         for fetch in fetchers:
-            if not self._connected:
-                _LOGGER.debug("Connection lost during state fetch, aborting")
-                return
             try:
                 await fetch()
-            except (OSError, ConnectionError):
-                _LOGGER.warning(
-                    "Failed to fetch state via %s, aborting remaining",
-                    fetch.__name__,
-                )
-                return
+            except (OSError, ConnectionError):  # pragma: no cover - log and continue
+                _LOGGER.warning("Failed to fetch state via %s", fetch.__name__)
 
         _LOGGER.debug(
             "State fetch complete - Power: %s, Volume: %d, Input: %s, "
