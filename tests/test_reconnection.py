@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.const import STATE_UNAVAILABLE, Platform
@@ -117,8 +117,8 @@ class TestClientReconnection:
         # Should not raise
         client.unregister_availability_callback(callback)
 
-    async def test_notification_loop_reconnects_on_eof(self) -> None:
-        """Test that the notification loop reconnects when EOF is received."""
+    async def test_notification_loop_stops_on_eof(self) -> None:
+        """Test that the notification loop stops when EOF is received."""
         client = BraviaQuadClient("192.168.1.100", "Test")
         availability_callback = MagicMock()
         client.register_availability_callback(availability_callback)
@@ -126,23 +126,15 @@ class TestClientReconnection:
         mock_reader = _setup_mock_stream(client)
         mock_reader.read = AsyncMock(return_value=b"")
 
-        async def mock_connect() -> None:
-            # Stop the loop after the first failed reconnect attempt
-            client._listening = False
-            raise ConnectionError
-
-        with (
-            patch.object(client, "async_connect", new=mock_connect),
-            patch("asyncio.sleep", new_callable=AsyncMock),
-        ):
-            client._listening = True
-            await client._notification_loop()
+        client._listening = True
+        await client._notification_loop()
 
         assert not client.is_connected
+        assert not client._listening
         availability_callback.assert_called_with(False)
 
-    async def test_notification_loop_reconnects_on_os_error(self) -> None:
-        """Test that the notification loop reconnects on OSError."""
+    async def test_notification_loop_stops_on_os_error(self) -> None:
+        """Test that the notification loop stops on OSError."""
         client = BraviaQuadClient("192.168.1.100", "Test")
         availability_callback = MagicMock()
         client.register_availability_callback(availability_callback)
@@ -150,67 +142,12 @@ class TestClientReconnection:
         mock_reader = _setup_mock_stream(client)
         mock_reader.read = AsyncMock(side_effect=OSError("Connection reset"))
 
-        async def mock_connect() -> None:
-            # Stop the loop after the first failed reconnect attempt
-            client._listening = False
-            raise ConnectionError
-
-        with (
-            patch.object(client, "async_connect", new=mock_connect),
-            patch("asyncio.sleep", new_callable=AsyncMock),
-        ):
-            client._listening = True
-            await client._notification_loop()
+        client._listening = True
+        await client._notification_loop()
 
         assert not client.is_connected
+        assert not client._listening
         availability_callback.assert_called_with(False)
-
-    async def test_notification_loop_successful_reconnect(self) -> None:
-        """Test that the notification loop successfully reconnects."""
-        client = BraviaQuadClient("192.168.1.100", "Test")
-        availability_callback = MagicMock()
-        client.register_availability_callback(availability_callback)
-
-        read_count = 0
-
-        async def mock_read(_n: int) -> bytes:
-            nonlocal read_count
-            read_count += 1
-            if read_count == 1:
-                # First read: EOF triggers disconnect + reconnect
-                return b""
-            if read_count == 2:
-                # Second read (after reconnect): device responds to test probe
-                return b'{"type":"result","feature":"power","value":"off"}\n'
-            # Third read: stop the loop
-            client._listening = False
-            return b""
-
-        mock_reader = _setup_mock_stream(client)
-        mock_reader.read = mock_read
-
-        mock_writer = MagicMock()
-        mock_writer.write = MagicMock()
-        mock_writer.drain = AsyncMock()
-        mock_writer.close = MagicMock()
-        mock_writer.wait_closed = AsyncMock()
-
-        async def mock_connect() -> None:
-            client._connected = True
-            client._reader = mock_reader
-            client._writer = mock_writer
-
-        with (
-            patch.object(client, "async_connect", new=mock_connect),
-            patch.object(client, "async_fetch_all_states", new_callable=AsyncMock),
-            patch("asyncio.sleep", new_callable=AsyncMock),
-        ):
-            client._listening = True
-            await client._notification_loop()
-
-        calls = availability_callback.call_args_list
-        assert any(c[0] == (False,) for c in calls)
-        assert any(c[0] == (True,) for c in calls)
 
 
 # --- Integration-level entity availability tests ---
