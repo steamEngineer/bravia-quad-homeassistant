@@ -901,9 +901,11 @@ class BraviaQuadClient:
             # Don't notify availability yet — wait until the first
             # successful data read confirms the connection is alive.
             self._pending_available_notify = True
-            task = asyncio.create_task(self.async_fetch_all_states())
-            self._background_tasks.add(task)
-            task.add_done_callback(self._background_tasks.discard)
+            # Send a single lightweight test command so the device has
+            # something to respond to.  The notification loop will read
+            # the reply and confirm the connection before we fetch the
+            # full state.
+            await self._async_send_test_probe()
             _LOGGER.info("Reconnected to Bravia Quad (confirming...)")
         except (OSError, ConnectionError, TimeoutError):
             _LOGGER.debug(
@@ -914,6 +916,23 @@ class BraviaQuadClient:
             raise _ReconnectNeededError(
                 min(delay * RECONNECT_DELAY_MULTIPLIER, RECONNECT_DELAY_MAX)
             ) from None
+
+    async def _async_send_test_probe(self) -> None:
+        """Send a fire-and-forget power-status query to elicit a response."""
+        if not self._writer:
+            return
+        probe = (
+            json.dumps(
+                {
+                    "id": self._get_next_command_id(),
+                    "type": "get",
+                    "feature": FEATURE_POWER,
+                }
+            )
+            + "\n"
+        )
+        self._writer.write(probe.encode())
+        await self._writer.drain()
 
     async def _async_read_and_process(self, reconnect_delay: float) -> float:
         """
@@ -963,6 +982,10 @@ class BraviaQuadClient:
             self._pending_available_notify = False
             _LOGGER.info("Reconnection confirmed by device response")
             self._notify_availability(available=True)
+            # Now that the device has actually responded, fetch full state.
+            task = asyncio.create_task(self.async_fetch_all_states())
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
 
         # Reset backoff on successful data read
         return RECONNECT_DELAY_INITIAL
@@ -1068,10 +1091,17 @@ class BraviaQuadClient:
         ]
 
         for fetch in fetchers:
+            if not self._connected:
+                _LOGGER.debug("Connection lost during state fetch, aborting")
+                return
             try:
                 await fetch()
-            except (OSError, ConnectionError):  # pragma: no cover - log and continue
-                _LOGGER.warning("Failed to fetch state via %s", fetch.__name__)
+            except (OSError, ConnectionError):
+                _LOGGER.warning(
+                    "Failed to fetch state via %s, aborting remaining",
+                    fetch.__name__,
+                )
+                return
 
         _LOGGER.debug(
             "State fetch complete - Power: %s, Volume: %d, Input: %s, "

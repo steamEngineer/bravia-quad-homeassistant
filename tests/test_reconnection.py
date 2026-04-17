@@ -180,7 +180,7 @@ class TestClientReconnection:
                 # First read: EOF triggers disconnect + reconnect
                 return b""
             if read_count == 2:
-                # Second read (after reconnect): valid data confirms connection
+                # Second read (after reconnect): device responds to test probe
                 return b'{"type":"result","feature":"power","value":"off"}\n'
             # Third read: stop the loop
             client._listening = False
@@ -189,12 +189,16 @@ class TestClientReconnection:
         mock_reader = _setup_mock_stream(client)
         mock_reader.read = mock_read
 
+        mock_writer = MagicMock()
+        mock_writer.write = MagicMock()
+        mock_writer.drain = AsyncMock()
+        mock_writer.close = MagicMock()
+        mock_writer.wait_closed = AsyncMock()
+
         async def mock_connect() -> None:
             client._connected = True
             client._reader = mock_reader
-            client._writer = MagicMock()
-            client._writer.close = MagicMock()
-            client._writer.wait_closed = AsyncMock()
+            client._writer = mock_writer
 
         with (
             patch.object(client, "async_connect", new=mock_connect),
