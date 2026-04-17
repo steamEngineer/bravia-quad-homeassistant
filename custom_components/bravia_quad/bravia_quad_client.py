@@ -106,7 +106,7 @@ class BraviaQuadClient:
         self._pending_responses: dict[int, asyncio.Future] = {}
         self._listener_task: asyncio.Task | None = None
         self._background_tasks: set[asyncio.Task] = set()
-        self._availability_callbacks: list[Callable[[bool], None]] = []
+        self._availability_callbacks: set[Callable[[bool], None]] = set()
 
     async def async_connect(self) -> None:
         """Connect to the Bravia Quad device."""
@@ -820,22 +820,16 @@ class BraviaQuadClient:
 
     def register_availability_callback(self, callback: Callable[[bool], None]) -> None:
         """Register a callback for connection state changes."""
-        if not isinstance(self._availability_callbacks, set):
-            self._availability_callbacks = set(self._availability_callbacks)
         self._availability_callbacks.add(callback)
 
     def unregister_availability_callback(
         self, callback: Callable[[bool], None]
     ) -> None:
         """Unregister a connection state change callback."""
-        if not isinstance(self._availability_callbacks, set):
-            self._availability_callbacks = set(self._availability_callbacks)
         self._availability_callbacks.discard(callback)
 
     def _notify_availability(self, *, available: bool) -> None:
         """Notify all registered availability callbacks."""
-        if not isinstance(self._availability_callbacks, set):
-            self._availability_callbacks = set(self._availability_callbacks)
         for callback in tuple(self._availability_callbacks):
             try:
                 callback(available)

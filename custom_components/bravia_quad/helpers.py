@@ -11,6 +11,7 @@ from homeassistant.const import CONF_MAC, CONF_NAME
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC, DeviceInfo
+from homeassistant.helpers.entity import Entity
 
 from .const import CONF_MODEL, DEFAULT_MODEL, DOMAIN
 
@@ -151,7 +152,7 @@ def get_device_info(entry: ConfigEntry) -> DeviceInfo:
     )
 
 
-class BraviaQuadAvailabilityMixin:
+class BraviaQuadAvailabilityMixin(Entity):
     """
     Mixin that tracks connection availability for Bravia Quad entities.
 
@@ -171,17 +172,17 @@ class BraviaQuadAvailabilityMixin:
 
     def _on_availability_changed(self, _available: bool) -> None:  # noqa: FBT001
         """Handle connection availability change."""
-        self.async_write_ha_state()  # type: ignore[attr-defined]
+        self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
         """Register availability callback when entity is added."""
-        await super().async_added_to_hass()  # type: ignore[misc]
+        await super().async_added_to_hass()
         self._client.register_availability_callback(self._on_availability_changed)
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister availability callback when entity is removed."""
         self._client.unregister_availability_callback(self._on_availability_changed)
-        await super().async_will_remove_from_hass()  # type: ignore[misc]
+        await super().async_will_remove_from_hass()
 
 
 class BraviaQuadNotificationMixin(BraviaQuadAvailabilityMixin):
