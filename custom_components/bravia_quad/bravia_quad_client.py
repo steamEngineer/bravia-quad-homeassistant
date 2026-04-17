@@ -820,18 +820,23 @@ class BraviaQuadClient:
 
     def register_availability_callback(self, callback: Callable[[bool], None]) -> None:
         """Register a callback for connection state changes."""
-        self._availability_callbacks.append(callback)
+        if not isinstance(self._availability_callbacks, set):
+            self._availability_callbacks = set(self._availability_callbacks)
+        self._availability_callbacks.add(callback)
 
     def unregister_availability_callback(
         self, callback: Callable[[bool], None]
     ) -> None:
         """Unregister a connection state change callback."""
-        with contextlib.suppress(ValueError):
-            self._availability_callbacks.remove(callback)
+        if not isinstance(self._availability_callbacks, set):
+            self._availability_callbacks = set(self._availability_callbacks)
+        self._availability_callbacks.discard(callback)
 
     def _notify_availability(self, *, available: bool) -> None:
         """Notify all registered availability callbacks."""
-        for callback in self._availability_callbacks:
+        if not isinstance(self._availability_callbacks, set):
+            self._availability_callbacks = set(self._availability_callbacks)
+        for callback in tuple(self._availability_callbacks):
             try:
                 callback(available)
             except Exception:
