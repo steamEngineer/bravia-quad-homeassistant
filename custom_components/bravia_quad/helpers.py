@@ -180,8 +180,8 @@ class BraviaQuadAvailabilityMixin:
 
     async def async_will_remove_from_hass(self) -> None:
         """Unregister availability callback when entity is removed."""
-        await super().async_will_remove_from_hass()  # type: ignore[misc]
         self._client.unregister_availability_callback(self._on_availability_changed)
+        await super().async_will_remove_from_hass()  # type: ignore[misc]
 
 
 class BraviaQuadNotificationMixin(BraviaQuadAvailabilityMixin):
