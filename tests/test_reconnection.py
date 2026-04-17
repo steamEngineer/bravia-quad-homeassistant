@@ -177,7 +177,12 @@ class TestClientReconnection:
             nonlocal read_count
             read_count += 1
             if read_count == 1:
+                # First read: EOF triggers disconnect + reconnect
                 return b""
+            if read_count == 2:
+                # Second read (after reconnect): valid data confirms connection
+                return b'{"type":"result","feature":"power","value":"off"}\n'
+            # Third read: stop the loop
             client._listening = False
             return b""
 

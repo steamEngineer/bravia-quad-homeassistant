@@ -107,6 +107,7 @@ class BraviaQuadClient:
         self._listener_task: asyncio.Task | None = None
         self._background_tasks: set[asyncio.Task] = set()
         self._availability_callbacks: set[Callable[[bool], None]] = set()
+        self._pending_available_notify = False
 
     async def async_connect(self) -> None:
         """Connect to the Bravia Quad device."""
@@ -872,7 +873,9 @@ class BraviaQuadClient:
                     # Reconnect if disconnected
                     if not self._connected:
                         await self._async_attempt_reconnect(reconnect_delay)
-                        reconnect_delay = RECONNECT_DELAY_INITIAL
+                        # Don't reset backoff here — wait for a
+                        # successful data read to confirm the
+                        # connection is truly alive.
                         continue
 
                     reconnect_delay = await self._async_read_and_process(
@@ -895,14 +898,13 @@ class BraviaQuadClient:
         """Try to reconnect; raise _ReconnectNeededError on failure."""
         try:
             await self.async_connect()
-            # Notify availability immediately — state fetch is
-            # scheduled as a background task because it sends
-            # commands whose responses are read by this loop.
-            self._notify_availability(available=True)
+            # Don't notify availability yet — wait until the first
+            # successful data read confirms the connection is alive.
+            self._pending_available_notify = True
             task = asyncio.create_task(self.async_fetch_all_states())
             self._background_tasks.add(task)
             task.add_done_callback(self._background_tasks.discard)
-            _LOGGER.info("Reconnected to Bravia Quad")
+            _LOGGER.info("Reconnected to Bravia Quad (confirming...)")
         except (OSError, ConnectionError, TimeoutError):
             _LOGGER.debug(
                 "Reconnection attempt failed, retrying in %.1f seconds",
@@ -954,6 +956,13 @@ class BraviaQuadClient:
             messages = self._decode_json_stream(response_str)
             for message in messages:
                 await self._process_incoming_message(message)
+
+        # Connection confirmed — notify entities if this is the
+        # first successful read after a reconnect.
+        if self._pending_available_notify:
+            self._pending_available_notify = False
+            _LOGGER.info("Reconnection confirmed by device response")
+            self._notify_availability(available=True)
 
         # Reset backoff on successful data read
         return RECONNECT_DELAY_INITIAL
