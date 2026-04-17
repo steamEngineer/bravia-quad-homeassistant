@@ -123,30 +123,20 @@ class TestClientReconnection:
         availability_callback = MagicMock()
         client.register_availability_callback(availability_callback)
 
-        read_count = 0
-
-        async def mock_read(n: int) -> bytes:
-            nonlocal read_count
-            read_count += 1
-            if read_count == 1:
-                return b""
-            client._listening = False
-            return b""
-
         mock_reader = _setup_mock_stream(client)
-        mock_reader.read = mock_read
+        mock_reader.read = AsyncMock(return_value=b"")
 
-        with patch.object(
-            client,
-            "async_connect",
-            side_effect=ConnectionError,
+        async def mock_connect() -> None:
+            # Stop the loop after the first failed reconnect attempt
+            client._listening = False
+            raise ConnectionError
+
+        with (
+            patch.object(client, "async_connect", new=mock_connect),
+            patch("asyncio.sleep", new_callable=AsyncMock),
         ):
             client._listening = True
-            with pytest.raises(asyncio.TimeoutError):
-                await asyncio.wait_for(
-                    client._notification_loop(),
-                    timeout=3.0,
-                )
+            await client._notification_loop()
 
         assert not client.is_connected
         availability_callback.assert_called_with(False)
@@ -157,24 +147,20 @@ class TestClientReconnection:
         availability_callback = MagicMock()
         client.register_availability_callback(availability_callback)
 
-        async def mock_read(_n: int) -> bytes:
-            msg = "Connection reset"
-            raise OSError(msg)
-
         mock_reader = _setup_mock_stream(client)
-        mock_reader.read = mock_read
+        mock_reader.read = AsyncMock(side_effect=OSError("Connection reset"))
 
         async def mock_connect() -> None:
+            # Stop the loop after the first failed reconnect attempt
             client._listening = False
             raise ConnectionError
 
-        with patch.object(client, "async_connect", side_effect=mock_connect):
+        with (
+            patch.object(client, "async_connect", new=mock_connect),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+        ):
             client._listening = True
-            with pytest.raises(asyncio.TimeoutError):
-                await asyncio.wait_for(
-                    client._notification_loop(),
-                    timeout=3.0,
-                )
+            await client._notification_loop()
 
         assert not client.is_connected
         availability_callback.assert_called_with(False)
@@ -206,14 +192,12 @@ class TestClientReconnection:
             client._writer.wait_closed = AsyncMock()
 
         with (
-            patch.object(client, "async_connect", side_effect=mock_connect),
+            patch.object(client, "async_connect", new=mock_connect),
             patch.object(client, "async_fetch_all_states", new_callable=AsyncMock),
+            patch("asyncio.sleep", new_callable=AsyncMock),
         ):
             client._listening = True
-            await asyncio.wait_for(
-                client._notification_loop(),
-                timeout=5.0,
-            )
+            await client._notification_loop()
 
         calls = availability_callback.call_args_list
         assert any(c[0] == (False,) for c in calls)
