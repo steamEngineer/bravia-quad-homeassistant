@@ -74,7 +74,7 @@ jobs:
         if: >-
           (github.event_name != 'workflow_dispatch' || inputs.release_type == 'stable')
           && steps.stable_version.outputs.version != ''
-        uses: release-drafter/release-drafter@v7.2.0
+        uses: release-drafter/release-drafter@v7.2.1
         with:
           version: ${{ steps.stable_version.outputs.version }}
         env:
@@ -84,13 +84,13 @@ jobs:
         if: >-
           (github.event_name != 'workflow_dispatch' || inputs.release_type == 'stable')
           && steps.stable_version.outputs.version == ''
-        uses: release-drafter/release-drafter@v7.2.0
+        uses: release-drafter/release-drafter@v7.2.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: 🚀 Run Release Drafter (pre-release)
         if: github.event_name == 'workflow_dispatch' && inputs.release_type != 'stable'
-        uses: release-drafter/release-drafter@v7.2.0
+        uses: release-drafter/release-drafter@v7.2.1
         with:
           prerelease: true
           prerelease-identifier: ${{ inputs.release_type }}
