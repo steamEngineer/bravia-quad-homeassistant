@@ -166,6 +166,18 @@ def _setup_feature_mocks(client: MagicMock) -> None:
     client.async_set_mute = AsyncMock(return_value=True)
     client.mute = "off"
 
+    # Device identity
+    client.async_get_mac_address = AsyncMock(return_value="aa:bb:cc:dd:ee:ff")
+    client.async_get_serial_number = AsyncMock(return_value="1234567")
+    client.async_get_firmware_version = AsyncMock(return_value="001.100")
+    client.async_get_model_type = AsyncMock(return_value="HT-A9M2")
+    client.async_get_manufacturer = AsyncMock(return_value="SONY")
+    client.serial_number = "1234567"
+    client.firmware_version = "001.100"
+    client.model_type = "HT-A9M2"
+    client.manufacturer = "SONY"
+    client.async_get_device_name = AsyncMock(return_value="Test BRAVIA Theatre Quad")
+
 
 @pytest.fixture
 def mock_bravia_quad_client() -> Generator[MagicMock]:

@@ -23,8 +23,209 @@ from custom_components.bravia_quad.helpers import (
     migrate_legacy_identifiers,
 )
 
+from .conftest import get_entity_id_by_unique_id_suffix
+
 if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
     from homeassistant.core import HomeAssistant
+
+
+# =============================================================================
+# Device registry enrichment tests
+# =============================================================================
+
+
+@pytest.fixture
+def platforms() -> list[Platform]:
+    """Load no platforms for these tests."""
+    return []
+
+
+@pytest.mark.usefixtures("mock_bravia_quad_client")
+async def test_device_registry_model_from_tcp(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_bravia_quad_client: MagicMock,
+) -> None:
+    """Test device registry gets model name resolved from TCP model type."""
+    # Entry has no CONF_MODEL (manual setup, no zeroconf)
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.bravia_quad.PLATFORMS", []):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    device_registry = dr.async_get(hass)
+    device = device_registry.async_get_device(
+        identifiers={(DOMAIN, mock_config_entry.unique_id)}
+    )
+    assert device is not None
+    # model_type "HT-A9M2" should resolve to "BRAVIA Theatre Quad" via lookup
+    assert device.model == "BRAVIA Theatre Quad"
+    assert device.model_id == "HT-A9M2"
+    assert device.manufacturer == "SONY"
+    assert device.serial_number == "1234567"
+    assert device.sw_version == "001.100"
+
+
+@pytest.mark.usefixtures("mock_bravia_quad_client")
+async def test_device_registry_model_from_zeroconf(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+) -> None:
+    """Test device registry prefers zeroconf model name over TCP fallback."""
+    entry = MockConfigEntry(
+        title="Bravia Quad",
+        domain=DOMAIN,
+        data={
+            CONF_HOST: "192.168.1.100",
+            CONF_HAS_SUBWOOFER: True,
+            CONF_MODEL: "BRAVIA Theatre Quad",
+        },
+        unique_id="192.168.1.100",
+        entry_id="test_zeroconf_entry",
+    )
+    entry.add_to_hass(hass)
+
+    with patch("custom_components.bravia_quad.PLATFORMS", []):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    device_registry = dr.async_get(hass)
+    device = device_registry.async_get_device(identifiers={(DOMAIN, entry.unique_id)})
+    assert device is not None
+    assert device.model == "BRAVIA Theatre Quad"
+
+
+@pytest.mark.usefixtures("mock_bravia_quad_client")
+async def test_device_registry_mac_connection(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_bravia_quad_client: MagicMock,
+) -> None:
+    """Test device registry gets MAC from TCP."""
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.bravia_quad.PLATFORMS", []):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    device_registry = dr.async_get(hass)
+    device = device_registry.async_get_device(
+        identifiers={(DOMAIN, mock_config_entry.unique_id)}
+    )
+    assert device is not None
+    assert (CONNECTION_NETWORK_MAC, "aa:bb:cc:dd:ee:ff") in device.connections
+
+
+@pytest.mark.usefixtures("mock_bravia_quad_client")
+async def test_device_registry_updates_existing_device(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_bravia_quad_client: MagicMock,
+) -> None:
+    """Test that device info is updated when device already exists with old values."""
+    mock_config_entry.add_to_hass(hass)
+
+    # Create device with stale values (simulates prior version of integration)
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=mock_config_entry.entry_id,
+        identifiers={(DOMAIN, mock_config_entry.unique_id)},
+        manufacturer="Sony",
+        model="Bravia Theatre",
+    )
+
+    # Verify stale values are set
+    device = device_registry.async_get_device(
+        identifiers={(DOMAIN, mock_config_entry.unique_id)}
+    )
+    assert device is not None
+    assert device.model == "Bravia Theatre"
+    assert device.manufacturer == "Sony"
+
+    # Now run setup, which should overwrite with TCP-sourced values
+    with patch("custom_components.bravia_quad.PLATFORMS", []):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    device = device_registry.async_get_device(
+        identifiers={(DOMAIN, mock_config_entry.unique_id)}
+    )
+    assert device is not None
+    assert device.model == "BRAVIA Theatre Quad"
+    assert device.manufacturer == "SONY"
+    assert device.model_id == "HT-A9M2"
+    assert device.serial_number == "1234567"
+    assert device.sw_version == "001.100"
+
+
+@pytest.mark.usefixtures("mock_bravia_quad_client")
+async def test_backfill_fetches_identity(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_bravia_quad_client: MagicMock,
+) -> None:
+    """Test that old entries without identity get backfilled on setup."""
+    # mock_config_entry has no CONF_MODEL_ID, triggering backfill
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.bravia_quad.PLATFORMS", []):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Backfill should have fetched permanent identity
+    mock_bravia_quad_client.async_get_serial_number.assert_called_once()
+    mock_bravia_quad_client.async_get_model_type.assert_called_once()
+    mock_bravia_quad_client.async_get_manufacturer.assert_called_once()
+
+    # Firmware version is fetched in _register_device (transient)
+    mock_bravia_quad_client.async_get_firmware_version.assert_called_once()
+
+    # Backfilled values should be in entry data
+    assert mock_config_entry.data["serial_number"] == "1234567"
+    assert mock_config_entry.data["model_id"] == "HT-A9M2"
+    assert mock_config_entry.data["model"] == "BRAVIA Theatre Quad"
+    assert mock_config_entry.data["manufacturer"] == "SONY"
+
+    # unique_id should be migrated from IP to serial
+    assert mock_config_entry.unique_id == "1234567"
+
+
+@pytest.mark.usefixtures("mock_bravia_quad_client")
+async def test_no_backfill_when_identity_present(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+) -> None:
+    """Test that backfill is skipped when identity is already in entry data."""
+    entry = MockConfigEntry(
+        title="Bravia Quad",
+        domain=DOMAIN,
+        data={
+            CONF_HOST: "192.168.1.100",
+            CONF_HAS_SUBWOOFER: True,
+            "model_id": "HT-A9M2",
+            "model": "BRAVIA Theatre Quad",
+            "manufacturer": "SONY",
+            "serial_number": "1234567",
+        },
+        unique_id="192.168.1.100",
+        entry_id="test_no_backfill",
+    )
+    entry.add_to_hass(hass)
+
+    with patch("custom_components.bravia_quad.PLATFORMS", []):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Backfill getters should NOT be called (identity already present)
+    mock_bravia_quad_client.async_get_serial_number.assert_not_called()
+    mock_bravia_quad_client.async_get_model_type.assert_not_called()
+    mock_bravia_quad_client.async_get_manufacturer.assert_not_called()
+
+    # Firmware version should still be fetched (transient)
+    mock_bravia_quad_client.async_get_firmware_version.assert_called_once()
 
 
 # =============================================================================
@@ -32,8 +233,8 @@ if TYPE_CHECKING:
 # =============================================================================
 
 
-def test_get_device_info_basic() -> None:
-    """Test get_device_info with basic config entry."""
+def test_get_device_info_returns_identifiers_only() -> None:
+    """Test get_device_info returns only identifiers for entity linking."""
     entry = MockConfigEntry(
         title="Bravia Quad",
         domain=DOMAIN,
@@ -47,50 +248,11 @@ def test_get_device_info_basic() -> None:
     device_info = get_device_info(entry)
 
     assert device_info["identifiers"] == {(DOMAIN, "192.168.1.100")}
-    assert device_info["name"] == DEFAULT_MODEL
-    assert device_info["manufacturer"] == "Sony"
-    assert device_info["model"] == DEFAULT_MODEL
-    assert device_info["configuration_url"] == "http://192.168.1.100"
-    # No MAC address, so connections should be empty
-    assert device_info["connections"] == set()
-
-
-def test_get_device_info_with_mac() -> None:
-    """Test get_device_info with MAC address."""
-    entry = MockConfigEntry(
-        title="Bravia Quad",
-        domain=DOMAIN,
-        data={
-            CONF_HOST: "192.168.1.100",
-            CONF_MAC: "aa:bb:cc:dd:ee:ff",
-            CONF_HAS_SUBWOOFER: True,
-        },
-        unique_id="192.168.1.100",
-    )
-
-    device_info = get_device_info(entry)
-
-    assert device_info["connections"] == {(CONNECTION_NETWORK_MAC, "aa:bb:cc:dd:ee:ff")}
-
-
-def test_get_device_info_with_custom_name_and_model() -> None:
-    """Test get_device_info with custom name and model."""
-    entry = MockConfigEntry(
-        title="My Bravia",
-        domain=DOMAIN,
-        data={
-            CONF_HOST: "192.168.1.100",
-            CONF_NAME: "Living Room Speaker",
-            CONF_MODEL: "HT-A9000",
-            CONF_HAS_SUBWOOFER: False,
-        },
-        unique_id="192.168.1.100",
-    )
-
-    device_info = get_device_info(entry)
-
-    assert device_info["name"] == "Living Room Speaker"
-    assert device_info["model"] == "HT-A9000"
+    # Entity-level DeviceInfo must NOT include metadata that would
+    # overwrite the values set by __init__.py during device creation
+    assert "manufacturer" not in device_info
+    assert "model" not in device_info
+    assert "name" not in device_info
 
 
 def test_get_device_info_without_unique_id_raises() -> None:

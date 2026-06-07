@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 
+from . import BraviaQuadData
 from .const import (
     AAV_OFF,
     AAV_ON,
@@ -50,7 +51,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Quad switches from a config entry."""
-    client: BraviaQuadClient = hass.data[DOMAIN][entry.entry_id]
+    data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+    client = data.tcp_client
 
     # Create all switch entities
     entities = [

@@ -11,6 +11,7 @@ from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 
+from . import BraviaQuadData
 from .const import CONF_HAS_SUBWOOFER, DOMAIN
 from .helpers import BraviaQuadAvailabilityMixin, get_device_info
 
@@ -30,7 +31,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Quad button entities from a config entry."""
-    client: BraviaQuadClient = hass.data[DOMAIN][entry.entry_id]
+    data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+    client = data.tcp_client
 
     entities = [
         BraviaQuadDetectSubwooferButton(hass, client, entry),

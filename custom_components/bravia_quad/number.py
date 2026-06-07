@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.number import NumberEntity, NumberMode, RestoreNumber
 from homeassistant.const import EntityCategory
 
+from . import BraviaQuadData
 from .const import (
     CONF_HAS_SUBWOOFER,
     DOMAIN,
@@ -41,7 +42,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Quad number entities from a config entry."""
-    client: BraviaQuadClient = hass.data[DOMAIN][entry.entry_id]
+    data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+    client = data.tcp_client
 
     # Create number entities
     entities: list[NumberEntity] = [

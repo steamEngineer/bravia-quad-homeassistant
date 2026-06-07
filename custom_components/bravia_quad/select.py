@@ -9,6 +9,7 @@ from homeassistant.components.select import SelectEntity
 from homeassistant.const import EntityCategory
 from homeassistant.helpers import entity_registry as er
 
+from . import BraviaQuadData
 from .const import (
     BASS_LEVEL_OPTIONS,
     CONF_HAS_SUBWOOFER,
@@ -42,7 +43,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Quad select entities from a config entry."""
-    client: BraviaQuadClient = hass.data[DOMAIN][entry.entry_id]
+    data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+    client = data.tcp_client
 
     # Create select entities
     entities: list[SelectEntity] = [

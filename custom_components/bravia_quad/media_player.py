@@ -12,6 +12,7 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
 )
 
+from . import BraviaQuadData
 from .const import (
     DOMAIN,
     FEATURE_INPUT,
@@ -43,7 +44,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Quad media player from a config entry."""
-    client: BraviaQuadClient = hass.data[DOMAIN][entry.entry_id]
+    data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+    client = data.tcp_client
     async_add_entities([BraviaQuadMediaPlayer(client, entry)])
 
 

@@ -6,7 +6,10 @@ DOMAIN = "bravia_quad"
 
 # Configuration keys
 CONF_HAS_SUBWOOFER = "has_subwoofer"
+CONF_MANUFACTURER = "manufacturer"
 CONF_MODEL = "model"
+CONF_MODEL_ID = "model_id"
+CONF_SERIAL = "serial_number"
 CONF_VOLUME_STEP_INTERVAL = "volume_step_interval"
 
 # Default values
@@ -19,6 +22,10 @@ DEFAULT_PORT = 33336
 
 # Timeout for TCP operations
 TCP_TIMEOUT = 10
+
+# Reconnection delays (seconds)
+RECONNECT_INITIAL_DELAY = 5
+RECONNECT_MAX_DELAY = 60
 
 # Command IDs
 CMD_ID_POWER = 3
@@ -59,6 +66,12 @@ FEATURE_AUTO_STANDBY = "system.autostandby"
 FEATURE_DRC = "audio.drangecomp"
 FEATURE_AAV = "audio.aav"
 FEATURE_MUTE = "main.mute"
+FEATURE_MAC_ADDRESS = "network.macaddress"
+FEATURE_SERIAL_NUMBER = "system.serialnumber"
+FEATURE_FIRMWARE_VERSION = "system.version"
+FEATURE_MODEL_TYPE = "system.modeltype"
+FEATURE_MANUFACTURER = "system.manufacturer"
+FEATURE_DEVICE_NAME = "system.devicename"
 
 # Power states
 POWER_ON = "on"
@@ -100,3 +113,8 @@ BASS_LEVEL_OPTIONS: dict[str, int] = {"min": 0, "mid": 1, "max": 2}
 
 # DRC options (API values used as translation keys)
 DRC_OPTIONS: list[str] = ["auto", "on", "off"]
+
+# Model ID to friendly name fallback (used when HTTP/zeroconf unavailable)
+MODEL_ID_TO_NAME: dict[str, str] = {
+    "HT-A9M2": "BRAVIA Theatre Quad",
+}
