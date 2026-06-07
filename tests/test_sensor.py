@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import MagicMock
 
 import pytest
 from homeassistant.const import Platform
 from homeassistant.helpers import entity_registry as er
+from homeassistant.helpers.entity_component import async_update_entity
+
+from custom_components.bravia_quad.bravia_http_client import DeviceDetails
 
 from .conftest import get_entity_id_by_unique_id_suffix
 
@@ -86,3 +90,80 @@ async def test_voice_zoom_level_sensor_value(
     state = hass.states.get(entity_id)
     assert state is not None
     assert state.state == "1"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_http_sensor_internet(
+    hass: HomeAssistant,
+) -> None:
+    """Test HTTP internet status sensor value."""
+    state = hass.states.get("sensor.bravia_theatre_internet")
+    assert state is not None
+    assert state.state == "connected"
+
+
+@pytest.mark.usefixtures("init_integration_all")
+async def test_http_disabled_sensors_when_enabled(
+    hass: HomeAssistant,
+) -> None:
+    """Test disabled-by-default HTTP sensors show values when enabled."""
+    ipv6 = hass.states.get("sensor.bravia_theatre_ip_address_ipv6")
+    assert ipv6 is not None
+    assert ipv6.state == "fe80::1"
+
+
+@pytest.mark.usefixtures("init_integration_all")
+async def test_ipv6_multi_address_separated_by_newline(
+    hass: HomeAssistant,
+    mock_bravia_http_client: MagicMock,
+) -> None:
+    """Test comma-separated IPv6 addresses are split by newline."""
+    mock_bravia_http_client.async_get_device_details.return_value = DeviceDetails(
+        ipv6_address="2001:db8::1/64,2001:db8::2/128",
+    )
+
+    await async_update_entity(hass, "sensor.bravia_theatre_ip_address_ipv6")
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.bravia_theatre_ip_address_ipv6")
+    assert state is not None
+    assert state.state == "2001:db8::1/64\n2001:db8::2/128"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_http_sensor_unavailable_when_unreachable(
+    hass: HomeAssistant,
+    mock_bravia_http_client: MagicMock,
+) -> None:
+    """Test HTTP sensor goes unavailable when HTTP API returns empty data."""
+    mock_bravia_http_client.async_get_device_details.return_value = DeviceDetails()
+
+    await async_update_entity(hass, "sensor.bravia_theatre_internet")
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.bravia_theatre_internet")
+    assert state is not None
+    assert state.state == "unavailable"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_http_sensor_recovers_from_unavailable(
+    hass: HomeAssistant,
+    mock_bravia_http_client: MagicMock,
+) -> None:
+    """Test HTTP sensor recovers when HTTP API returns data again."""
+    mock_bravia_http_client.async_get_device_details.return_value = DeviceDetails()
+    await async_update_entity(hass, "sensor.bravia_theatre_internet")
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.bravia_theatre_internet")
+    assert state.state == "unavailable"
+
+    mock_bravia_http_client.async_get_device_details.return_value = DeviceDetails(
+        internet="connected",
+    )
+    await async_update_entity(hass, "sensor.bravia_theatre_internet")
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.bravia_theatre_internet")
+    assert state.state == "connected"

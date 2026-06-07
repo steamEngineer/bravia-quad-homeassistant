@@ -122,6 +122,21 @@
       },
       "dhcp": {
         "default": "mdi:ip-network-outline"
+      },
+      "internet": {
+        "default": "mdi:web"
+      },
+      "ipv6_address": {
+        "default": "mdi:ip-network"
+      },
+      "wifi_signal": {
+        "default": "mdi:wifi"
+      },
+      "mac_wired": {
+        "default": "mdi:ethernet"
+      },
+      "mac_wireless": {
+        "default": "mdi:wifi"
       }
     }
   }

@@ -146,6 +146,11 @@
         }
       }
     },
+    "update": {
+      "firmware": {
+        "name": "Firmware update"
+      }
+    },
     "switch": {
       "power": {
         "name": "Power"
@@ -214,6 +219,21 @@
       },
       "dhcp": {
         "name": "DHCP"
+      },
+      "internet": {
+        "name": "Internet"
+      },
+      "ipv6_address": {
+        "name": "IP address (IPv6)"
+      },
+      "wifi_signal": {
+        "name": "WiFi signal"
+      },
+      "mac_wired": {
+        "name": "MAC address (wired)"
+      },
+      "mac_wireless": {
+        "name": "MAC address (wireless)"
       }
     }
   },
@@ -223,6 +243,9 @@
     },
     "detection_failed": {
       "message": "Failed to detect subwoofer due to a connection error. Please try again."
+    },
+    "firmware_update_failed": {
+      "message": "Failed to trigger firmware update. The device may be busy or unreachable. Please try again later."
     }
   }
 }

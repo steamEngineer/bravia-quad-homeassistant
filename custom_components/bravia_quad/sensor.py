@@ -1,15 +1,21 @@
-"""Sensor platform for Bravia Quad diagnostics."""
+"""Sensor platform for Bravia Quad diagnostics and device details."""
 
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import timedelta
 from typing import TYPE_CHECKING
 
-from homeassistant.components.sensor import SensorDeviceClass, SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+)
 from homeassistant.const import EntityCategory, UnitOfTemperature
 
 from . import BraviaQuadData
+from .bravia_http_client import DeviceDetails
 from .const import (
     DOMAIN,
     FEATURE_360SSM,
@@ -26,10 +32,13 @@ from .const import (
 from .helpers import BraviaQuadNotificationMixin, get_device_info
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+    from .bravia_http_client import BraviaHttpClient
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -37,6 +46,53 @@ _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=60)
 
 PARALLEL_UPDATES = 1
+
+
+@dataclass(frozen=True, kw_only=True)
+class BraviaHttpSensorDescription(SensorEntityDescription):
+    """Describe a Bravia HTTP device details sensor."""
+
+    value_fn: Callable[[DeviceDetails], str | None]
+
+
+HTTP_SENSOR_DESCRIPTIONS: tuple[BraviaHttpSensorDescription, ...] = (
+    BraviaHttpSensorDescription(
+        key="internet",
+        translation_key="internet",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda info: info.internet,
+    ),
+    BraviaHttpSensorDescription(
+        key="ipv6_address",
+        translation_key="ipv6_address",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda info: (
+            info.ipv6_address.replace(",", "\n") if info.ipv6_address else None
+        ),
+    ),
+    BraviaHttpSensorDescription(
+        key="wifi_signal",
+        translation_key="wifi_signal",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda info: info.wifi_signal,
+    ),
+    BraviaHttpSensorDescription(
+        key="mac_wired",
+        translation_key="mac_wired",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda info: info.mac_wired,
+    ),
+    BraviaHttpSensorDescription(
+        key="mac_wireless",
+        translation_key="mac_wireless",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        entity_registry_enabled_default=False,
+        value_fn=lambda info: info.mac_wireless,
+    ),
+)
 
 
 async def async_setup_entry(
@@ -48,21 +104,53 @@ async def async_setup_entry(
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
     client = data.tcp_client
 
-    async_add_entities(
-        [
-            BraviaQuadTemperatureSensor(client, entry),
-            BraviaQuadTimezoneSensor(client, entry),
-            BraviaQuad360SsmSensor(client, entry),
-            BraviaQuadVoiceZoomLevelSensor(client, entry),
-            BraviaQuadNetworkModeSensor(client, entry),
-            BraviaQuadIpAddressSensor(client, entry),
-            BraviaQuadDeviceNameSensor(client, entry),
-            BraviaQuadDestinationSensor(client, entry),
-            BraviaQuadLanguageSensor(client, entry),
-            BraviaQuadDhcpSensor(client, entry),
-        ],
-        update_before_add=True,
+    entities: list[SensorEntity] = [
+        BraviaQuadTemperatureSensor(client, entry),
+        BraviaQuadTimezoneSensor(client, entry),
+        BraviaQuad360SsmSensor(client, entry),
+        BraviaQuadVoiceZoomLevelSensor(client, entry),
+        BraviaQuadNetworkModeSensor(client, entry),
+        BraviaQuadIpAddressSensor(client, entry),
+        BraviaQuadDeviceNameSensor(client, entry),
+        BraviaQuadDestinationSensor(client, entry),
+        BraviaQuadLanguageSensor(client, entry),
+        BraviaQuadDhcpSensor(client, entry),
+    ]
+
+    entities.extend(
+        BraviaHttpSensor(data.http_client, entry, desc)
+        for desc in HTTP_SENSOR_DESCRIPTIONS
     )
+
+    async_add_entities(entities, update_before_add=True)
+
+
+class BraviaHttpSensor(SensorEntity):
+    """A device details sensor backed by the HTTP management API."""
+
+    entity_description: BraviaHttpSensorDescription
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        http_client: BraviaHttpClient,
+        entry: ConfigEntry,
+        description: BraviaHttpSensorDescription,
+    ) -> None:
+        """Initialize the sensor."""
+        self._http_client = http_client
+        self.entity_description = description
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_{description.key}"
+        self._attr_device_info = get_device_info(entry)
+
+    async def async_update(self) -> None:
+        """Fetch device details and update sensor value."""
+        details = await self._http_client.async_get_device_details()
+        if details == DeviceDetails():
+            self._attr_available = False
+            return
+        self._attr_available = True
+        self._attr_native_value = self.entity_description.value_fn(details)
 
 
 class BraviaQuadTemperatureSensor(BraviaQuadNotificationMixin, SensorEntity):

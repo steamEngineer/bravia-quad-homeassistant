@@ -10,7 +10,9 @@ from typing import TYPE_CHECKING
 from homeassistant.const import CONF_MAC, CONF_NAME, Platform
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
+from .bravia_http_client import HTTP_API_PORT, BraviaHttpClient
 from .bravia_quad_client import BraviaQuadClient
 from .const import (
     CONF_HAS_SUBWOOFER,
@@ -35,6 +37,7 @@ class BraviaQuadData:
     """Runtime data for a Bravia Quad config entry."""
 
     tcp_client: BraviaQuadClient
+    http_client: BraviaHttpClient
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -46,6 +49,7 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.SENSOR,
     Platform.SWITCH,
+    Platform.UPDATE,
 ]
 
 
@@ -100,8 +104,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass.config_entries.async_update_entry(entry, data=new_data)
         _LOGGER.info("Subwoofer detection complete: %s", has_subwoofer)
 
+    # Create HTTP client for management API and firmware updates
+    session = async_get_clientsession(hass)
+    http_client = BraviaHttpClient(entry.data["host"], session)
+
     # Store runtime data and forward entry setup to platforms
-    hass.data[DOMAIN][entry.entry_id] = BraviaQuadData(tcp_client=client)
+    hass.data[DOMAIN][entry.entry_id] = BraviaQuadData(
+        tcp_client=client, http_client=http_client
+    )
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
     return True
@@ -198,7 +208,7 @@ async def _register_device(
         model_id=model_id,
         serial_number=serial,
         sw_version=firmware_version,
-        configuration_url=f"http://{entry.data['host']}",
+        configuration_url=f"http://{entry.data['host']}:{HTTP_API_PORT}",
     )
 
 

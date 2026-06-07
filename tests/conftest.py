@@ -10,6 +10,12 @@ from homeassistant.const import CONF_HOST, Platform
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
+from custom_components.bravia_quad.bravia_http_client import (
+    DeviceDetails,
+    FirmwareUpdateStatus,
+    LatestFirmwareInfo,
+    SystemInfo,
+)
 from custom_components.bravia_quad.const import (
     CONF_HAS_SUBWOOFER,
     DOMAIN,
@@ -285,6 +291,44 @@ def mock_bravia_quad_client() -> Generator[MagicMock]:
 
 
 @pytest.fixture
+def mock_bravia_http_client() -> Generator[MagicMock]:
+    """Return a mocked BraviaHttpClient."""
+    with patch(
+        "custom_components.bravia_quad.BraviaHttpClient",
+        autospec=True,
+    ) as client_mock:
+        client = client_mock.return_value
+
+        client.async_get_system_info = AsyncMock(
+            return_value=SystemInfo(version="001.100", model_name="BRAVIA Theatre Quad")
+        )
+        client.async_get_device_details = AsyncMock(
+            return_value=DeviceDetails(
+                device_name="Living Room",
+                connection_type="wired",
+                internet="connected",
+                ipv4_address="192.168.1.100",
+                ipv6_address="fe80::1",
+                wifi_signal=None,
+                mac_wired="aa:bb:cc:dd:ee:ff",
+                mac_wireless="11:22:33:44:55:66",
+            )
+        )
+        client.async_check_firmware_update = AsyncMock(
+            return_value=FirmwareUpdateStatus.UP_TO_DATE
+        )
+        client.async_request_firmware_update = AsyncMock(return_value=True)
+        client.async_get_latest_firmware_info = AsyncMock(
+            return_value=LatestFirmwareInfo(
+                version="001.200",
+                release_url="https://www.sony.co.uk/electronics/support/software/00342249",
+            )
+        )
+
+        yield client
+
+
+@pytest.fixture
 def platforms() -> list[Platform]:
     """Return the platforms to be loaded for this test."""
     return [
@@ -301,6 +345,7 @@ async def init_integration(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_bravia_quad_client: MagicMock,
+    mock_bravia_http_client: MagicMock,
     platforms: list[Platform],
 ) -> MockConfigEntry:
     """Set up the Bravia Quad integration for testing."""
@@ -318,6 +363,7 @@ async def init_integration_all(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_bravia_quad_client: MagicMock,
+    mock_bravia_http_client: MagicMock,
     platforms: list[Platform],
 ) -> MockConfigEntry:
     """Set up the Bravia Quad integration with all entities enabled."""
