@@ -10,39 +10,75 @@ from typing import TYPE_CHECKING, Any
 
 from .const import (
     AAV_OFF,
+    AUDIO_RETURN_CHANNEL_OPTIONS,
     AUTO_STANDBY_OFF,
+    AUTO_UPDATE_OFF,
+    AUTO_UPDATE_ON,
+    BT_CONNECTION_QUALITY_OPTIONS,
     CMD_ID_INITIAL,
     CMD_ID_MAX,
     DEFAULT_PORT,
+    DUAL_MONO_OPTIONS,
+    EXTERNAL_CONTROL_OFF,
+    EXTERNAL_CONTROL_ON,
+    FEATURE_360SSM,
     FEATURE_AAV,
+    FEATURE_AUDIO_RETURN_CHANNEL,
     FEATURE_AUTO_STANDBY,
+    FEATURE_AUTO_UPDATE,
+    FEATURE_AV_SYNC,
     FEATURE_BASS_LEVEL,
+    FEATURE_BT_CONNECTION_QUALITY,
+    FEATURE_DESTINATION,
     FEATURE_DEVICE_NAME,
+    FEATURE_DHCP,
     FEATURE_DRC,
+    FEATURE_DUAL_MONO,
+    FEATURE_EXTERNAL_CONTROL,
     FEATURE_FIRMWARE_VERSION,
     FEATURE_HDMI_CEC,
+    FEATURE_HDMI_PASSTHROUGH,
+    FEATURE_HDMI_STANDBY_LINK,
+    FEATURE_IMAX_MODE,
     FEATURE_INPUT,
+    FEATURE_IP_ADDRESS,
+    FEATURE_LANGUAGE,
     FEATURE_MAC_ADDRESS,
     FEATURE_MANUFACTURER,
     FEATURE_MODEL_TYPE,
     FEATURE_MUTE,
+    FEATURE_NET_BT_STANDBY,
+    FEATURE_NETWORK_MODE,
     FEATURE_NIGHT_MODE,
     FEATURE_POWER,
     FEATURE_REAR_LEVEL,
     FEATURE_SERIAL_NUMBER,
     FEATURE_SOUND_FIELD,
+    FEATURE_TEMPERATURE,
+    FEATURE_TIMEZONE,
+    FEATURE_TV_AV_SYNC,
     FEATURE_VOICE_ENHANCER,
+    FEATURE_VOICE_ZOOM,
+    FEATURE_VOICE_ZOOM_LEVEL,
     FEATURE_VOLUME,
     HDMI_CEC_OFF,
+    HDMI_PASSTHROUGH_OPTIONS,
+    HDMI_STANDBY_LINK_OPTIONS,
+    IMAX_MODE_AUTO,
+    IMAX_MODE_OFF,
+    MAX_AV_SYNC,
     MAX_BASS_LEVEL,
     MAX_BASS_LEVEL_NO_SUB,
     MAX_REAR_LEVEL,
     MAX_VOLUME,
+    MIN_AV_SYNC,
     MIN_BASS_LEVEL,
     MIN_BASS_LEVEL_NO_SUB,
     MIN_REAR_LEVEL,
     MIN_VOLUME,
     MUTE_OFF,
+    NET_BT_STANDBY_OFF,
+    NET_BT_STANDBY_ON,
     NIGHT_MODE_OFF,
     POWER_OFF,
     POWER_ON,
@@ -51,6 +87,8 @@ from .const import (
     SOUND_FIELD_OFF,
     TCP_TIMEOUT,
     VOICE_ENHANCER_OFF,
+    VOICE_ZOOM_OFF,
+    VOICE_ZOOM_ON,
 )
 
 if TYPE_CHECKING:
@@ -100,6 +138,9 @@ class BraviaQuadClient:
         self._firmware_version: str | None = None
         self._model_type: str | None = None
         self._manufacturer: str | None = None
+        self._auto_update = AUTO_UPDATE_OFF
+        self._imax_mode = IMAX_MODE_OFF
+        self._voice_zoom = VOICE_ZOOM_OFF
 
     async def async_connect(self) -> None:
         """Connect to the Bravia Quad device."""
@@ -490,6 +531,176 @@ class BraviaQuadClient:
                 pass
         return self._bass_level
 
+    async def async_set_hdmi_passthrough(self, value: str) -> bool:
+        """Set the HDMI passthrough mode."""
+        return await self._async_set_feature(FEATURE_HDMI_PASSTHROUGH, value)
+
+    async def async_get_hdmi_passthrough(self) -> str | None:
+        """Get the HDMI passthrough mode."""
+        return await self._async_get_feature(FEATURE_HDMI_PASSTHROUGH)
+
+    async def async_set_dual_mono(self, value: str) -> bool:
+        """Set the dual mono mode."""
+        return await self._async_set_feature(FEATURE_DUAL_MONO, value)
+
+    async def async_get_dual_mono(self) -> str | None:
+        """Get the dual mono mode."""
+        return await self._async_get_feature(FEATURE_DUAL_MONO)
+
+    async def async_set_auto_update(self, value: str) -> bool:
+        """Set the auto update state."""
+        if await self._async_set_feature(FEATURE_AUTO_UPDATE, value):
+            self._auto_update = value
+            return True
+        return False
+
+    async def async_get_auto_update(self) -> str:
+        """Get the auto update state."""
+        value = await self._async_get_feature(FEATURE_AUTO_UPDATE)
+        if value is not None:
+            self._auto_update = value
+        return self._auto_update
+
+    async def async_set_imax_mode(self, value: str) -> bool:
+        """Set the IMAX mode."""
+        if await self._async_set_feature(FEATURE_IMAX_MODE, value):
+            self._imax_mode = value
+            return True
+        return False
+
+    async def async_get_imax_mode(self) -> str:
+        """Get the IMAX mode."""
+        value = await self._async_get_feature(FEATURE_IMAX_MODE)
+        if value is not None:
+            self._imax_mode = value
+        return self._imax_mode
+
+    async def async_set_av_sync(self, value: int) -> bool:
+        """Set AV sync delay in milliseconds."""
+        value = max(MIN_AV_SYNC, min(MAX_AV_SYNC, value))
+        return await self._async_set_feature(FEATURE_AV_SYNC, str(value))
+
+    async def async_get_av_sync(self) -> int | None:
+        """Get AV sync delay."""
+        raw = await self._async_get_feature(FEATURE_AV_SYNC)
+        if raw is not None:
+            try:
+                return int(raw)
+            except (ValueError, TypeError):
+                pass
+        return None
+
+    async def async_set_tv_av_sync(self, value: int) -> bool:
+        """Set TV AV sync delay in milliseconds."""
+        value = max(MIN_AV_SYNC, min(MAX_AV_SYNC, value))
+        return await self._async_set_feature(FEATURE_TV_AV_SYNC, str(value))
+
+    async def async_get_tv_av_sync(self) -> int | None:
+        """Get TV AV sync delay."""
+        raw = await self._async_get_feature(FEATURE_TV_AV_SYNC)
+        if raw is not None:
+            try:
+                return int(raw)
+            except (ValueError, TypeError):
+                pass
+        return None
+
+    async def async_set_bt_connection_quality(self, value: str) -> bool:
+        """Set the Bluetooth connection quality."""
+        return await self._async_set_feature(FEATURE_BT_CONNECTION_QUALITY, value)
+
+    async def async_get_bt_connection_quality(self) -> str | None:
+        """Get the Bluetooth connection quality."""
+        return await self._async_get_feature(FEATURE_BT_CONNECTION_QUALITY)
+
+    async def async_set_external_control(self, value: str) -> bool:
+        """Set the external control state."""
+        return await self._async_set_feature(FEATURE_EXTERNAL_CONTROL, value)
+
+    async def async_get_external_control(self) -> str | None:
+        """Get the external control state."""
+        return await self._async_get_feature(FEATURE_EXTERNAL_CONTROL)
+
+    async def async_set_hdmi_standby_link(self, value: str) -> bool:
+        """Set the HDMI standby link mode."""
+        return await self._async_set_feature(FEATURE_HDMI_STANDBY_LINK, value)
+
+    async def async_get_hdmi_standby_link(self) -> str | None:
+        """Get the HDMI standby link mode."""
+        return await self._async_get_feature(FEATURE_HDMI_STANDBY_LINK)
+
+    async def async_set_net_bt_standby(self, value: str) -> bool:
+        """Set the network/BT standby state."""
+        return await self._async_set_feature(FEATURE_NET_BT_STANDBY, value)
+
+    async def async_get_net_bt_standby(self) -> str | None:
+        """Get the network/BT standby state."""
+        return await self._async_get_feature(FEATURE_NET_BT_STANDBY)
+
+    async def async_set_voice_zoom(self, value: str) -> bool:
+        """Set the voice zoom state."""
+        if await self._async_set_feature(FEATURE_VOICE_ZOOM, value):
+            self._voice_zoom = value
+            return True
+        return False
+
+    async def async_get_voice_zoom(self) -> str:
+        """Get the voice zoom state."""
+        value = await self._async_get_feature(FEATURE_VOICE_ZOOM)
+        if value is not None:
+            self._voice_zoom = value
+        return self._voice_zoom
+
+    async def async_set_audio_return_channel(self, value: str) -> bool:
+        """Set the audio return channel mode."""
+        return await self._async_set_feature(FEATURE_AUDIO_RETURN_CHANNEL, value)
+
+    async def async_get_audio_return_channel(self) -> str | None:
+        """Get the audio return channel mode."""
+        return await self._async_get_feature(FEATURE_AUDIO_RETURN_CHANNEL)
+
+    async def async_get_voice_zoom_level(self) -> int | None:
+        """Get the voice zoom level."""
+        raw = await self._async_get_feature(FEATURE_VOICE_ZOOM_LEVEL)
+        if raw is not None:
+            try:
+                return int(raw)
+            except (ValueError, TypeError):
+                pass
+        return None
+
+    async def async_get_timezone(self) -> str | None:
+        """Get the device timezone."""
+        return await self._async_get_feature(FEATURE_TIMEZONE)
+
+    async def async_get_temperature(self) -> str | None:
+        """Get the device temperature."""
+        return await self._async_get_feature(FEATURE_TEMPERATURE)
+
+    async def async_get_360ssm(self) -> str | None:
+        """Get the 360SSM status."""
+        return await self._async_get_feature(FEATURE_360SSM)
+
+    async def async_get_network_mode(self) -> str | None:
+        """Get the network mode."""
+        return await self._async_get_feature(FEATURE_NETWORK_MODE)
+
+    async def async_get_ip_address(self) -> str | None:
+        """Get the device IP address."""
+        return await self._async_get_feature(FEATURE_IP_ADDRESS)
+
+    async def async_get_destination(self) -> str | None:
+        """Get the device destination."""
+        return await self._async_get_feature(FEATURE_DESTINATION)
+
+    async def async_get_language(self) -> str | None:
+        """Get the device language."""
+        return await self._async_get_feature(FEATURE_LANGUAGE)
+
+    async def async_get_dhcp(self) -> str | None:
+        """Get the DHCP status."""
+        return await self._async_get_feature(FEATURE_DHCP)
+
     async def async_detect_subwoofer(self) -> bool:
         """
         Detect if subwoofer is connected by testing bass level range.
@@ -752,6 +963,21 @@ class BraviaQuadClient:
         return self._manufacturer
 
     @property
+    def auto_update(self) -> str:
+        """Return the auto update state."""
+        return self._auto_update
+
+    @property
+    def imax_mode(self) -> str:
+        """Return the IMAX mode."""
+        return self._imax_mode
+
+    @property
+    def voice_zoom(self) -> str:
+        """Return the voice zoom state."""
+        return self._voice_zoom
+
+    @property
     def volume_step_interval(self) -> int:
         """Return the volume step interval in ms."""
         return self._volume_step_interval
@@ -783,6 +1009,9 @@ class BraviaQuadClient:
             self.async_get_firmware_version,
             self.async_get_model_type,
             self.async_get_manufacturer,
+            self.async_get_auto_update,
+            self.async_get_imax_mode,
+            self.async_get_voice_zoom,
         ]
 
         for fetch in fetchers:
@@ -796,7 +1025,8 @@ class BraviaQuadClient:
             "Rear Level: %d, Bass Level: %d, Voice Enhancer: %s, "
             "Sound Field: %s, Night Mode: %s, HDMI CEC: %s, "
             "Auto Standby: %s, DRC: %s, AAV: %s, Mute: %s, "
-            "Serial: %s, FW: %s, Model Type: %s, Manufacturer: %s",
+            "Serial: %s, FW: %s, Model Type: %s, Manufacturer: %s, "
+            "Auto Update: %s, IMAX Mode: %s, Voice Zoom: %s",
             self._power_state,
             self._volume,
             self._input,
@@ -814,6 +1044,9 @@ class BraviaQuadClient:
             self._firmware_version,
             self._model_type,
             self._manufacturer,
+            self._auto_update,
+            self._imax_mode,
+            self._voice_zoom,
         )
 
     def _get_next_command_id(self) -> int:
@@ -917,6 +1150,9 @@ class BraviaQuadClient:
             FEATURE_FIRMWARE_VERSION: self._update_firmware_version_state,
             FEATURE_MODEL_TYPE: self._update_model_type_state,
             FEATURE_MANUFACTURER: self._update_manufacturer_state,
+            FEATURE_AUTO_UPDATE: self._update_auto_update_state,
+            FEATURE_IMAX_MODE: self._update_imax_mode_state,
+            FEATURE_VOICE_ZOOM: self._update_voice_zoom_state,
         }
 
         handler = feature_handlers.get(feature)
@@ -997,6 +1233,18 @@ class BraviaQuadClient:
     def _update_manufacturer_state(self, value: Any) -> None:
         """Update manufacturer from value."""
         self._manufacturer = str(value)
+
+    def _update_auto_update_state(self, value: Any) -> None:
+        """Update auto update from value."""
+        self._auto_update = str(value)
+
+    def _update_imax_mode_state(self, value: Any) -> None:
+        """Update IMAX mode from value."""
+        self._imax_mode = str(value)
+
+    def _update_voice_zoom_state(self, value: Any) -> None:
+        """Update voice zoom from value."""
+        self._voice_zoom = str(value)
 
     async def _dispatch_notification_callbacks(
         self, feature: str | None, value: Any

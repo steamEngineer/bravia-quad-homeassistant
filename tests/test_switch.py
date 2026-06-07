@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock
 
 import pytest
 from homeassistant.const import (
@@ -377,3 +378,104 @@ async def test_advanced_auto_volume_switch_turn_off(
     )
 
     mock_bravia_quad_client.async_set_aav.assert_called_once_with("off")
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_new_switch_entities(
+    hass: HomeAssistant,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test that new switch entities are created."""
+    # Enabled by default
+    for suffix in ("_auto_update", "_imax_mode", "_net_bt_standby"):
+        entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
+        assert entity_id is not None, f"Entity with suffix {suffix} not found"
+        state = hass.states.get(entity_id)
+        assert state is not None, f"State for {entity_id} not found"
+
+    # Disabled by default
+    for suffix in ("_voice_zoom", "_external_control"):
+        entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
+        assert entity_id is not None, f"Entity with suffix {suffix} not found"
+        state = hass.states.get(entity_id)
+        assert state is None, f"{entity_id} should be disabled by default"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_auto_update_switch_turn_on(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test turning on auto update switch."""
+    mock_bravia_quad_client.async_get_auto_update = AsyncMock(return_value="on")
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_auto_update")
+    assert entity_id is not None
+    await hass.services.async_call(
+        SWITCH_DOMAIN, SERVICE_TURN_ON, {ATTR_ENTITY_ID: entity_id}, blocking=True
+    )
+    mock_bravia_quad_client.async_set_auto_update.assert_called_once_with("on")
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_auto_update_switch_turn_off(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test turning off auto update switch."""
+    mock_bravia_quad_client.async_get_auto_update = AsyncMock(return_value="off")
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_auto_update")
+    assert entity_id is not None
+    await hass.services.async_call(
+        SWITCH_DOMAIN, SERVICE_TURN_OFF, {ATTR_ENTITY_ID: entity_id}, blocking=True
+    )
+    mock_bravia_quad_client.async_set_auto_update.assert_called_once_with("off")
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_imax_mode_switch_turn_on(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test turning on IMAX mode switch."""
+    mock_bravia_quad_client.async_get_imax_mode = AsyncMock(return_value="auto")
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_imax_mode")
+    assert entity_id is not None
+    await hass.services.async_call(
+        SWITCH_DOMAIN, SERVICE_TURN_ON, {ATTR_ENTITY_ID: entity_id}, blocking=True
+    )
+    mock_bravia_quad_client.async_set_imax_mode.assert_called_once_with("auto")
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_net_bt_standby_switch_turn_on(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test turning on net/BT standby switch."""
+    mock_bravia_quad_client.async_get_net_bt_standby = AsyncMock(return_value="on")
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_net_bt_standby")
+    assert entity_id is not None
+    await hass.services.async_call(
+        SWITCH_DOMAIN, SERVICE_TURN_ON, {ATTR_ENTITY_ID: entity_id}, blocking=True
+    )
+    mock_bravia_quad_client.async_set_net_bt_standby.assert_called_once_with("on")
+
+
+@pytest.mark.usefixtures("init_integration_all")
+async def test_voice_zoom_switch_turn_on(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test turning on voice zoom switch."""
+    mock_bravia_quad_client.async_get_voice_zoom = AsyncMock(return_value="on")
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_voice_zoom")
+    assert entity_id is not None
+    await hass.services.async_call(
+        SWITCH_DOMAIN, SERVICE_TURN_ON, {ATTR_ENTITY_ID: entity_id}, blocking=True
+    )
+    mock_bravia_quad_client.async_set_voice_zoom.assert_called_once_with("on")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.number import NumberEntity, NumberMode, RestoreNumber
@@ -12,12 +13,16 @@ from . import BraviaQuadData
 from .const import (
     CONF_HAS_SUBWOOFER,
     DOMAIN,
+    FEATURE_AV_SYNC,
     FEATURE_BASS_LEVEL,
     FEATURE_REAR_LEVEL,
+    FEATURE_TV_AV_SYNC,
     FEATURE_VOLUME,
+    MAX_AV_SYNC,
     MAX_BASS_LEVEL,
     MAX_REAR_LEVEL,
     MAX_VOLUME_STEP_INTERVAL,
+    MIN_AV_SYNC,
     MIN_BASS_LEVEL,
     MIN_REAR_LEVEL,
 )
@@ -31,6 +36,9 @@ if TYPE_CHECKING:
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
+
+SCAN_INTERVAL = timedelta(seconds=60)
+PARALLEL_UPDATES = 1
 
 # Constants for validation ranges
 MAX_VOLUME = 100
@@ -56,7 +64,10 @@ async def async_setup_entry(
     if entry.data.get(CONF_HAS_SUBWOOFER, False):
         entities.append(BraviaQuadBassLevelNumber(client, entry))
 
-    async_add_entities(entities)
+    entities.append(BraviaQuadAvSyncNumber(client, entry))
+    entities.append(BraviaQuadTvAvSyncNumber(client, entry))
+
+    async_add_entities(entities, update_before_add=True)
 
 
 class BraviaQuadVolumeNumber(
@@ -225,6 +236,115 @@ class BraviaQuadBassLevelNumber(BraviaQuadNotificationMixin, NumberEntity):
             self._attr_native_value = bass_level
         except (OSError, TimeoutError):
             _LOGGER.exception("Failed to update bass level")
+
+
+class BraviaQuadAvSyncNumber(BraviaQuadNotificationMixin, NumberEntity):
+    """Representation of a Bravia Quad AV sync number."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+    _attr_translation_key = "av_sync"
+    _attr_mode = NumberMode.SLIDER
+    _attr_native_min_value = MIN_AV_SYNC
+    _attr_native_max_value = MAX_AV_SYNC
+    _attr_native_step = 25
+    _attr_native_unit_of_measurement = "ms"
+    _notification_feature = FEATURE_AV_SYNC
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the AV sync number."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_av_sync"
+        self._attr_native_value = None
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle AV sync notification."""
+        try:
+            av_sync = int(value)
+        except (ValueError, TypeError):
+            _LOGGER.warning("Invalid AV sync notification value: %s", value)
+            return
+        if MIN_AV_SYNC <= av_sync <= MAX_AV_SYNC:
+            self._attr_native_value = av_sync
+            self.async_write_ha_state()
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set AV sync delay."""
+        int_value = int(value)
+        success = await self._client.async_set_av_sync(int_value)
+        if not success:
+            _LOGGER.error("Failed to set AV sync to %d", int_value)
+            return
+        try:
+            actual = await self._client.async_get_av_sync()
+            self._attr_native_value = actual
+        except (OSError, TimeoutError):
+            self._attr_native_value = int_value
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Update AV sync state."""
+        try:
+            self._attr_native_value = await self._client.async_get_av_sync()
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update AV sync state")
+
+
+class BraviaQuadTvAvSyncNumber(BraviaQuadNotificationMixin, NumberEntity):
+    """Representation of a Bravia Quad TV AV sync number."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+    _attr_translation_key = "tv_av_sync"
+    _attr_mode = NumberMode.SLIDER
+    _attr_native_min_value = MIN_AV_SYNC
+    _attr_native_max_value = MAX_AV_SYNC
+    _attr_native_step = 25
+    _attr_native_unit_of_measurement = "ms"
+    _attr_entity_registry_enabled_default = False
+    _notification_feature = FEATURE_TV_AV_SYNC
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the TV AV sync number."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_tv_av_sync"
+        self._attr_native_value = None
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle TV AV sync notification."""
+        try:
+            av_sync = int(value)
+        except (ValueError, TypeError):
+            _LOGGER.warning("Invalid TV AV sync notification value: %s", value)
+            return
+        if MIN_AV_SYNC <= av_sync <= MAX_AV_SYNC:
+            self._attr_native_value = av_sync
+            self.async_write_ha_state()
+
+    async def async_set_native_value(self, value: float) -> None:
+        """Set TV AV sync delay."""
+        int_value = int(value)
+        success = await self._client.async_set_tv_av_sync(int_value)
+        if not success:
+            _LOGGER.error("Failed to set TV AV sync to %d", int_value)
+            return
+        try:
+            actual = await self._client.async_get_tv_av_sync()
+            self._attr_native_value = actual
+        except (OSError, TimeoutError):
+            self._attr_native_value = int_value
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Update TV AV sync state."""
+        try:
+            self._attr_native_value = await self._client.async_get_tv_av_sync()
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update TV AV sync state")
 
 
 class BraviaQuadVolumeStepIntervalNumber(RestoreNumber):

@@ -20,6 +20,12 @@
       },
       "volume_step_interval": {
         "default": "mdi:timer-outline"
+      },
+      "av_sync": {
+        "default": "mdi:timer-outline"
+      },
+      "tv_av_sync": {
+        "default": "mdi:timer-outline"
       }
     },
     "select": {
@@ -31,6 +37,21 @@
       },
       "drc": {
         "default": "mdi:tune-vertical"
+      },
+      "hdmi_passthrough": {
+        "default": "mdi:hdmi-port"
+      },
+      "dual_mono": {
+        "default": "mdi:surround-sound"
+      },
+      "bt_connection_quality": {
+        "default": "mdi:bluetooth-settings"
+      },
+      "hdmi_standby_link": {
+        "default": "mdi:link-variant"
+      },
+      "audio_return_channel": {
+        "default": "mdi:audio-video"
       }
     },
     "switch": {
@@ -54,6 +75,53 @@
       },
       "auto_volume": {
         "default": "mdi:volume-equal"
+      },
+      "auto_update": {
+        "default": "mdi:update"
+      },
+      "imax_mode": {
+        "default": "mdi:filmstrip"
+      },
+      "net_bt_standby": {
+        "default": "mdi:power-standby"
+      },
+      "voice_zoom": {
+        "default": "mdi:account-voice"
+      },
+      "external_control": {
+        "default": "mdi:remote"
+      }
+    },
+    "sensor": {
+      "temperature": {
+        "default": "mdi:thermometer"
+      },
+      "timezone": {
+        "default": "mdi:map-clock"
+      },
+      "ssm_360": {
+        "default": "mdi:surround-sound"
+      },
+      "voice_zoom_level": {
+        "default": "mdi:account-voice"
+      },
+      "network_mode": {
+        "default": "mdi:ethernet"
+      },
+      "ip_address": {
+        "default": "mdi:ip-network"
+      },
+      "device_name": {
+        "default": "mdi:label"
+      },
+      "destination": {
+        "default": "mdi:earth"
+      },
+      "language": {
+        "default": "mdi:translate"
+      },
+      "dhcp": {
+        "default": "mdi:ip-network-outline"
       }
     }
   }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from homeassistant.components.select import SelectEntity
@@ -11,13 +12,23 @@ from homeassistant.helpers import entity_registry as er
 
 from . import BraviaQuadData
 from .const import (
+    AUDIO_RETURN_CHANNEL_OPTIONS,
     BASS_LEVEL_OPTIONS,
+    BT_CONNECTION_QUALITY_OPTIONS,
     CONF_HAS_SUBWOOFER,
     DOMAIN,
     DRC_OPTIONS,
+    DUAL_MONO_OPTIONS,
+    FEATURE_AUDIO_RETURN_CHANNEL,
     FEATURE_BASS_LEVEL,
+    FEATURE_BT_CONNECTION_QUALITY,
     FEATURE_DRC,
+    FEATURE_DUAL_MONO,
+    FEATURE_HDMI_PASSTHROUGH,
+    FEATURE_HDMI_STANDBY_LINK,
     FEATURE_INPUT,
+    HDMI_PASSTHROUGH_OPTIONS,
+    HDMI_STANDBY_LINK_OPTIONS,
     INPUT_OPTIONS,
 )
 from .helpers import BraviaQuadNotificationMixin, get_device_info
@@ -30,6 +41,9 @@ if TYPE_CHECKING:
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
+
+SCAN_INTERVAL = timedelta(seconds=60)
+PARALLEL_UPDATES = 1
 
 # Reverse mapping for bass level (int -> API value)
 BASS_LEVEL_VALUES_TO_OPTIONS: dict[int, str] = {
@@ -58,7 +72,14 @@ async def async_setup_entry(
     # Add Dynamic Range Compressor select (polling-based)
     entities.append(BraviaQuadDynamicRangeCompressorSelect(client, entry))
 
-    async_add_entities(entities)
+    # Add new polling-based selects
+    entities.append(BraviaQuadHdmiPassthroughSelect(client, entry))
+    entities.append(BraviaQuadDualMonoSelect(client, entry))
+    entities.append(BraviaQuadBtConnectionQualitySelect(client, entry))
+    entities.append(BraviaQuadHdmiStandbyLinkSelect(client, entry))
+    entities.append(BraviaQuadAudioReturnChannelSelect(client, entry))
+
+    async_add_entities(entities, update_before_add=True)
 
 
 class BraviaQuadInputSelect(BraviaQuadNotificationMixin, SelectEntity):
@@ -262,3 +283,286 @@ class BraviaQuadDynamicRangeCompressorSelect(BraviaQuadNotificationMixin, Select
                 _LOGGER.warning("Unknown DRC value: %s", drc_value)
         except (OSError, TimeoutError):
             _LOGGER.exception("Failed to update DRC state")
+
+
+class BraviaQuadHdmiPassthroughSelect(BraviaQuadNotificationMixin, SelectEntity):
+    """Representation of a Bravia Quad HDMI passthrough selector."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+    _attr_translation_key = "hdmi_passthrough"
+    _notification_feature = FEATURE_HDMI_PASSTHROUGH
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the HDMI passthrough select."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_hdmi_passthrough"
+        self._attr_options = HDMI_PASSTHROUGH_OPTIONS
+        current = None
+        self._attr_current_option = (
+            current if current in HDMI_PASSTHROUGH_OPTIONS else "auto"
+        )
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle notification."""
+        if value in HDMI_PASSTHROUGH_OPTIONS:
+            self._attr_current_option = value
+            self.async_write_ha_state()
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        if option not in HDMI_PASSTHROUGH_OPTIONS:
+            _LOGGER.error("Invalid HDMI passthrough option: %s", option)
+            return
+        success = await self._client.async_set_hdmi_passthrough(option)
+        if not success:
+            _LOGGER.error("Failed to set HDMI passthrough to %s", option)
+            return
+        # Re-read to verify device accepted the value
+        try:
+            actual = await self._client.async_get_hdmi_passthrough()
+            if actual in HDMI_PASSTHROUGH_OPTIONS:
+                self._attr_current_option = actual
+            else:
+                self._attr_current_option = option
+        except (OSError, TimeoutError):
+            self._attr_current_option = option
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Update the current state."""
+        try:
+            value = await self._client.async_get_hdmi_passthrough()
+            if value in HDMI_PASSTHROUGH_OPTIONS:
+                self._attr_current_option = value
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update HDMI passthrough state")
+
+
+class BraviaQuadDualMonoSelect(BraviaQuadNotificationMixin, SelectEntity):
+    """Representation of a Bravia Quad dual mono selector.
+
+    Option values (main/sub/main_sub) are unconfirmed on real hardware.
+    Disabled by default until verified.
+    """
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_entity_registry_enabled_default = False
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+    _attr_translation_key = "dual_mono"
+    _notification_feature = FEATURE_DUAL_MONO
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the dual mono select."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_dual_mono"
+        self._attr_options = DUAL_MONO_OPTIONS
+        current = None
+        self._attr_current_option = current if current in DUAL_MONO_OPTIONS else "main"
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle notification."""
+        if value in DUAL_MONO_OPTIONS:
+            self._attr_current_option = value
+            self.async_write_ha_state()
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        if option not in DUAL_MONO_OPTIONS:
+            _LOGGER.error("Invalid dual mono option: %s", option)
+            return
+        success = await self._client.async_set_dual_mono(option)
+        if not success:
+            _LOGGER.error("Failed to set dual mono to %s", option)
+            return
+        # Re-read to verify device accepted the value
+        try:
+            actual = await self._client.async_get_dual_mono()
+            if actual in DUAL_MONO_OPTIONS:
+                self._attr_current_option = actual
+            else:
+                self._attr_current_option = option
+        except (OSError, TimeoutError):
+            self._attr_current_option = option
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Update the current state."""
+        try:
+            value = await self._client.async_get_dual_mono()
+            if value in DUAL_MONO_OPTIONS:
+                self._attr_current_option = value
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update dual mono state")
+
+
+class BraviaQuadBtConnectionQualitySelect(BraviaQuadNotificationMixin, SelectEntity):
+    """Representation of a Bravia Quad Bluetooth connection quality selector."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+    _attr_translation_key = "bt_connection_quality"
+    _notification_feature = FEATURE_BT_CONNECTION_QUALITY
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the Bluetooth connection quality select."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_bt_connection_quality"
+        self._attr_options = BT_CONNECTION_QUALITY_OPTIONS
+        current = None
+        self._attr_current_option = (
+            current if current in BT_CONNECTION_QUALITY_OPTIONS else "prioritysound"
+        )
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle notification."""
+        if value in BT_CONNECTION_QUALITY_OPTIONS:
+            self._attr_current_option = value
+            self.async_write_ha_state()
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        if option not in BT_CONNECTION_QUALITY_OPTIONS:
+            _LOGGER.error("Invalid Bluetooth connection quality option: %s", option)
+            return
+        success = await self._client.async_set_bt_connection_quality(option)
+        if not success:
+            _LOGGER.error("Failed to set Bluetooth connection quality to %s", option)
+            return
+        # Re-read to verify device accepted the value
+        try:
+            actual = await self._client.async_get_bt_connection_quality()
+            if actual in BT_CONNECTION_QUALITY_OPTIONS:
+                self._attr_current_option = actual
+            else:
+                self._attr_current_option = option
+        except (OSError, TimeoutError):
+            self._attr_current_option = option
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Update the current state."""
+        try:
+            value = await self._client.async_get_bt_connection_quality()
+            if value in BT_CONNECTION_QUALITY_OPTIONS:
+                self._attr_current_option = value
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update Bluetooth connection quality state")
+
+
+class BraviaQuadHdmiStandbyLinkSelect(BraviaQuadNotificationMixin, SelectEntity):
+    """Representation of a Bravia Quad HDMI standby link selector."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+    _attr_translation_key = "hdmi_standby_link"
+    _notification_feature = FEATURE_HDMI_STANDBY_LINK
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the HDMI standby link select."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_hdmi_standby_link"
+        self._attr_options = HDMI_STANDBY_LINK_OPTIONS
+        current = None
+        self._attr_current_option = (
+            current if current in HDMI_STANDBY_LINK_OPTIONS else "auto"
+        )
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle notification."""
+        if value in HDMI_STANDBY_LINK_OPTIONS:
+            self._attr_current_option = value
+            self.async_write_ha_state()
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        if option not in HDMI_STANDBY_LINK_OPTIONS:
+            _LOGGER.error("Invalid HDMI standby link option: %s", option)
+            return
+        success = await self._client.async_set_hdmi_standby_link(option)
+        if not success:
+            _LOGGER.error("Failed to set HDMI standby link to %s", option)
+            return
+        # Re-read to verify device accepted the value
+        try:
+            actual = await self._client.async_get_hdmi_standby_link()
+            if actual in HDMI_STANDBY_LINK_OPTIONS:
+                self._attr_current_option = actual
+            else:
+                self._attr_current_option = option
+        except (OSError, TimeoutError):
+            self._attr_current_option = option
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Update the current state."""
+        try:
+            value = await self._client.async_get_hdmi_standby_link()
+            if value in HDMI_STANDBY_LINK_OPTIONS:
+                self._attr_current_option = value
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update HDMI standby link state")
+
+
+class BraviaQuadAudioReturnChannelSelect(BraviaQuadNotificationMixin, SelectEntity):
+    """Representation of a Bravia Quad audio return channel selector."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+    _attr_translation_key = "audio_return_channel"
+    _notification_feature = FEATURE_AUDIO_RETURN_CHANNEL
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the audio return channel select."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_audio_return_channel"
+        self._attr_options = AUDIO_RETURN_CHANNEL_OPTIONS
+        current = None
+        self._attr_current_option = (
+            current if current in AUDIO_RETURN_CHANNEL_OPTIONS else "arc"
+        )
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle notification."""
+        if value in AUDIO_RETURN_CHANNEL_OPTIONS:
+            self._attr_current_option = value
+            self.async_write_ha_state()
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
+        if option not in AUDIO_RETURN_CHANNEL_OPTIONS:
+            _LOGGER.error("Invalid audio return channel option: %s", option)
+            return
+        success = await self._client.async_set_audio_return_channel(option)
+        if not success:
+            _LOGGER.error("Failed to set audio return channel to %s", option)
+            return
+        # Re-read to verify device accepted the value
+        try:
+            actual = await self._client.async_get_audio_return_channel()
+            if actual in AUDIO_RETURN_CHANNEL_OPTIONS:
+                self._attr_current_option = actual
+            else:
+                self._attr_current_option = option
+        except (OSError, TimeoutError):
+            self._attr_current_option = option
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Update the current state."""
+        try:
+            value = await self._client.async_get_audio_return_channel()
+            if value in AUDIO_RETURN_CHANNEL_OPTIONS:
+                self._attr_current_option = value
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update audio return channel state")

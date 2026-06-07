@@ -178,6 +178,71 @@ def _setup_feature_mocks(client: MagicMock) -> None:
     client.manufacturer = "SONY"
     client.async_get_device_name = AsyncMock(return_value="Test BRAVIA Theatre Quad")
 
+    # HDMI Passthrough
+    client.async_get_hdmi_passthrough = AsyncMock(return_value="auto")
+    client.async_set_hdmi_passthrough = AsyncMock(return_value=True)
+
+    # Dual Mono
+    client.async_get_dual_mono = AsyncMock(return_value="main")
+    client.async_set_dual_mono = AsyncMock(return_value=True)
+
+    # Auto Update
+    client.async_get_auto_update = AsyncMock(return_value="off")
+    client.async_set_auto_update = AsyncMock(return_value=True)
+    client.auto_update = "off"
+
+    # IMAX Mode
+    client.async_get_imax_mode = AsyncMock(return_value="off")
+    client.async_set_imax_mode = AsyncMock(return_value=True)
+    client.imax_mode = "off"
+
+    # AV Sync
+    client.async_get_av_sync = AsyncMock(return_value=0)
+    client.async_set_av_sync = AsyncMock(return_value=True)
+
+    # TV AV Sync
+    client.async_get_tv_av_sync = AsyncMock(return_value=0)
+    client.async_set_tv_av_sync = AsyncMock(return_value=True)
+
+    # Bluetooth Connection Quality
+    client.async_get_bt_connection_quality = AsyncMock(return_value="prioritysound")
+    client.async_set_bt_connection_quality = AsyncMock(return_value=True)
+
+    # External Control
+    client.async_get_external_control = AsyncMock(return_value="on")
+    client.async_set_external_control = AsyncMock(return_value=True)
+
+    # HDMI Standby Link
+    client.async_get_hdmi_standby_link = AsyncMock(return_value="auto")
+    client.async_set_hdmi_standby_link = AsyncMock(return_value=True)
+
+    # Net/BT Standby
+    client.async_get_net_bt_standby = AsyncMock(return_value="off")
+    client.async_set_net_bt_standby = AsyncMock(return_value=True)
+
+    # Voice Zoom
+    client.async_get_voice_zoom = AsyncMock(return_value="off")
+    client.async_set_voice_zoom = AsyncMock(return_value=True)
+    client.voice_zoom = "off"
+
+    # Audio Return Channel
+    client.async_get_audio_return_channel = AsyncMock(return_value="arc")
+    client.async_set_audio_return_channel = AsyncMock(return_value=True)
+
+    # Voice Zoom Level (read-only)
+    client.async_get_voice_zoom_level = AsyncMock(return_value=1)
+
+    # Diagnostic sensors (read-only)
+    client.async_get_timezone = AsyncMock(return_value="America/New_York|-300")
+    client.async_get_temperature = AsyncMock(return_value="F:134,C:57")
+    client.async_get_360ssm = AsyncMock(return_value="on")
+    client.async_get_network_mode = AsyncMock(return_value="wired")
+    client.async_get_ip_address = AsyncMock(return_value="192.168.1.100")
+    client.async_get_device_name = AsyncMock(return_value="Test BRAVIA Theatre Quad")
+    client.async_get_destination = AsyncMock(return_value="us")
+    client.async_get_language = AsyncMock(return_value="english")
+    client.async_get_dhcp = AsyncMock(return_value="on")
+
 
 @pytest.fixture
 def mock_bravia_quad_client() -> Generator[MagicMock]:
@@ -222,7 +287,13 @@ def mock_bravia_quad_client() -> Generator[MagicMock]:
 @pytest.fixture
 def platforms() -> list[Platform]:
     """Return the platforms to be loaded for this test."""
-    return [Platform.BUTTON, Platform.NUMBER, Platform.SELECT, Platform.SWITCH]
+    return [
+        Platform.BUTTON,
+        Platform.NUMBER,
+        Platform.SELECT,
+        Platform.SENSOR,
+        Platform.SWITCH,
+    ]
 
 
 @pytest.fixture

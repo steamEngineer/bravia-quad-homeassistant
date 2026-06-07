@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, NamedTuple
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.const import ATTR_ENTITY_ID, CONF_HOST, Platform
@@ -630,3 +630,118 @@ async def test_bass_level_subwoofer_detection_triggers_reload(
     entry = hass.config_entries.async_get_entry(mock_config_entry_no_subwoofer.entry_id)
     assert entry is not None
     assert entry.data.get(CONF_HAS_SUBWOOFER) is True
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_new_select_entities(
+    hass: HomeAssistant,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test that new select entities are created."""
+    for suffix in (
+        "_hdmi_passthrough",
+        "_bt_connection_quality",
+        "_hdmi_standby_link",
+        "_audio_return_channel",
+    ):
+        entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
+        assert entity_id is not None, f"Entity with suffix {suffix} not found"
+        state = hass.states.get(entity_id)
+        assert state is not None, f"State for {entity_id} not found"
+
+    # Dual mono is disabled by default (option values unconfirmed)
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_dual_mono")
+    assert entity_id is not None
+    assert hass.states.get(entity_id) is None
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_hdmi_passthrough_select_option(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test selecting HDMI passthrough option."""
+    mock_bravia_quad_client.async_get_hdmi_passthrough = AsyncMock(return_value="on")
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_hdmi_passthrough")
+    assert entity_id is not None
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": entity_id, "option": "on"},
+        blocking=True,
+    )
+    mock_bravia_quad_client.async_set_hdmi_passthrough.assert_called_once_with("on")
+
+
+@pytest.mark.usefixtures("init_integration_all")
+async def test_dual_mono_select_option(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test selecting dual mono option."""
+    mock_bravia_quad_client.async_get_dual_mono = AsyncMock(return_value="sub")
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_dual_mono")
+    assert entity_id is not None
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": entity_id, "option": "sub"},
+        blocking=True,
+    )
+    mock_bravia_quad_client.async_set_dual_mono.assert_called_once_with("sub")
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_audio_return_channel_select_option(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test selecting audio return channel option with re-read."""
+    mock_bravia_quad_client.async_get_audio_return_channel = AsyncMock(
+        return_value="arc"
+    )
+    entity_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, "_audio_return_channel"
+    )
+    assert entity_id is not None
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": entity_id, "option": "earc"},
+        blocking=True,
+    )
+    mock_bravia_quad_client.async_set_audio_return_channel.assert_called_once_with(
+        "earc"
+    )
+    # Should re-read after SET; device fell back to arc
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "arc"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_bt_connection_quality_select_option(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test selecting Bluetooth connection quality."""
+    mock_bravia_quad_client.async_get_bt_connection_quality = AsyncMock(
+        return_value="priorityconnection"
+    )
+    entity_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, "_bt_connection_quality"
+    )
+    assert entity_id is not None
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": entity_id, "option": "priorityconnection"},
+        blocking=True,
+    )
+    mock_bravia_quad_client.async_set_bt_connection_quality.assert_called_once_with(
+        "priorityconnection"
+    )
