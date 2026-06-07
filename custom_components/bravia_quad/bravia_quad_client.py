@@ -11,14 +11,8 @@ from typing import TYPE_CHECKING, Any
 from .const import (
     AAV_OFF,
     AUTO_STANDBY_OFF,
-    CMD_ID_AUDIO,
-    CMD_ID_AUTO_STANDBY,
-    CMD_ID_HDMI_CEC,
     CMD_ID_INITIAL,
-    CMD_ID_INPUT,
     CMD_ID_MAX,
-    CMD_ID_POWER,
-    CMD_ID_VOLUME,
     DEFAULT_PORT,
     FEATURE_AAV,
     FEATURE_AUTO_STANDBY,
@@ -175,19 +169,9 @@ class BraviaQuadClient:
             await self.async_connect()
 
         try:
-            command = {
-                "id": CMD_ID_POWER,
-                "type": "get",
-                "feature": FEATURE_POWER,
-            }
-            response = await self.async_send_command(command)
-
-            if (
-                response
-                and response.get("type") == "result"
-                and response.get("feature") == FEATURE_POWER
-            ):
-                self._power_state = response.get("value", POWER_OFF)
+            value = await self._async_get_feature(FEATURE_POWER)
+            if value is not None:
+                self._power_state = value
                 return True
         except (OSError, ConnectionError):
             _LOGGER.exception("Test connection failed")
@@ -258,19 +242,7 @@ class BraviaQuadClient:
 
     async def async_set_power(self, state: str) -> bool:
         """Set power state (on/off)."""
-        command = {
-            "id": CMD_ID_POWER,
-            "type": "set",
-            "feature": FEATURE_POWER,
-            "value": state,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        if await self._async_set_feature(FEATURE_POWER, state):
             self._power_state = state
             return True
         return False
@@ -281,395 +253,154 @@ class BraviaQuadClient:
             msg = f"Volume must be between {MIN_VOLUME} and {MAX_VOLUME}"
             raise ValueError(msg)
 
-        command = {
-            "id": CMD_ID_VOLUME,
-            "type": "set",
-            "feature": FEATURE_VOLUME,
-            "value": volume,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        if await self._async_set_feature(FEATURE_VOLUME, str(volume)):
             self._volume = volume
             return True
         return False
 
     async def async_get_power(self) -> str:
         """Get current power state."""
-        command = {
-            "id": CMD_ID_POWER,
-            "type": "get",
-            "feature": FEATURE_POWER,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_POWER
-        ):
-            self._power_state = response.get("value", POWER_OFF)
-            return self._power_state
+        value = await self._async_get_feature(FEATURE_POWER)
+        if value is not None:
+            self._power_state = value
         return self._power_state
 
     async def async_get_volume(self) -> int:
         """Get current volume."""
-        command = {
-            "id": CMD_ID_VOLUME,
-            "type": "get",
-            "feature": FEATURE_VOLUME,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_VOLUME
-        ):
+        value = await self._async_get_feature(FEATURE_VOLUME)
+        if value is not None:
             try:
-                volume = int(response.get("value", 0))
+                volume = int(value)
                 if MIN_VOLUME <= volume <= MAX_VOLUME:
                     self._volume = volume
-                    return self._volume
             except (ValueError, TypeError):
-                pass  # Invalid response value, return cached state
+                pass
         return self._volume
 
     async def async_set_input(self, input_value: str) -> bool:
-        """Set input (tv, hdmi1, spotify, bluetooth, airplay2)."""
-        command = {
-            "id": CMD_ID_INPUT,
-            "type": "set",
-            "feature": FEATURE_INPUT,
-            "value": input_value,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        """Set input source."""
+        if await self._async_set_feature(FEATURE_INPUT, input_value):
             self._input = input_value
             return True
         return False
 
     async def async_get_input(self) -> str:
-        """Get current input."""
-        command = {
-            "id": CMD_ID_INPUT,
-            "type": "get",
-            "feature": FEATURE_INPUT,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_INPUT
-        ):
-            self._input = response.get("value", "tv")
-            return self._input
+        """Get current input source."""
+        value = await self._async_get_feature(FEATURE_INPUT)
+        if value is not None:
+            self._input = value
         return self._input
 
     async def async_set_voice_enhancer(self, state: str) -> bool:
-        """Set voice enhancer state (upon/upoff)."""
-        command = {
-            "id": CMD_ID_AUDIO,
-            "type": "set",
-            "feature": FEATURE_VOICE_ENHANCER,
-            "value": state,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        """Set voice enhancer state."""
+        if await self._async_set_feature(FEATURE_VOICE_ENHANCER, state):
             self._voice_enhancer = state
             return True
         return False
 
     async def async_get_voice_enhancer(self) -> str:
         """Get current voice enhancer state."""
-        command = {
-            "id": CMD_ID_AUDIO,
-            "type": "get",
-            "feature": FEATURE_VOICE_ENHANCER,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_VOICE_ENHANCER
-        ):
-            self._voice_enhancer = response.get("value", VOICE_ENHANCER_OFF)
-            return self._voice_enhancer
+        value = await self._async_get_feature(FEATURE_VOICE_ENHANCER)
+        if value is not None:
+            self._voice_enhancer = value
         return self._voice_enhancer
 
     async def async_set_sound_field(self, state: str) -> bool:
-        """Set sound field state (on/off)."""
-        command = {
-            "id": CMD_ID_AUDIO,
-            "type": "set",
-            "feature": FEATURE_SOUND_FIELD,
-            "value": state,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        """Set sound field state."""
+        if await self._async_set_feature(FEATURE_SOUND_FIELD, state):
             self._sound_field = state
             return True
         return False
 
     async def async_get_sound_field(self) -> str:
         """Get current sound field state."""
-        command = {
-            "id": CMD_ID_AUDIO,
-            "type": "get",
-            "feature": FEATURE_SOUND_FIELD,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_SOUND_FIELD
-        ):
-            self._sound_field = response.get("value", SOUND_FIELD_OFF)
-            return self._sound_field
+        value = await self._async_get_feature(FEATURE_SOUND_FIELD)
+        if value is not None:
+            self._sound_field = value
         return self._sound_field
 
     async def async_set_night_mode(self, state: str) -> bool:
-        """Set night mode state (on/off)."""
-        command = {
-            "id": CMD_ID_AUDIO,
-            "type": "set",
-            "feature": FEATURE_NIGHT_MODE,
-            "value": state,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        """Set night mode state."""
+        if await self._async_set_feature(FEATURE_NIGHT_MODE, state):
             self._night_mode = state
             return True
         return False
 
     async def async_get_night_mode(self) -> str:
         """Get current night mode state."""
-        command = {
-            "id": CMD_ID_AUDIO,
-            "type": "get",
-            "feature": FEATURE_NIGHT_MODE,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_NIGHT_MODE
-        ):
-            self._night_mode = response.get("value", NIGHT_MODE_OFF)
-            return self._night_mode
+        value = await self._async_get_feature(FEATURE_NIGHT_MODE)
+        if value is not None:
+            self._night_mode = value
         return self._night_mode
 
     async def async_set_hdmi_cec(self, state: str) -> bool:
-        """Enable or disable HDMI CEC."""
-        command = {
-            "id": CMD_ID_HDMI_CEC,
-            "type": "set",
-            "feature": FEATURE_HDMI_CEC,
-            "value": state,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        """Set HDMI CEC state."""
+        if await self._async_set_feature(FEATURE_HDMI_CEC, state):
             self._hdmi_cec = state
             return True
         return False
 
     async def async_get_hdmi_cec(self) -> str:
         """Get current HDMI CEC state."""
-        command = {
-            "id": CMD_ID_HDMI_CEC,
-            "type": "get",
-            "feature": FEATURE_HDMI_CEC,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_HDMI_CEC
-        ):
-            self._hdmi_cec = response.get("value", HDMI_CEC_OFF)
-            return self._hdmi_cec
+        value = await self._async_get_feature(FEATURE_HDMI_CEC)
+        if value is not None:
+            self._hdmi_cec = value
         return self._hdmi_cec
 
     async def async_set_auto_standby(self, state: str) -> bool:
-        """Enable or disable auto standby."""
-        command = {
-            "id": CMD_ID_AUTO_STANDBY,
-            "type": "set",
-            "feature": FEATURE_AUTO_STANDBY,
-            "value": state,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        """Set auto standby state."""
+        if await self._async_set_feature(FEATURE_AUTO_STANDBY, state):
             self._auto_standby = state
             return True
         return False
 
     async def async_get_auto_standby(self) -> str:
         """Get current auto standby state."""
-        command = {
-            "id": CMD_ID_AUTO_STANDBY,
-            "type": "get",
-            "feature": FEATURE_AUTO_STANDBY,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_AUTO_STANDBY
-        ):
-            self._auto_standby = response.get("value", AUTO_STANDBY_OFF)
-            return self._auto_standby
+        value = await self._async_get_feature(FEATURE_AUTO_STANDBY)
+        if value is not None:
+            self._auto_standby = value
         return self._auto_standby
 
     async def async_set_drc(self, state: str) -> bool:
-        """Set Dynamic Range Compressor state (auto/on/off)."""
-        command = {
-            "id": CMD_ID_AUDIO,
-            "type": "set",
-            "feature": FEATURE_DRC,
-            "value": state,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        """Set DRC state."""
+        if await self._async_set_feature(FEATURE_DRC, state):
             self._drc = state
             return True
         return False
 
     async def async_get_drc(self) -> str:
-        """Get current Dynamic Range Compressor state."""
-        command = {
-            "id": CMD_ID_AUDIO,
-            "type": "get",
-            "feature": FEATURE_DRC,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_DRC
-        ):
-            self._drc = response.get("value", DEFAULT_DRC)
-            return self._drc
+        """Get current DRC state."""
+        value = await self._async_get_feature(FEATURE_DRC)
+        if value is not None:
+            self._drc = value
         return self._drc
 
     async def async_set_aav(self, state: str) -> bool:
-        """Set Advanced Auto Volume state (on/off)."""
-        command = {
-            "id": CMD_ID_AUDIO,
-            "type": "set",
-            "feature": FEATURE_AAV,
-            "value": state,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        """Set AAV state."""
+        if await self._async_set_feature(FEATURE_AAV, state):
             self._aav = state
             return True
         return False
 
     async def async_get_aav(self) -> str:
-        """Get current Advanced Auto Volume state."""
-        command = {
-            "id": CMD_ID_AUDIO,
-            "type": "get",
-            "feature": FEATURE_AAV,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_AAV
-        ):
-            self._aav = response.get("value", AAV_OFF)
-            return self._aav
+        """Get current AAV state."""
+        value = await self._async_get_feature(FEATURE_AAV)
+        if value is not None:
+            self._aav = value
         return self._aav
 
     async def async_set_mute(self, state: str) -> bool:
-        """Set mute state (on/off)."""
-        command = {
-            "id": self._get_next_command_id(),
-            "type": "set",
-            "feature": FEATURE_MUTE,
-            "value": state,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        """Set mute state."""
+        if await self._async_set_feature(FEATURE_MUTE, state):
             self._mute = state
             return True
         return False
 
     async def async_get_mute(self) -> str:
         """Get current mute state."""
-        command = {
-            "id": self._get_next_command_id(),
-            "type": "get",
-            "feature": FEATURE_MUTE,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_MUTE
-        ):
-            self._mute = response.get("value", MUTE_OFF)
-            return self._mute
+        value = await self._async_get_feature(FEATURE_MUTE)
+        if value is not None:
+            self._mute = value
         return self._mute
 
     async def async_get_serial_number(self) -> str | None:
@@ -714,44 +445,21 @@ class BraviaQuadClient:
             msg = f"Rear level must be between {MIN_REAR_LEVEL} and {MAX_REAR_LEVEL}"
             raise ValueError(msg)
 
-        command = {
-            "id": CMD_ID_VOLUME,
-            "type": "set",
-            "feature": FEATURE_REAR_LEVEL,
-            "value": level,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        if await self._async_set_feature(FEATURE_REAR_LEVEL, str(level)):
             self._rear_level = level
             return True
         return False
 
     async def async_get_rear_level(self) -> int:
         """Get current rear level."""
-        command = {
-            "id": CMD_ID_VOLUME,
-            "type": "get",
-            "feature": FEATURE_REAR_LEVEL,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_REAR_LEVEL
-        ):
+        value = await self._async_get_feature(FEATURE_REAR_LEVEL)
+        if value is not None:
             try:
-                rear_level = int(response.get("value", 0))
+                rear_level = int(value)
                 if MIN_REAR_LEVEL <= rear_level <= MAX_REAR_LEVEL:
                     self._rear_level = rear_level
-                    return self._rear_level
             except (ValueError, TypeError):
-                pass  # Invalid response value, return cached state
+                pass
         return self._rear_level
 
     async def async_set_bass_level(self, level: int) -> bool:
@@ -765,44 +473,21 @@ class BraviaQuadClient:
             msg = f"Bass level must be between {MIN_BASS_LEVEL} and {MAX_BASS_LEVEL}"
             raise ValueError(msg)
 
-        command = {
-            "id": CMD_ID_VOLUME,
-            "type": "set",
-            "feature": FEATURE_BASS_LEVEL,
-            "value": level,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        if await self._async_set_feature(FEATURE_BASS_LEVEL, str(level)):
             self._bass_level = level
             return True
         return False
 
     async def async_get_bass_level(self) -> int:
         """Get current bass level."""
-        command = {
-            "id": CMD_ID_VOLUME,
-            "type": "get",
-            "feature": FEATURE_BASS_LEVEL,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("feature") == FEATURE_BASS_LEVEL
-        ):
+        value = await self._async_get_feature(FEATURE_BASS_LEVEL)
+        if value is not None:
             try:
-                bass_level = int(response.get("value", DEFAULT_BASS_LEVEL))
+                bass_level = int(value)
                 if MIN_BASS_LEVEL <= bass_level <= MAX_BASS_LEVEL:
                     self._bass_level = bass_level
-                    return self._bass_level
             except (ValueError, TypeError):
-                pass  # Invalid response value, return cached state
+                pass
         return self._bass_level
 
     async def async_detect_subwoofer(self) -> bool:
@@ -828,33 +513,16 @@ class BraviaQuadClient:
 
         # Try setting to -1 (invalid without subwoofer)
         test_value = -1
-        command = {
-            "id": CMD_ID_VOLUME,
-            "type": "set",
-            "feature": FEATURE_BASS_LEVEL,
-            "value": test_value,
-        }
-        response = await self.async_send_command(command)
-
-        if (
-            response
-            and response.get("type") == "result"
-            and response.get("value") == "ACK"
-        ):
+        if await self._async_set_feature(FEATURE_BASS_LEVEL, str(test_value)):
             # Successfully set to -1, subwoofer is connected
+            self._bass_level = test_value
             _LOGGER.info(
                 "Subwoofer detected: device accepted bass level %d", test_value
             )
-            # Revert to original value. Note: there's a brief window where user
-            # bass level changes could be overwritten, but this is acceptable
-            # given detection is rare and the window is very short.
-            revert_command = {
-                "id": CMD_ID_VOLUME,
-                "type": "set",
-                "feature": FEATURE_BASS_LEVEL,
-                "value": current_level,
-            }
-            await self.async_send_command(revert_command)
+            # Revert to original value. Note: there's a brief window where
+            # user bass level changes could be overwritten, but this is
+            # acceptable given detection is rare and the window is very short.
+            await self._async_set_feature(FEATURE_BASS_LEVEL, str(current_level))
             self._bass_level = current_level
             return True
 
