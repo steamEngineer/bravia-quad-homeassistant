@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 🔍 Verify PR has at least one label
-        uses: mheap/github-action-required-labels@v5
+        uses: mheap/github-action-required-labels@v5.5.2
         with:
           mode: minimum
           count: 1
