@@ -53,7 +53,7 @@ rules:
 
 ## Python Requirements
 
-- **Compatibility**: Python 3.13+
+- **Compatibility**: Python 3.14.2+
 - **Language Features**: Use the newest features when possible:
   - Pattern matching
   - Type hints
