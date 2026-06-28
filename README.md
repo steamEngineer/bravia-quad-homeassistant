@@ -437,7 +437,7 @@ This project uses [Ruff](https://docs.astral.sh/ruff/) for linting and code form
 
 - **Linting**: Automated linting runs on all pull requests via GitHub Actions
 - **Formatting**: Code is automatically formatted using Ruff
-- **Python Version**: Targets Python 3.13.2+
+- **Python Version**: Targets Python 3.14.2+
 
 Run linting locally:
 ```bash
