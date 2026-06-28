@@ -24,7 +24,7 @@
       "type": "_airplay._tcp.local.",
       "properties": {
         "manufacturer": "sony*",
-        "model": "ht-a9*"
+        "model": "ht-a9"
       }
     }
   ]
