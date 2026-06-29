@@ -8,12 +8,37 @@ on:
     branches:
       - "main"
 
-permissions: {}
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
   changes:
     if: github.event_name == 'pull_request'
-    uses: ./.github/workflows/ci-changes.yml
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v7.0.0
+
+      - name: Detect code paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # Keep filters in sync with .github/workflows/ci-changes.yml
+          filters: |
+            code:
+              - 'custom_components/**'
+              - 'tests/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.python-version'
+              - '.ruff.toml'
+              - '.pre-commit-config.yaml'
+              - '.github/workflows/tests.yml'
+              - '.github/workflows/lint.yml'
+              - '.github/workflows/ci-changes.yml'
 
   ruff:
     name: "🧹 Ruff"

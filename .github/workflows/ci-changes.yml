@@ -1,4 +1,6 @@
 ---
+# Canonical path filter for Python CI. tests.yml and lint.yml duplicate this
+# filter inline (reusable workflow_call requires the file on default branch).
 name: CI path changes
 
 on:
