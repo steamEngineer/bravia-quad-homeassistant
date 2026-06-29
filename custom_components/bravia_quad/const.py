@@ -126,7 +126,11 @@ AUTO_UPDATE_OFF = "off"
 
 # IMAX Mode states
 IMAX_MODE_AUTO = "auto"
+IMAX_MODE_ON = "on"
 IMAX_MODE_OFF = "off"
+
+# IMAX Mode options (API values used as translation keys)
+IMAX_MODE_OPTIONS: list[str] = ["auto", "on", "off"]
 
 # External Control states
 EXTERNAL_CONTROL_ON = "on"

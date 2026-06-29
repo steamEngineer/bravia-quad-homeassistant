@@ -109,7 +109,7 @@ def mock_setup_entry() -> Generator[None]:
         yield
 
 
-def _setup_feature_mocks(client: MagicMock) -> None:
+def _setup_feature_mocks(client: MagicMock) -> None:  # noqa: PLR0915
     """Configure feature-specific mock attributes on the client."""
     # Power
     client.async_get_power = AsyncMock(return_value="on")
@@ -198,9 +198,9 @@ def _setup_feature_mocks(client: MagicMock) -> None:
     client.auto_update = "off"
 
     # IMAX Mode
-    client.async_get_imax_mode = AsyncMock(return_value="off")
+    client.async_get_imax_mode = AsyncMock(return_value="auto")
     client.async_set_imax_mode = AsyncMock(return_value=True)
-    client.imax_mode = "off"
+    client.imax_mode = "auto"
 
     # AV Sync
     client.async_get_av_sync = AsyncMock(return_value=0)

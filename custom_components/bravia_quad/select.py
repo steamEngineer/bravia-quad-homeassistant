@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING
 
 from homeassistant.components.select import SelectEntity
 from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 
-from . import BraviaQuadData
 from .const import (
     AUDIO_RETURN_CHANNEL_OPTIONS,
     BASS_LEVEL_OPTIONS,
@@ -26,9 +26,11 @@ from .const import (
     FEATURE_DUAL_MONO,
     FEATURE_HDMI_PASSTHROUGH,
     FEATURE_HDMI_STANDBY_LINK,
+    FEATURE_IMAX_MODE,
     FEATURE_INPUT,
     HDMI_PASSTHROUGH_OPTIONS,
     HDMI_STANDBY_LINK_OPTIONS,
+    IMAX_MODE_OPTIONS,
     INPUT_OPTIONS,
 )
 from .helpers import BraviaQuadNotificationMixin, get_device_info
@@ -38,6 +40,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+    from . import BraviaQuadData
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,6 +63,17 @@ async def async_setup_entry(
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
     client = data.tcp_client
 
+    # Remove legacy switch entity after IMAX mode became a select
+    registry = er.async_get(hass)
+    imax_unique_id = f"{DOMAIN}_{entry.unique_id}_imax_mode"
+    for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+        if (
+            entity_entry.entity_id.startswith("switch.")
+            and entity_entry.unique_id == imax_unique_id
+        ):
+            registry.async_remove(entity_entry.entity_id)
+            break
+
     # Create select entities
     entities: list[SelectEntity] = [
         BraviaQuadInputSelect(client, entry),
@@ -74,6 +88,7 @@ async def async_setup_entry(
 
     # Add new polling-based selects
     entities.append(BraviaQuadHdmiPassthroughSelect(client, entry))
+    entities.append(BraviaQuadImaxModeSelect(client, entry))
     entities.append(BraviaQuadDualMonoSelect(client, entry))
     entities.append(BraviaQuadBtConnectionQualitySelect(client, entry))
     entities.append(BraviaQuadHdmiStandbyLinkSelect(client, entry))
@@ -341,8 +356,81 @@ class BraviaQuadHdmiPassthroughSelect(BraviaQuadNotificationMixin, SelectEntity)
             _LOGGER.exception("Failed to update HDMI passthrough state")
 
 
+class BraviaQuadImaxModeSelect(BraviaQuadNotificationMixin, SelectEntity):
+    """Representation of a Bravia Quad IMAX Enhanced mode selector."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_translation_key = "imax_mode"
+
+    _notification_feature = FEATURE_IMAX_MODE
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the IMAX mode select."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_imax_mode"
+        self._attr_options = list(IMAX_MODE_OPTIONS)
+        current = client.imax_mode
+        self._attr_current_option = current if current in IMAX_MODE_OPTIONS else "auto"
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle IMAX mode notification."""
+        if value in IMAX_MODE_OPTIONS:
+            self._attr_current_option = value
+            self.async_write_ha_state()
+        else:
+            _LOGGER.warning("Unknown IMAX mode value received: %s", value)
+
+    async def async_select_option(self, option: str) -> None:
+        """Change the IMAX mode."""
+        if option not in IMAX_MODE_OPTIONS:
+            _LOGGER.error("Invalid IMAX mode option: %s", option)
+            return
+
+        if not await self._client.async_set_imax_mode(option):
+            msg = f"Device rejected IMAX mode {option!r}"
+            raise HomeAssistantError(msg)
+
+        try:
+            actual = await self._client.async_get_imax_mode()
+        except (OSError, TimeoutError) as err:
+            msg = f"Failed to verify IMAX mode after setting {option!r}"
+            raise HomeAssistantError(msg) from err
+
+        if actual not in IMAX_MODE_OPTIONS:
+            _LOGGER.warning("Unexpected IMAX mode from device: %s", actual)
+            self._attr_current_option = "auto"
+            self.async_write_ha_state()
+            msg = f"Device returned unexpected IMAX mode {actual!r}"
+            raise HomeAssistantError(msg)
+
+        self._attr_current_option = actual
+        self.async_write_ha_state()
+
+        if actual != option:
+            msg = (
+                f"Device kept IMAX mode {actual!r} (requested {option!r}). "
+                "IMAX Enhanced may require a compatible TV and Sony wireless subwoofer."
+            )
+            raise HomeAssistantError(msg)
+
+    async def async_update(self) -> None:
+        """Update the current IMAX mode."""
+        try:
+            value = await self._client.async_get_imax_mode()
+            if value in IMAX_MODE_OPTIONS:
+                self._attr_current_option = value
+            else:
+                _LOGGER.warning("Unknown IMAX mode value: %s", value)
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update IMAX mode state")
+
+
 class BraviaQuadDualMonoSelect(BraviaQuadNotificationMixin, SelectEntity):
-    """Representation of a Bravia Quad dual mono selector.
+    """
+    Representation of a Bravia Quad dual mono selector.
 
     Option values (main/sub/main_sub) are unconfirmed on real hardware.
     Disabled by default until verified.

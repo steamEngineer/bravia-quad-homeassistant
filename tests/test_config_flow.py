@@ -18,7 +18,6 @@ from custom_components.bravia_quad.const import (
     CONF_MODEL,
     CONF_MODEL_ID,
     CONF_SERIAL,
-    DEFAULT_NAME,
     DOMAIN,
     MODEL_ID_TO_NAME,
 )

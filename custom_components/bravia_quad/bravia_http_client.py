@@ -181,7 +181,8 @@ class BraviaHttpClient:
         return info
 
     async def async_get_device_details(self) -> DeviceDetails:
-        """Fetch device details from the device.
+        """
+        Fetch device details from the device.
 
         Results are cached for DEVICE_DETAILS_CACHE_TTL seconds so that
         multiple sensor updates in the same poll cycle share one call.

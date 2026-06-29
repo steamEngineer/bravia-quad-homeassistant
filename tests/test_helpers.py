@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import pytest
-from homeassistant.const import CONF_HOST, CONF_MAC, CONF_NAME, Platform
+from homeassistant.const import CONF_HOST, CONF_MAC, Platform
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
@@ -15,15 +15,12 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.bravia_quad.const import (
     CONF_HAS_SUBWOOFER,
     CONF_MODEL,
-    DEFAULT_MODEL,
     DOMAIN,
 )
 from custom_components.bravia_quad.helpers import (
     get_device_info,
     migrate_legacy_identifiers,
 )
-
-from .conftest import get_entity_id_by_unique_id_suffix
 
 if TYPE_CHECKING:
     from unittest.mock import MagicMock
@@ -191,6 +188,15 @@ async def test_backfill_fetches_identity(
 
     # unique_id should be migrated from IP to serial
     assert mock_config_entry.unique_id == "1234567"
+
+    device_registry = dr.async_get(hass)
+    device = device_registry.async_get_device(identifiers={(DOMAIN, "1234567")})
+    assert device is not None
+    assert device.serial_number == "1234567"
+    assert (
+        device_registry.async_get_device(identifiers={(DOMAIN, "192.168.1.100")})
+        is None
+    )
 
 
 @pytest.mark.usefixtures("mock_bravia_quad_client")
@@ -601,6 +607,212 @@ async def test_migrate_no_old_device(
 
     # No device created - migration should handle gracefully
     migrate_legacy_identifiers(hass, entry)  # Should not raise
+
+
+async def test_migrate_from_ip_based_device_and_entities(
+    hass: HomeAssistant,
+) -> None:
+    """Test migration from IP-based device identifier and entity prefix."""
+    legacy_ip = "192.168.1.100"
+    target_serial = "1234567"
+
+    entry = MockConfigEntry(
+        title="Bravia Quad",
+        domain=DOMAIN,
+        data={CONF_HOST: legacy_ip, CONF_HAS_SUBWOOFER: True},
+        unique_id=target_serial,
+        entry_id="test_ip_migration",
+    )
+    entry.add_to_hass(hass)
+
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, legacy_ip)},
+        name="Bravia Quad",
+    )
+
+    entity_registry = er.async_get(hass)
+    old_unique_id = f"{DOMAIN}_{legacy_ip}_power"
+    entity_registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        old_unique_id,
+        config_entry=entry,
+    )
+
+    migrate_legacy_identifiers(hass, entry)
+
+    assert device_registry.async_get_device(identifiers={(DOMAIN, legacy_ip)}) is None
+    assert (
+        device_registry.async_get_device(identifiers={(DOMAIN, target_serial)})
+        is not None
+    )
+    assert entity_registry.async_get_entity_id("switch", DOMAIN, old_unique_id) is None
+    assert (
+        entity_registry.async_get_entity_id(
+            "switch", DOMAIN, f"{DOMAIN}_{target_serial}_power"
+        )
+        is not None
+    )
+
+
+async def test_migrate_from_mac_based_device_and_entities(
+    hass: HomeAssistant,
+) -> None:
+    """Test migration from MAC-based device identifier and entity prefix."""
+    legacy_mac = "60:ff:9e:12:34:56"
+    target_serial = "1234567"
+
+    entry = MockConfigEntry(
+        title="Bravia Quad",
+        domain=DOMAIN,
+        data={
+            CONF_HOST: "192.168.1.100",
+            CONF_MAC: legacy_mac,
+            CONF_HAS_SUBWOOFER: True,
+        },
+        unique_id=target_serial,
+        entry_id="test_mac_migration",
+    )
+    entry.add_to_hass(hass)
+
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, legacy_mac)},
+        name="Bravia Quad",
+    )
+
+    entity_registry = er.async_get(hass)
+    old_unique_id = f"{DOMAIN}_{legacy_mac}_power"
+    entity_registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        old_unique_id,
+        config_entry=entry,
+    )
+
+    migrate_legacy_identifiers(hass, entry)
+
+    assert device_registry.async_get_device(identifiers={(DOMAIN, legacy_mac)}) is None
+    assert (
+        device_registry.async_get_device(identifiers={(DOMAIN, target_serial)})
+        is not None
+    )
+    assert entity_registry.async_get_entity_id("switch", DOMAIN, old_unique_id) is None
+    assert (
+        entity_registry.async_get_entity_id(
+            "switch", DOMAIN, f"{DOMAIN}_{target_serial}_power"
+        )
+        is not None
+    )
+
+
+async def test_migrate_removes_duplicate_when_serial_entity_already_exists(
+    hass: HomeAssistant,
+) -> None:
+    """Test botched upgrade dedup removes legacy entity when serial entity exists."""
+    legacy_ip = "192.168.1.100"
+    target_serial = "1234567"
+
+    entry = MockConfigEntry(
+        title="Bravia Quad",
+        domain=DOMAIN,
+        data={CONF_HOST: legacy_ip, CONF_HAS_SUBWOOFER: True},
+        unique_id=target_serial,
+        entry_id="test_dedup",
+    )
+    entry.add_to_hass(hass)
+
+    entity_registry = er.async_get(hass)
+    old_unique_id = f"{DOMAIN}_{legacy_ip}_power"
+    new_unique_id = f"{DOMAIN}_{target_serial}_power"
+    old_entity = entity_registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        old_unique_id,
+        config_entry=entry,
+        suggested_object_id="bravia_theatre_power",
+    )
+    new_entity = entity_registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        new_unique_id,
+        config_entry=entry,
+        suggested_object_id="bravia_theatre_power_2",
+    )
+
+    migrate_legacy_identifiers(hass, entry)
+
+    assert entity_registry.async_get(old_entity.entity_id) is None
+    assert entity_registry.async_get(new_entity.entity_id) is not None
+
+
+@pytest.mark.usefixtures("mock_bravia_quad_client")
+async def test_setup_ip_entry_migrates_without_duplicates(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+) -> None:
+    """Test full setup migrates IP-based legacy entities without duplicating."""
+    legacy_ip = "192.168.1.100"
+    target_serial = "1234567"
+
+    entry = MockConfigEntry(
+        title="Bravia Quad",
+        domain=DOMAIN,
+        data={CONF_HOST: legacy_ip, CONF_HAS_SUBWOOFER: True},
+        unique_id=legacy_ip,
+        entry_id="test_setup_migration",
+    )
+    entry.add_to_hass(hass)
+
+    device_registry = dr.async_get(hass)
+    device_registry.async_get_or_create(
+        config_entry_id=entry.entry_id,
+        identifiers={(DOMAIN, legacy_ip)},
+        name="Bravia Quad",
+    )
+
+    entity_registry = er.async_get(hass)
+    legacy_suffixes = ("power", "volume", "input")
+    for suffix in legacy_suffixes:
+        entity_registry.async_get_or_create(
+            "switch"
+            if suffix == "power"
+            else "number"
+            if suffix == "volume"
+            else "select",
+            DOMAIN,
+            f"{DOMAIN}_{legacy_ip}_{suffix}",
+            config_entry=entry,
+        )
+
+    with patch("custom_components.bravia_quad.PLATFORMS", [Platform.SWITCH]):
+        await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert entry.unique_id == target_serial
+
+    assert device_registry.async_get_device(identifiers={(DOMAIN, legacy_ip)}) is None
+    assert (
+        device_registry.async_get_device(identifiers={(DOMAIN, target_serial)})
+        is not None
+    )
+
+    bravia_entities = [
+        e
+        for e in entity_registry.entities.values()
+        if e.platform == DOMAIN and e.config_entry_id == entry.entry_id
+    ]
+    ip_entities = [e for e in bravia_entities if legacy_ip in (e.unique_id or "")]
+    assert not ip_entities
+
+    power_entities = [
+        e for e in bravia_entities if e.unique_id and e.unique_id.endswith("_power")
+    ]
+    assert len(power_entities) == 1
+    assert power_entities[0].unique_id == f"{DOMAIN}_{target_serial}_power"
 
 
 # =============================================================================

@@ -38,6 +38,9 @@
       "drc": {
         "default": "mdi:tune-vertical"
       },
+      "imax_mode": {
+        "default": "mdi:filmstrip"
+      },
       "hdmi_passthrough": {
         "default": "mdi:hdmi-port"
       },
@@ -78,9 +81,6 @@
       },
       "auto_update": {
         "default": "mdi:update"
-      },
-      "imax_mode": {
-        "default": "mdi:filmstrip"
       },
       "net_bt_standby": {
         "default": "mdi:power-standby"

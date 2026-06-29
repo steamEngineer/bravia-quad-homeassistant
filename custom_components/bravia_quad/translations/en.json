@@ -91,6 +91,14 @@
           "off": "Off"
         }
       },
+      "imax_mode": {
+        "name": "IMAX Enhanced",
+        "state": {
+          "auto": "Automatic",
+          "on": "On",
+          "off": "Off"
+        }
+      },
       "hdmi_passthrough": {
         "name": "HDMI signal pass through",
         "state": {
@@ -175,9 +183,6 @@
       },
       "auto_update": {
         "name": "Auto update"
-      },
-      "imax_mode": {
-        "name": "IMAX Enhanced"
       },
       "net_bt_standby": {
         "name": "Network/Bluetooth standby"

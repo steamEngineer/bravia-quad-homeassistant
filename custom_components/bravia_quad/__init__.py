@@ -25,7 +25,7 @@ from .const import (
     DOMAIN,
     MODEL_ID_TO_NAME,
 )
-from .helpers import migrate_legacy_identifiers
+from .helpers import migrate_legacy_identifiers, require_unique_id
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -57,9 +57,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Bravia Quad from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    # Migrate legacy device and entity identifiers (entry_id -> unique_id format)
-    migrate_legacy_identifiers(hass, entry)
-
     # Create client instance
     client = BraviaQuadClient(
         entry.data["host"], entry.data.get(CONF_NAME, DEFAULT_NAME)
@@ -80,6 +77,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Backfill permanent identity for entries created before this version
     await _backfill_identity(hass, entry, client)
+
+    # Migrate legacy device/entity identifiers (IP/MAC/entry_id -> serial)
+    migrate_legacy_identifiers(hass, entry)
 
     # Register the device with identity from entry.data (permanent)
     # plus firmware version and active MAC from TCP (transient)
@@ -200,7 +200,7 @@ async def _register_device(
 
     dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
-        identifiers={(DOMAIN, entry.unique_id)},
+        identifiers={(DOMAIN, require_unique_id(entry))},
         connections=connections,
         name=entry.data.get(CONF_NAME, DEFAULT_NAME),
         manufacturer=manufacturer,

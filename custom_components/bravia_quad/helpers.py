@@ -7,6 +7,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
+from homeassistant.const import CONF_HOST, CONF_MAC
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -23,32 +24,50 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 
 
+def require_unique_id(entry: ConfigEntry) -> str:
+    """Return config entry unique_id or raise if missing."""
+    if entry.unique_id is None:
+        msg = (
+            f"Config entry {entry.entry_id} has no unique_id. "
+            "This indicates a bug in the config flow."
+        )
+        raise ValueError(msg)
+    return entry.unique_id
+
+
+def _legacy_keys(entry: ConfigEntry) -> set[str]:
+    """Return legacy identifier keys that differ from the current unique_id."""
+    target = entry.unique_id
+    if target is None:
+        return set()
+    keys = {entry.entry_id, entry.data.get(CONF_HOST), entry.data.get(CONF_MAC)}
+    return {key for key in keys if key and key != target}
+
+
 def migrate_legacy_identifiers(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """
-    Migrate legacy device and entity identifiers from entry_id to unique_id format.
+    Migrate legacy device and entity identifiers to the current unique_id.
 
-    This handles legacy entries created before discovery support was added,
-    where devices and entities used entry.entry_id instead of entry.unique_id.
+    Handles entry_id-based, IP-based, and MAC-based legacy formats.
     """
-    if entry.unique_id is None or entry.unique_id == entry.entry_id:
-        # No migration needed - either no unique_id or they're the same
+    legacy_keys = _legacy_keys(entry)
+    if not legacy_keys:
         return
 
-    # Type narrowing: unique_id is now confirmed to be str
-    unique_id: str = entry.unique_id
+    target_key = require_unique_id(entry)
+    for legacy_key in legacy_keys:
+        _migrate_device(hass, legacy_key, target_key)
+        _migrate_entities(hass, entry.entry_id, legacy_key, target_key)
 
-    _migrate_device(hass, entry.entry_id, unique_id)
-    _migrate_entities(hass, entry.entry_id, unique_id)
 
-
-def _migrate_device(hass: HomeAssistant, entry_id: str, unique_id: str) -> None:
-    """Migrate device identifier from entry_id to unique_id format."""
+def _migrate_device(hass: HomeAssistant, legacy_key: str, target_key: str) -> None:
+    """Migrate device identifier from legacy_key to target_key format."""
     device_registry = dr.async_get(hass)
 
-    old_identifier = (DOMAIN, entry_id)
-    new_identifier = (DOMAIN, unique_id)
+    old_identifier = (DOMAIN, legacy_key)
+    new_identifier = (DOMAIN, target_key)
 
-    # Find old device with entry_id-based identifier
+    # Find old device with legacy identifier
     old_device = device_registry.async_get_device(identifiers={old_identifier})
     if old_device is None:
         return
@@ -75,18 +94,22 @@ def _migrate_device(hass: HomeAssistant, entry_id: str, unique_id: str) -> None:
     _LOGGER.info("Migrated device from legacy identifier format")
 
 
-def _migrate_entities(hass: HomeAssistant, entry_id: str, unique_id: str) -> None:
-    """Migrate entity unique_ids from entry_id to unique_id format."""
+def _migrate_entities(
+    hass: HomeAssistant, config_entry_id: str, legacy_key: str, target_key: str
+) -> None:
+    """Migrate entity unique_ids from legacy_key prefix to target_key prefix."""
     entity_registry = er.async_get(hass)
-    old_prefix = f"{DOMAIN}_{entry_id}_"
-    new_prefix = f"{DOMAIN}_{unique_id}_"
+    old_prefix = f"{DOMAIN}_{legacy_key}_"
+    new_prefix = f"{DOMAIN}_{target_key}_"
     migrated_count = 0
 
     # Get all entities for this config entry
-    entities = er.async_entries_for_config_entry(entity_registry, entry_id)
+    entities = er.async_entries_for_config_entry(entity_registry, config_entry_id)
 
     for entity_entry in entities:
-        if not entity_entry.unique_id.startswith(old_prefix):
+        if not entity_entry.unique_id or not entity_entry.unique_id.startswith(
+            old_prefix
+        ):
             continue
 
         # Build new unique_id by replacing the prefix
@@ -127,19 +150,13 @@ def _migrate_entities(hass: HomeAssistant, entry_id: str, unique_id: str) -> Non
 
 
 def get_device_info(entry: ConfigEntry) -> DeviceInfo:
-    """Return device info to link an entity to its device.
+    """
+    Return device info to link an entity to its device.
 
     Returns only identifiers so HA matches the entity to the device
     without overwriting the manufacturer/model set during setup.
     """
-    if entry.unique_id is None:
-        msg = (
-            f"Config entry {entry.entry_id} has no unique_id. "
-            "This indicates a bug in the config flow."
-        )
-        raise ValueError(msg)
-
-    return DeviceInfo(identifiers={(DOMAIN, entry.unique_id)})
+    return DeviceInfo(identifiers={(DOMAIN, require_unique_id(entry))})
 
 
 class BraviaQuadAvailabilityMixin(Entity):

@@ -20,13 +20,14 @@ from .bravia_http_client import (
     LatestFirmwareInfo,
 )
 from .const import DOMAIN
-from .helpers import get_device_info
+from .helpers import get_device_info, require_unique_id
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+    from . import BraviaQuadData
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,8 +45,6 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Theatre firmware update entity."""
-    from . import BraviaQuadData
-
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
 
     async_add_entities(
@@ -149,11 +148,12 @@ class BraviaQuadFirmwareUpdate(UpdateEntity):
 
     async def async_install(
         self,
-        _version: str | None,
-        _backup: bool,  # noqa: FBT001
-        **_kwargs: Any,
+        version: str | None,
+        backup: bool,  # noqa: FBT001
+        **kwargs: Any,
     ) -> None:
         """Trigger the firmware update on the device."""
+        del version, backup, kwargs
         success = await self._http_client.async_request_firmware_update()
         if not success:
             raise HomeAssistantError(
@@ -217,7 +217,7 @@ class BraviaQuadFirmwareUpdate(UpdateEntity):
         """Update the device registry with the current firmware version."""
         device_registry = dr.async_get(self.hass)
         device = device_registry.async_get_device(
-            identifiers={(DOMAIN, self._entry.unique_id)}
+            identifiers={(DOMAIN, require_unique_id(self._entry))}
         )
         if device and device.sw_version != version:
             device_registry.async_update_device(device.id, sw_version=version)

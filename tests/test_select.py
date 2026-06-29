@@ -640,6 +640,7 @@ async def test_new_select_entities(
     """Test that new select entities are created."""
     for suffix in (
         "_hdmi_passthrough",
+        "_imax_mode",
         "_bt_connection_quality",
         "_hdmi_standby_link",
         "_audio_return_channel",
@@ -745,3 +746,62 @@ async def test_bt_connection_quality_select_option(
     mock_bravia_quad_client.async_set_bt_connection_quality.assert_called_once_with(
         "priorityconnection"
     )
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_imax_mode_select_shows_auto(
+    hass: HomeAssistant,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test IMAX mode select shows auto, not switch ON."""
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_imax_mode")
+    assert entity_id is not None
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "auto"
+    assert state.domain == "select"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_imax_mode_select_option_stable(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test selecting a stable IMAX mode updates state."""
+    mock_bravia_quad_client.async_get_imax_mode = AsyncMock(return_value="auto")
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_imax_mode")
+    assert entity_id is not None
+    await hass.services.async_call(
+        "select",
+        "select_option",
+        {"entity_id": entity_id, "option": "auto"},
+        blocking=True,
+    )
+    mock_bravia_quad_client.async_set_imax_mode.assert_called_once_with("auto")
+    assert hass.states.get(entity_id).state == "auto"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_imax_mode_select_option_reverts(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test IMAX mode stays auto when device rejects off."""
+    mock_bravia_quad_client.async_get_imax_mode = AsyncMock(return_value="auto")
+    mock_bravia_quad_client.async_set_imax_mode = AsyncMock(return_value=True)
+
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_imax_mode")
+    assert entity_id is not None
+
+    with pytest.raises(Exception, match="kept IMAX mode"):
+        await hass.services.async_call(
+            "select",
+            "select_option",
+            {"entity_id": entity_id, "option": "off"},
+            blocking=True,
+        )
+
+    assert hass.states.get(entity_id).state == "auto"
+    mock_bravia_quad_client.async_set_imax_mode.assert_called_once_with("off")

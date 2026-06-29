@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 
-from . import BraviaQuadData
 from .const import (
     AAV_OFF,
     AAV_ON,
@@ -25,7 +24,6 @@ from .const import (
     FEATURE_AUTO_UPDATE,
     FEATURE_EXTERNAL_CONTROL,
     FEATURE_HDMI_CEC,
-    FEATURE_IMAX_MODE,
     FEATURE_NET_BT_STANDBY,
     FEATURE_NIGHT_MODE,
     FEATURE_POWER,
@@ -34,8 +32,6 @@ from .const import (
     FEATURE_VOICE_ZOOM,
     HDMI_CEC_OFF,
     HDMI_CEC_ON,
-    IMAX_MODE_AUTO,
-    IMAX_MODE_OFF,
     NET_BT_STANDBY_OFF,
     NET_BT_STANDBY_ON,
     NIGHT_MODE_OFF,
@@ -56,6 +52,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+    from . import BraviaQuadData
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -83,7 +80,6 @@ async def async_setup_entry(
         BraviaQuadNightModeSwitch(client, entry),
         BraviaQuadAdvancedAutoVolumeSwitch(client, entry),
         BraviaQuadAutoUpdateSwitch(client, entry),
-        BraviaQuadImaxModeSwitch(client, entry),
         BraviaQuadNetBtStandbySwitch(client, entry),
         BraviaQuadVoiceZoomSwitch(client, entry),
         BraviaQuadExternalControlSwitch(client, entry),
@@ -482,61 +478,6 @@ class BraviaQuadAutoUpdateSwitch(BraviaQuadNotificationMixin, SwitchEntity):
             self._attr_is_on = value == AUTO_UPDATE_ON
         except (OSError, TimeoutError):
             _LOGGER.exception("Failed to update auto update state")
-
-
-class BraviaQuadImaxModeSwitch(BraviaQuadNotificationMixin, SwitchEntity):
-    """Representation of a Bravia Quad IMAX mode switch."""
-
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_has_entity_name = True
-    _attr_should_poll = False
-    _attr_translation_key = "imax_mode"
-    _notification_feature = FEATURE_IMAX_MODE
-
-    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
-        """Initialize the IMAX mode switch."""
-        self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_imax_mode"
-        self._attr_is_on = client.imax_mode == IMAX_MODE_AUTO
-        self._attr_device_info = get_device_info(entry)
-
-    async def _on_notification(self, value: str) -> None:
-        """Handle IMAX mode notification."""
-        self._attr_is_on = value == IMAX_MODE_AUTO
-        self.async_write_ha_state()
-
-    async def async_turn_on(self, **_kwargs: Any) -> None:
-        """Enable IMAX mode."""
-        success = await self._client.async_set_imax_mode(IMAX_MODE_AUTO)
-        if success:
-            await self._verify_state()
-        else:
-            _LOGGER.error("Failed to enable IMAX mode")
-
-    async def async_turn_off(self, **_kwargs: Any) -> None:
-        """Disable IMAX mode."""
-        success = await self._client.async_set_imax_mode(IMAX_MODE_OFF)
-        if success:
-            await self._verify_state()
-        else:
-            _LOGGER.error("Failed to disable IMAX mode")
-
-    async def _verify_state(self) -> None:
-        """Re-read state from device to verify SET was accepted."""
-        try:
-            value = await self._client.async_get_imax_mode()
-            self._attr_is_on = value == IMAX_MODE_AUTO
-        except (OSError, TimeoutError):
-            pass
-        self.async_write_ha_state()
-
-    async def async_update(self) -> None:
-        """Update IMAX mode state."""
-        try:
-            value = await self._client.async_get_imax_mode()
-            self._attr_is_on = value == IMAX_MODE_AUTO
-        except (OSError, TimeoutError):
-            _LOGGER.exception("Failed to update IMAX mode state")
 
 
 class BraviaQuadNetBtStandbySwitch(BraviaQuadNotificationMixin, SwitchEntity):

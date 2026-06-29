@@ -9,6 +9,12 @@ __pycache__
 .coverage
 .cursor
 .vscode
+
+# Local dev reports (device IPs, draft PR notes)
+docs/
+
+# Devcontainer auto-generated lock
+.devcontainer/devcontainer-lock.json
 !.vscode/tasks.json
 coverage.xml
 .ruff_cache

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
@@ -395,9 +395,7 @@ async def test_device_details_cache_prevents_redundant_calls(
     )
 
     # Call 7 times in rapid succession (simulating 7 sensor updates)
-    results = []
-    for _ in range(7):
-        results.append(await http_client.async_get_device_details())
+    results = [await http_client.async_get_device_details() for _ in range(7)]
 
     # All results should be identical
     for r in results:

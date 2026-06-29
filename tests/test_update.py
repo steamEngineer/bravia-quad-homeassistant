@@ -17,7 +17,6 @@ from custom_components.bravia_quad.bravia_http_client import (
     LatestFirmwareInfo,
     SystemInfo,
 )
-from custom_components.bravia_quad.const import DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant

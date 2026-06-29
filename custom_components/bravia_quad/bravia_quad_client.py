@@ -10,17 +10,11 @@ from typing import TYPE_CHECKING, Any
 
 from .const import (
     AAV_OFF,
-    AUDIO_RETURN_CHANNEL_OPTIONS,
     AUTO_STANDBY_OFF,
     AUTO_UPDATE_OFF,
-    AUTO_UPDATE_ON,
-    BT_CONNECTION_QUALITY_OPTIONS,
     CMD_ID_INITIAL,
     CMD_ID_MAX,
     DEFAULT_PORT,
-    DUAL_MONO_OPTIONS,
-    EXTERNAL_CONTROL_OFF,
-    EXTERNAL_CONTROL_ON,
     FEATURE_360SSM,
     FEATURE_AAV,
     FEATURE_AUDIO_RETURN_CHANNEL,
@@ -62,10 +56,7 @@ from .const import (
     FEATURE_VOICE_ZOOM_LEVEL,
     FEATURE_VOLUME,
     HDMI_CEC_OFF,
-    HDMI_PASSTHROUGH_OPTIONS,
-    HDMI_STANDBY_LINK_OPTIONS,
     IMAX_MODE_AUTO,
-    IMAX_MODE_OFF,
     MAX_AV_SYNC,
     MAX_BASS_LEVEL,
     MAX_BASS_LEVEL_NO_SUB,
@@ -77,8 +68,6 @@ from .const import (
     MIN_REAR_LEVEL,
     MIN_VOLUME,
     MUTE_OFF,
-    NET_BT_STANDBY_OFF,
-    NET_BT_STANDBY_ON,
     NIGHT_MODE_OFF,
     POWER_OFF,
     POWER_ON,
@@ -88,7 +77,6 @@ from .const import (
     TCP_TIMEOUT,
     VOICE_ENHANCER_OFF,
     VOICE_ZOOM_OFF,
-    VOICE_ZOOM_ON,
 )
 
 if TYPE_CHECKING:
@@ -139,7 +127,7 @@ class BraviaQuadClient:
         self._model_type: str | None = None
         self._manufacturer: str | None = None
         self._auto_update = AUTO_UPDATE_OFF
-        self._imax_mode = IMAX_MODE_OFF
+        self._imax_mode = IMAX_MODE_AUTO
         self._voice_zoom = VOICE_ZOOM_OFF
 
     async def async_connect(self) -> None:
@@ -784,7 +772,8 @@ class BraviaQuadClient:
         self._listener_task = asyncio.create_task(self._connection_manager())
 
     async def _connection_manager(self) -> None:
-        """Manage the notification loop lifecycle with auto-reconnect.
+        """
+        Manage the notification loop lifecycle with auto-reconnect.
 
         Starts the read loop, waits for it to exit (on disconnect),
         reconnects, then starts a fresh loop. State fetch and
@@ -818,7 +807,8 @@ class BraviaQuadClient:
             raise
 
     async def _notification_loop(self) -> None:
-        """Read and dispatch messages from the device.
+        """
+        Read and dispatch messages from the device.
 
         Exits on any connection error so the connection manager
         can reconnect.
@@ -826,28 +816,25 @@ class BraviaQuadClient:
         _LOGGER.info("Starting notification listener")
         buffer = ""
 
-        try:
-            while self._connected and self._reader:
-                try:
-                    data = await asyncio.wait_for(self._reader.read(8192), timeout=1.0)
+        while self._connected and self._reader:
+            try:
+                data = await asyncio.wait_for(self._reader.read(8192), timeout=1.0)
 
-                    if not data:
-                        _LOGGER.warning("Connection closed by device (EOF)")
-                        break
-
-                    buffer += data.decode("utf-8", errors="replace")
-                    buffer = buffer.strip()
-                    if buffer:
-                        messages, buffer = self._decode_json_stream(buffer)
-                        for message in messages:
-                            await self._process_incoming_message(message)
-                except TimeoutError:
-                    continue
-                except OSError:
-                    _LOGGER.warning("Connection error in notification listener")
+                if not data:
+                    _LOGGER.warning("Connection closed by device (EOF)")
                     break
-        except asyncio.CancelledError:
-            raise
+
+                buffer += data.decode("utf-8", errors="replace")
+                buffer = buffer.strip()
+                if buffer:
+                    messages, buffer = self._decode_json_stream(buffer)
+                    for message in messages:
+                        await self._process_incoming_message(message)
+            except TimeoutError:
+                continue
+            except OSError:
+                _LOGGER.warning("Connection error in notification listener")
+                break
 
         await self._async_mark_disconnected()
 
@@ -1057,7 +1044,8 @@ class BraviaQuadClient:
         return self._command_id_counter
 
     def _decode_json_stream(self, data: str) -> tuple[list[dict[str, Any]], str]:
-        """Decode JSON objects from a buffer, returning unparsed remainder.
+        """
+        Decode JSON objects from a buffer, returning unparsed remainder.
 
         The device sends concatenated JSON objects with no delimiter.
         A single TCP read may split an object mid-byte. This method

@@ -387,7 +387,7 @@ async def test_new_switch_entities(
 ) -> None:
     """Test that new switch entities are created."""
     # Enabled by default
-    for suffix in ("_auto_update", "_imax_mode", "_net_bt_standby"):
+    for suffix in ("_auto_update", "_net_bt_standby"):
         entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
         assert entity_id is not None, f"Entity with suffix {suffix} not found"
         state = hass.states.get(entity_id)
@@ -431,22 +431,6 @@ async def test_auto_update_switch_turn_off(
         SWITCH_DOMAIN, SERVICE_TURN_OFF, {ATTR_ENTITY_ID: entity_id}, blocking=True
     )
     mock_bravia_quad_client.async_set_auto_update.assert_called_once_with("off")
-
-
-@pytest.mark.usefixtures("init_integration")
-async def test_imax_mode_switch_turn_on(
-    hass: HomeAssistant,
-    mock_bravia_quad_client: MagicMock,
-    entity_registry: er.EntityRegistry,
-) -> None:
-    """Test turning on IMAX mode switch."""
-    mock_bravia_quad_client.async_get_imax_mode = AsyncMock(return_value="auto")
-    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_imax_mode")
-    assert entity_id is not None
-    await hass.services.async_call(
-        SWITCH_DOMAIN, SERVICE_TURN_ON, {ATTR_ENTITY_ID: entity_id}, blocking=True
-    )
-    mock_bravia_quad_client.async_set_imax_mode.assert_called_once_with("auto")
 
 
 @pytest.mark.usefixtures("init_integration")
