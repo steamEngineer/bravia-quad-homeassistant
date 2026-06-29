@@ -8,27 +8,82 @@ on:
     branches:
       - "main"
 
-permissions: {}
+permissions:
+  contents: read
+  pull-requests: read
 
 jobs:
-  pytest:
-    name: 🧪 pytest
-    runs-on: "ubuntu-latest"
-
+  changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v7.0.0
 
+      - name: Detect code paths
+        uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # Keep filters in sync with .github/workflows/ci-changes.yml
+          filters: |
+            code:
+              - 'custom_components/**'
+              - 'tests/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - '.python-version'
+              - '.ruff.toml'
+              - '.pre-commit-config.yaml'
+              - '.github/workflows/tests.yml'
+              - '.github/workflows/lint.yml'
+              - '.github/workflows/ci-changes.yml'
+
+  pytest:
+    name: 🧪 pytest
+    runs-on: "ubuntu-latest"
+    needs: [changes]
+    if: >-
+      always() &&
+      !cancelled() &&
+      (github.event_name == 'push' || needs.changes.result != 'failure')
+
+    steps:
+      - name: Skip pytest (no code changes)
+        if: >-
+          github.event_name == 'pull_request' &&
+          needs.changes.outputs.code != 'true'
+        run: echo "No testable paths changed; pytest skipped."
+
+      - name: Checkout the repository
+        if: >-
+          github.event_name == 'push' ||
+          needs.changes.outputs.code == 'true'
+        uses: actions/checkout@v7.0.0
+
       - name: Install uv
+        if: >-
+          github.event_name == 'push' ||
+          needs.changes.outputs.code == 'true'
         uses: astral-sh/setup-uv@v8.2.0
         with:
           enable-cache: true
 
       - name: Set up Python
+        if: >-
+          github.event_name == 'push' ||
+          needs.changes.outputs.code == 'true'
         run: uv python install 3.14.2
 
       - name: Install dependencies
+        if: >-
+          github.event_name == 'push' ||
+          needs.changes.outputs.code == 'true'
         run: uv sync --dev
 
       - name: Run tests
+        if: >-
+          github.event_name == 'push' ||
+          needs.changes.outputs.code == 'true'
         run: uv run pytest tests/ -v --tb=short
