@@ -1,0 +1,107 @@
+---
+name: PR Label Apply
+
+# Each PR must carry exactly one of the labels release-drafter knows how
+# to slot into a section. We derive that label from the "Types of changes"
+# checkbox in the PR template and apply it automatically — most external
+# contributors can't label their own PRs. The job fails when zero or more
+# than one checkbox is ticked.
+
+# yamllint disable-line rule:truthy
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - labeled
+      - unlabeled
+      - reopened
+      - ready_for_review
+    branches:
+      - main
+
+permissions:
+  pull-requests: write
+
+jobs:
+  apply_label:
+    name: Apply
+    runs-on: ubuntu-latest
+    # GitHub-typed bots (Dependabot, etc.) don't follow the PR template
+    # and apply their own labels — skip them outright.
+    if: github.event.pull_request.user.type != 'Bot'
+    steps:
+      - name: 🏷 Apply label from PR description checkbox
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+        with:
+          script: |
+            const known = [
+              'breaking-change', 'bugfix', 'refactor',
+              'new-feature', 'enhancement',
+              'maintenance', 'ci', 'dependencies', 'documentation',
+              'skip-changelog',
+            ];
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const current = (context.payload.pull_request.labels || [])
+              .map(l => l.name);
+
+            // If the PR already carries exactly one known-set label
+            // (e.g. applied by tooling that doesn't use the PR template),
+            // trust it and exit. Zero or 2+ known labels still fall through
+            // to the checkbox-driven path so a stray manual label can't hide
+            // a missing template tick.
+            const alreadyLabelled = current.filter(n => known.includes(n));
+            if (alreadyLabelled.length === 1) {
+              core.info(
+                `Skipping: PR already labelled '${alreadyLabelled[0]}'.`
+              );
+              return;
+            }
+
+            // Match a ticked checkbox bullet whose line ends with a
+            // backticked label, e.g.  - [x] CI / workflow change — `ci`
+            const body = context.payload.pull_request.body || '';
+            const re = /^\s*-\s*\[x\][^`\n]*`([^`]+)`/gim;
+            const ticked = [];
+            for (const m of body.matchAll(re)) {
+              const name = m[1];
+              if (known.includes(name) && !ticked.includes(name)) {
+                ticked.push(name);
+              }
+            }
+
+            if (ticked.length === 0) {
+              core.setFailed(
+                'No "Types of changes" checkbox is ticked in the PR ' +
+                'description. Edit the description and tick exactly ' +
+                'one box so this PR can be release-noted.'
+              );
+              return;
+            }
+            if (ticked.length > 1) {
+              core.setFailed(
+                `Multiple "Types of changes" checkboxes are ticked ` +
+                `(${ticked.join(', ')}). Tick exactly one.`
+              );
+              return;
+            }
+
+            const desired = ticked[0];
+
+            // Strip stale labels from the known set when the contributor
+            // changes their mind in the description.
+            for (const name of current) {
+              if (known.includes(name) && name !== desired) {
+                await github.rest.issues.removeLabel({
+                  owner, repo, issue_number, name,
+                }).catch(() => {});
+              }
+            }
+            if (!current.includes(desired)) {
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number, labels: [desired],
+              });
+            }
