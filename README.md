@@ -502,7 +502,7 @@ s.close()
 
 ## Contributing
 
-Contributions are welcome! Open a pull request against `main` and complete [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) (change type and test plan).
+Contributions are welcome! Open a pull request against `main` and complete [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) (change type and test plan). Python CI runs only when PRs touch integration code or tests.
 
 ### Development Guidelines
 
