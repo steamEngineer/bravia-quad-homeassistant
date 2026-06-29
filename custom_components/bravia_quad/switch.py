@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError
 
 from .const import (
     AAV_OFF,
@@ -45,7 +46,7 @@ from .const import (
     VOICE_ZOOM_OFF,
     VOICE_ZOOM_ON,
 )
-from .helpers import BraviaQuadNotificationMixin, get_device_info
+from .helpers import BraviaQuadNotificationMixin, get_device_info, verify_feature_value
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -448,27 +449,54 @@ class BraviaQuadAutoUpdateSwitch(BraviaQuadNotificationMixin, SwitchEntity):
 
     async def async_turn_on(self, **_kwargs: Any) -> None:
         """Enable auto update."""
-        success = await self._client.async_set_auto_update(AUTO_UPDATE_ON)
-        if success:
-            await self._verify_state()
-        else:
+        requested = AUTO_UPDATE_ON
+        if not await self._client.async_set_auto_update(requested):
             _LOGGER.error("Failed to enable auto update")
+            return
+        try:
+            actual = await self._client.async_get_auto_update()
+        except (OSError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="verify_read_failed",
+                translation_placeholders={
+                    "feature": "auto update",
+                    "requested": requested,
+                },
+            ) from err
+        self._attr_is_on = actual == AUTO_UPDATE_ON
+        verify_feature_value(
+            requested=requested,
+            actual=actual,
+            valid_values={AUTO_UPDATE_ON, AUTO_UPDATE_OFF},
+            feature_label="auto update",
+        )
+        self.async_write_ha_state()
 
     async def async_turn_off(self, **_kwargs: Any) -> None:
         """Disable auto update."""
-        success = await self._client.async_set_auto_update(AUTO_UPDATE_OFF)
-        if success:
-            await self._verify_state()
-        else:
+        requested = AUTO_UPDATE_OFF
+        if not await self._client.async_set_auto_update(requested):
             _LOGGER.error("Failed to disable auto update")
-
-    async def _verify_state(self) -> None:
-        """Re-read state from device to verify SET was accepted."""
+            return
         try:
-            value = await self._client.async_get_auto_update()
-            self._attr_is_on = value == AUTO_UPDATE_ON
-        except (OSError, TimeoutError):
-            pass
+            actual = await self._client.async_get_auto_update()
+        except (OSError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="verify_read_failed",
+                translation_placeholders={
+                    "feature": "auto update",
+                    "requested": requested,
+                },
+            ) from err
+        self._attr_is_on = actual == AUTO_UPDATE_ON
+        verify_feature_value(
+            requested=requested,
+            actual=actual,
+            valid_values={AUTO_UPDATE_ON, AUTO_UPDATE_OFF},
+            feature_label="auto update",
+        )
         self.async_write_ha_state()
 
     async def async_update(self) -> None:
@@ -503,27 +531,54 @@ class BraviaQuadNetBtStandbySwitch(BraviaQuadNotificationMixin, SwitchEntity):
 
     async def async_turn_on(self, **_kwargs: Any) -> None:
         """Enable network/Bluetooth standby."""
-        success = await self._client.async_set_net_bt_standby(NET_BT_STANDBY_ON)
-        if success:
-            await self._verify_state()
-        else:
+        requested = NET_BT_STANDBY_ON
+        if not await self._client.async_set_net_bt_standby(requested):
             _LOGGER.error("Failed to enable network/Bluetooth standby")
+            return
+        try:
+            actual = await self._client.async_get_net_bt_standby()
+        except (OSError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="verify_read_failed",
+                translation_placeholders={
+                    "feature": "network/Bluetooth standby",
+                    "requested": requested,
+                },
+            ) from err
+        self._attr_is_on = actual == NET_BT_STANDBY_ON
+        verify_feature_value(
+            requested=requested,
+            actual=actual,
+            valid_values={NET_BT_STANDBY_ON, NET_BT_STANDBY_OFF},
+            feature_label="network/Bluetooth standby",
+        )
+        self.async_write_ha_state()
 
     async def async_turn_off(self, **_kwargs: Any) -> None:
         """Disable network/Bluetooth standby."""
-        success = await self._client.async_set_net_bt_standby(NET_BT_STANDBY_OFF)
-        if success:
-            await self._verify_state()
-        else:
+        requested = NET_BT_STANDBY_OFF
+        if not await self._client.async_set_net_bt_standby(requested):
             _LOGGER.error("Failed to disable network/Bluetooth standby")
-
-    async def _verify_state(self) -> None:
-        """Re-read state from device to verify SET was accepted."""
+            return
         try:
-            value = await self._client.async_get_net_bt_standby()
-            self._attr_is_on = value == NET_BT_STANDBY_ON
-        except (OSError, TimeoutError):
-            pass
+            actual = await self._client.async_get_net_bt_standby()
+        except (OSError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="verify_read_failed",
+                translation_placeholders={
+                    "feature": "network/Bluetooth standby",
+                    "requested": requested,
+                },
+            ) from err
+        self._attr_is_on = actual == NET_BT_STANDBY_ON
+        verify_feature_value(
+            requested=requested,
+            actual=actual,
+            valid_values={NET_BT_STANDBY_ON, NET_BT_STANDBY_OFF},
+            feature_label="network/Bluetooth standby",
+        )
         self.async_write_ha_state()
 
     async def async_update(self) -> None:
@@ -615,27 +670,54 @@ class BraviaQuadExternalControlSwitch(BraviaQuadNotificationMixin, SwitchEntity)
 
     async def async_turn_on(self, **_kwargs: Any) -> None:
         """Enable external control."""
-        success = await self._client.async_set_external_control(EXTERNAL_CONTROL_ON)
-        if success:
-            await self._verify_state()
-        else:
+        requested = EXTERNAL_CONTROL_ON
+        if not await self._client.async_set_external_control(requested):
             _LOGGER.error("Failed to enable external control")
+            return
+        try:
+            actual = await self._client.async_get_external_control()
+        except (OSError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="verify_read_failed",
+                translation_placeholders={
+                    "feature": "external control",
+                    "requested": requested,
+                },
+            ) from err
+        self._attr_is_on = actual == EXTERNAL_CONTROL_ON
+        verify_feature_value(
+            requested=requested,
+            actual=actual,
+            valid_values={EXTERNAL_CONTROL_ON, EXTERNAL_CONTROL_OFF},
+            feature_label="external control",
+        )
+        self.async_write_ha_state()
 
     async def async_turn_off(self, **_kwargs: Any) -> None:
         """Disable external control."""
-        success = await self._client.async_set_external_control(EXTERNAL_CONTROL_OFF)
-        if success:
-            await self._verify_state()
-        else:
+        requested = EXTERNAL_CONTROL_OFF
+        if not await self._client.async_set_external_control(requested):
             _LOGGER.error("Failed to disable external control")
-
-    async def _verify_state(self) -> None:
-        """Re-read state from device to verify SET was accepted."""
+            return
         try:
-            value = await self._client.async_get_external_control()
-            self._attr_is_on = value == EXTERNAL_CONTROL_ON
-        except (OSError, TimeoutError):
-            pass
+            actual = await self._client.async_get_external_control()
+        except (OSError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="verify_read_failed",
+                translation_placeholders={
+                    "feature": "external control",
+                    "requested": requested,
+                },
+            ) from err
+        self._attr_is_on = actual == EXTERNAL_CONTROL_ON
+        verify_feature_value(
+            requested=requested,
+            actual=actual,
+            valid_values={EXTERNAL_CONTROL_ON, EXTERNAL_CONTROL_OFF},
+            feature_label="external control",
+        )
         self.async_write_ha_state()
 
     async def async_update(self) -> None:

@@ -674,3 +674,27 @@ async def test_av_sync_set_value(
         blocking=True,
     )
     mock_bravia_quad_client.async_set_av_sync.assert_called_once_with(100)
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_av_sync_set_value_reverts(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test AV sync stays at 0 when device rejects non-zero value."""
+    mock_bravia_quad_client.async_get_av_sync = AsyncMock(return_value=0)
+    mock_bravia_quad_client.async_set_av_sync = AsyncMock(return_value=True)
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_av_sync")
+    assert entity_id is not None
+
+    with pytest.raises(Exception, match="kept AV sync"):
+        await hass.services.async_call(
+            "number",
+            "set_value",
+            {"entity_id": entity_id, "value": 10},
+            blocking=True,
+        )
+
+    assert hass.states.get(entity_id).state == "0"
+    mock_bravia_quad_client.async_set_av_sync.assert_called_once_with(10)
