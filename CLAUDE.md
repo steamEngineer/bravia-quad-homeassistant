@@ -7,7 +7,7 @@
 ## Branching and PRs
 
 - All PRs target `main`.
-- Fill in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md); tick exactly one change type (CI applies the matching label automatically).
+- Fill in [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md); tick exactly one change type (CI applies the matching label automatically via the **PR Label Apply** workflow).
 - PR title: functional description of the change. Do not use conventional commit prefixes such as `feat:`, `fix:`, or `chore:` — labels categorize PRs, not the title.
 - PR body: include a test plan; device-facing changes should note live Quad smoke testing when applicable.
 
