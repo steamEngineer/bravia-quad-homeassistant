@@ -44,7 +44,7 @@ def _setup_client_identity(client: AsyncMock) -> None:
     client.async_get_device_name = AsyncMock(return_value=TEST_DEVICE_NAME)
 
 
-async def test_user_flow_success(hass: HomeAssistant) -> None:
+async def test_user_flow_success(hass: HomeAssistant, mock_setup_entry: None) -> None:
     """Test successful user flow with confirmation step."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -105,7 +105,9 @@ async def test_user_flow_success(hass: HomeAssistant) -> None:
     assert result["result"].unique_id == TEST_SERIAL
 
 
-async def test_user_flow_success_no_subwoofer(hass: HomeAssistant) -> None:
+async def test_user_flow_success_no_subwoofer(
+    hass: HomeAssistant, mock_setup_entry: None
+) -> None:
     """Test successful user flow without subwoofer."""
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -314,7 +316,7 @@ async def test_user_flow_unknown_error(hass: HomeAssistant) -> None:
     assert result["errors"] == {"base": "unknown"}
 
 
-async def test_zeroconf_discovery(hass: HomeAssistant) -> None:
+async def test_zeroconf_discovery(hass: HomeAssistant, mock_setup_entry: None) -> None:
     """Test zeroconf discovery creates entry with MAC-based unique_id."""
     discovery_info = ZeroconfServiceInfo(
         ip_address=make_ip_address(TEST_HOST),
@@ -365,7 +367,9 @@ async def test_zeroconf_discovery(hass: HomeAssistant) -> None:
     assert result["result"].unique_id == TEST_SERIAL
 
 
-async def test_zeroconf_discovery_without_deviceid(hass: HomeAssistant) -> None:
+async def test_zeroconf_discovery_without_deviceid(
+    hass: HomeAssistant, mock_setup_entry: None
+) -> None:
     """Test zeroconf discovery uses IP-based unique_id when deviceid is missing."""
     discovery_info = ZeroconfServiceInfo(
         ip_address=make_ip_address(TEST_HOST),
@@ -576,6 +580,7 @@ async def test_zeroconf_confirm_unknown_error(hass: HomeAssistant) -> None:
 async def test_reauth_flow_success(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
+    mock_setup_entry: None,
 ) -> None:
     """Test successful reauth flow updates host."""
     mock_config_entry.add_to_hass(hass)
