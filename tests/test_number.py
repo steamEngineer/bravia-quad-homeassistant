@@ -57,7 +57,7 @@ async def test_number_entities(
         assert state is None, f"Expected {suffix} to be disabled"
 
 
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_volume")
 async def test_volume_number_set_value(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -167,7 +167,7 @@ async def test_volume_step_interval_number_set_value(
     assert state.state == "500.0"
 
 
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_volume")
 async def test_volume_step_interval_logic(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -216,7 +216,7 @@ async def test_volume_step_interval_logic(
     mock_bravia_quad_client.async_set_volume.assert_any_call(52)
 
 
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_volume")
 async def test_volume_step_interval_race_condition(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -250,34 +250,37 @@ async def test_volume_step_interval_race_condition(
 
     mock_bravia_quad_client.async_set_volume.side_effect = mock_set_volume
 
-    # Start first transition
-    await hass.services.async_call(
-        NUMBER_DOMAIN,
-        "set_value",
-        {ATTR_ENTITY_ID: volume_id, "value": 60},
-        blocking=True,
-    )
-    await asyncio.sleep(0.02)
+    with patch(
+        "custom_components.bravia_quad.helpers.asyncio.sleep", new_callable=AsyncMock
+    ):
+        # Start first transition
+        await hass.services.async_call(
+            NUMBER_DOMAIN,
+            "set_value",
+            {ATTR_ENTITY_ID: volume_id, "value": 60},
+            blocking=True,
+        )
+        await asyncio.sleep(0.02)
 
-    # Start second transition immediately
-    await hass.services.async_call(
-        NUMBER_DOMAIN,
-        "set_value",
-        {ATTR_ENTITY_ID: volume_id, "value": 70},
-        blocking=True,
-    )
-    await asyncio.sleep(0.02)
+        # Start second transition immediately
+        await hass.services.async_call(
+            NUMBER_DOMAIN,
+            "set_value",
+            {ATTR_ENTITY_ID: volume_id, "value": 70},
+            blocking=True,
+        )
+        await asyncio.sleep(0.02)
 
-    # Start third transition
-    await hass.services.async_call(
-        NUMBER_DOMAIN,
-        "set_value",
-        {ATTR_ENTITY_ID: volume_id, "value": 80},
-        blocking=True,
-    )
+        # Start third transition
+        await hass.services.async_call(
+            NUMBER_DOMAIN,
+            "set_value",
+            {ATTR_ENTITY_ID: volume_id, "value": 80},
+            blocking=True,
+        )
 
-    # Wait for all transitions to complete
-    await hass.async_block_till_done()
+        # Wait for all transitions to complete
+        await hass.async_block_till_done()
 
     assert max_active_transitions == 1
 
@@ -307,7 +310,7 @@ async def test_bass_level_not_created_without_subwoofer(
     assert entity_id is None
 
 
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_volume")
 async def test_volume_step_interval_cancellation_on_remove(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -373,7 +376,7 @@ async def test_volume_step_interval_cancellation_on_remove(
     assert cancelled is True
 
 
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_volume")
 async def test_volume_slider_does_not_update_during_transition(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -454,7 +457,7 @@ async def test_volume_slider_does_not_update_during_transition(
     assert state.state == "55"
 
 
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_volume")
 async def test_volume_transition_sets_target_immediately(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -490,25 +493,28 @@ async def test_volume_transition_sets_target_immediately(
     assert state is not None
     assert state.state == "50"
 
-    # Start transition to 60
-    await hass.services.async_call(
-        NUMBER_DOMAIN,
-        "set_value",
-        {ATTR_ENTITY_ID: volume_id, "value": 60},
-        blocking=True,
-    )
+    with patch(
+        "custom_components.bravia_quad.helpers.asyncio.sleep", new_callable=AsyncMock
+    ):
+        # Start transition to 60
+        await hass.services.async_call(
+            NUMBER_DOMAIN,
+            "set_value",
+            {ATTR_ENTITY_ID: volume_id, "value": 60},
+            blocking=True,
+        )
 
-    # State should immediately be 60 (the target), not 50
-    state = hass.states.get(volume_id)
-    assert state is not None
-    assert state.state == "60"
+        # State should immediately be 60 (the target), not 50
+        state = hass.states.get(volume_id)
+        assert state is not None
+        assert state.state == "60"
 
-    # Unblock and cleanup
-    volume_blocked.set()
-    await hass.async_block_till_done()
+        # Unblock and cleanup
+        volume_blocked.set()
+        await hass.async_block_till_done()
 
 
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_volume")
 async def test_volume_transition_flag_reset_on_cancel(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -584,7 +590,7 @@ async def test_volume_transition_flag_reset_on_cancel(
     await hass.async_block_till_done()
 
 
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_volume")
 async def test_volume_notification_accepted_after_transition(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,

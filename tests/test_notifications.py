@@ -22,7 +22,10 @@ from custom_components.bravia_quad.const import (
     FEATURE_VOLUME,
 )
 
-from .conftest import get_entity_id_by_unique_id_suffix
+from .conftest import (
+    _setup_integration_with_suffixes_enabled,
+    get_entity_id_by_unique_id_suffix,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -103,12 +106,18 @@ SELECT_TEST_CASES = [
     SelectTestCase("_drc", FEATURE_DRC, ["on", "off", "auto"]),
 ]
 
+NOTIFICATION_ENTITY_SUFFIXES = [
+    *(tc.entity_suffix for tc in SWITCH_TEST_CASES),
+    *(tc.entity_suffix for tc in NUMBER_TEST_CASES),
+    *(tc.entity_suffix for tc in SELECT_TEST_CASES),
+]
+
 
 def _get_registered_callback(mock_client: MagicMock, feature: str) -> Callable | None:
     """Get the callback registered for a specific feature.
 
     Returns the last registered callback for the feature, which is important
-    when init_integration_all reloads the integration after enabling entities.
+    when init_integration_notifications reloads the integration after enabling entities.
     """
     callback = None
     for call_args in mock_client.register_notification_callback.call_args_list:
@@ -123,7 +132,24 @@ def platforms() -> list[Platform]:
     return [Platform.MEDIA_PLAYER, Platform.NUMBER, Platform.SELECT, Platform.SWITCH]
 
 
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.fixture
+async def init_integration_notifications(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_bravia_quad_client: MagicMock,
+    mock_bravia_http_client: MagicMock,
+    platforms: list[Platform],
+) -> MockConfigEntry:
+    """Set up the integration with notification test entities enabled."""
+    return await _setup_integration_with_suffixes_enabled(
+        hass,
+        mock_config_entry,
+        platforms,
+        NOTIFICATION_ENTITY_SUFFIXES,
+    )
+
+
+@pytest.mark.usefixtures("init_integration_notifications")
 async def test_callbacks_registered_on_setup(
     mock_bravia_quad_client: MagicMock,
 ) -> None:
@@ -139,7 +165,7 @@ async def test_callbacks_registered_on_setup(
         assert feature in registered_features, f"Feature {feature} not registered"
 
 
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_notifications")
 async def test_callbacks_unregistered_on_unload(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -173,7 +199,7 @@ async def test_callbacks_unregistered_on_unload(
     SWITCH_TEST_CASES,
     ids=[tc.entity_suffix.lstrip("_") for tc in SWITCH_TEST_CASES],
 )
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_notifications")
 async def test_switch_notification_updates_state(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -226,7 +252,7 @@ def _get_entity_id_by_unique_id_suffix_and_platform(
     NUMBER_TEST_CASES,
     ids=[tc.entity_suffix.lstrip("_") for tc in NUMBER_TEST_CASES],
 )
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_notifications")
 async def test_number_notification_updates_state(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
@@ -262,7 +288,7 @@ async def test_number_notification_updates_state(
     SELECT_TEST_CASES,
     ids=[tc.entity_suffix.lstrip("_") for tc in SELECT_TEST_CASES],
 )
-@pytest.mark.usefixtures("init_integration_all")
+@pytest.mark.usefixtures("init_integration_notifications")
 async def test_select_notification_updates_state(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
