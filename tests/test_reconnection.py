@@ -10,6 +10,10 @@ import pytest
 from homeassistant.const import STATE_UNAVAILABLE, Platform
 
 from custom_components.bravia_quad.bravia_quad_client import BraviaQuadClient
+from custom_components.bravia_quad.const import (
+    RECONNECT_INITIAL_DELAY,
+    RECONNECT_MAX_DELAY,
+)
 
 from .conftest import get_entity_id_by_unique_id_suffix
 
@@ -149,11 +153,6 @@ class TestClientReconnection:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         """Test that reconnect uses exponential backoff."""
-        from custom_components.bravia_quad.const import (
-            RECONNECT_INITIAL_DELAY,
-            RECONNECT_MAX_DELAY,
-        )
-
         client = BraviaQuadClient("192.168.1.100", "Test")
 
         sleep_delays: list[float] = []
@@ -167,7 +166,8 @@ class TestClientReconnection:
             nonlocal connect_attempts
             connect_attempts += 1
             if connect_attempts <= max_attempts:
-                raise ConnectionError("refused")
+                msg = "refused"
+                raise ConnectionError(msg)
             client._connected = True
 
         monkeypatch.setattr(asyncio, "sleep", _fake_sleep)

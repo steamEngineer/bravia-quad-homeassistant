@@ -14,7 +14,6 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.const import EntityCategory, UnitOfTemperature
 
-from . import BraviaQuadData
 from .bravia_http_client import DeviceDetails
 from .const import (
     DOMAIN,
@@ -38,6 +37,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+    from . import BraviaQuadData
     from .bravia_http_client import BraviaHttpClient
     from .bravia_quad_client import BraviaQuadClient
 
@@ -190,8 +190,8 @@ def _parse_temperature(value: str | None) -> float | None:
     if not value:
         return None
     try:
-        for part in value.split(","):
-            part = part.strip()
+        for raw_part in value.split(","):
+            part = raw_part.strip()
             if part.startswith("C:"):
                 return float(part[2:])
     except (ValueError, IndexError):

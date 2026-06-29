@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock
 
 import pytest
 from homeassistant.const import Platform
@@ -15,6 +14,8 @@ from custom_components.bravia_quad.bravia_http_client import DeviceDetails
 from .conftest import get_entity_id_by_unique_id_suffix
 
 if TYPE_CHECKING:
+    from unittest.mock import MagicMock
+
     from homeassistant.core import HomeAssistant
 
 

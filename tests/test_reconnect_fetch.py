@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import json
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -100,10 +102,8 @@ async def test_fetch_is_not_awaited_during_reconnect(
 
     for t in list(client._background_tasks):
         t.cancel()
-        try:
+        with contextlib.suppress(asyncio.CancelledError):
             await t
-        except asyncio.CancelledError:
-            pass
 
 
 async def test_split_message_not_lost(
@@ -117,7 +117,7 @@ async def test_split_message_not_lost(
 
     reads = iter([chunk1, chunk2, b""])
     reader = AsyncMock()
-    reader.read = AsyncMock(side_effect=lambda n: next(reads))
+    reader.read = AsyncMock(side_effect=lambda _n: next(reads))
 
     client._connected = True
     client._reader = reader
@@ -143,10 +143,8 @@ async def test_burst_split_across_reads_no_messages_lost(
     client: BraviaQuadClient,
 ) -> None:
     """A burst of messages split at arbitrary byte boundaries loses nothing."""
-    import json as json_mod
-
     messages = [
-        json_mod.dumps({"feature": f"test.{i}", "type": "notify", "value": str(i)})
+        json.dumps({"feature": f"test.{i}", "type": "notify", "value": str(i)})
         for i in range(20)
     ]
     full_stream = "".join(messages)
@@ -160,7 +158,7 @@ async def test_burst_split_across_reads_no_messages_lost(
 
     reads = iter(chunks)
     reader = AsyncMock()
-    reader.read = AsyncMock(side_effect=lambda n: next(reads))
+    reader.read = AsyncMock(side_effect=lambda _n: next(reads))
 
     client._connected = True
     client._reader = reader

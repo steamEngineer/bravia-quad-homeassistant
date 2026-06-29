@@ -12,7 +12,6 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
 )
 
-from . import BraviaQuadData
 from .const import (
     DOMAIN,
     FEATURE_INPUT,
@@ -33,6 +32,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+    from . import BraviaQuadData
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)

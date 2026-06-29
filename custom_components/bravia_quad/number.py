@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.number import NumberEntity, NumberMode, RestoreNumber
 from homeassistant.const import EntityCategory
 
-from . import BraviaQuadData
 from .const import (
     CONF_HAS_SUBWOOFER,
     DOMAIN,
@@ -33,6 +32,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+    from . import BraviaQuadData
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)

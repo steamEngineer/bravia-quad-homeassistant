@@ -11,7 +11,6 @@ from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 
-from . import BraviaQuadData
 from .const import CONF_HAS_SUBWOOFER, DOMAIN
 from .helpers import BraviaQuadAvailabilityMixin, get_device_info
 
@@ -20,6 +19,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+    from . import BraviaQuadData
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)

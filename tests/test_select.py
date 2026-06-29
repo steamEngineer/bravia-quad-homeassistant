@@ -601,6 +601,7 @@ async def test_bass_level_subwoofer_detection_triggers_reload(
     hass: HomeAssistant,
     mock_config_entry_no_subwoofer: MockConfigEntry,
     mock_bravia_quad_client: MagicMock,
+    mock_bravia_http_client: MagicMock,
 ) -> None:
     """Test bass level value outside 0-2 triggers subwoofer detection reload."""
     mock_config_entry_no_subwoofer.add_to_hass(hass)
