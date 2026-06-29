@@ -9,15 +9,15 @@
 ## Types of changes
 
 <!--
-Tick exactly one box. CI (.github/workflows/pr-labels.yaml) derives
-the label from the ticked box and applies it automatically; release
-drafter uses that label to slot this change into the changelog.
+Tick exactly one box. CI (.github/workflows/pr-labels.yaml) applies the
+GitHub label shown in backticks; release drafter uses that label in the
+changelog. Label names match .github/labels.yml descriptions.
 -->
 
-- [ ] Bugfix (non-breaking change which fixes an issue) — `bugfix`
-- [ ] New feature (non-breaking change which adds functionality) — `new-feature`
+- [ ] Bugfix — `bugfix`
+- [ ] New feature — `new-feature`
 - [ ] Enhancement to an existing feature — `enhancement`
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected) — `breaking-change`
+- [ ] Breaking change — `breaking-change`
 - [ ] Refactor (no behaviour change) — `refactor`
 - [ ] Documentation only — `documentation`
 - [ ] Maintenance / chore — `maintenance`

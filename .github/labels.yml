@@ -1,76 +1,82 @@
 ---
-# Labels for the repository
-# Synced by .github/workflows/labels.yml
-# Used by release-drafter for changelog categories
+# Labels for the repository — synced by .github/workflows/labels.yml
+# Used by release-drafter for changelog categories.
+#
+# PR template labels (keep in sync with .github/PULL_REQUEST_TEMPLATE.md
+# and the `known` list in .github/workflows/pr-labels.yaml):
+#   breaking-change, new-feature, enhancement, bugfix, refactor,
+#   documentation, maintenance, ci, dependencies, skip-changelog
 
-# 🚨 Breaking changes
+# --- PR template (release-drafter primary) ---
+
 - name: "breaking-change"
   color: "b60205"
-  description: "Introduces a breaking change"
+  description: "Breaking change"
 
-# ✨ New features
 - name: "new-feature"
   color: "a2eeef"
   description: "New feature"
 
-- name: "feature"
-  color: "a2eeef"
-  description: "New feature or request"
-
-# 🐛 Bug fixes
-- name: "bug"
-  color: "d73a4a"
-  description: "Something isn't working"
+- name: "enhancement"
+  color: "84b6eb"
+  description: "Enhancement to an existing feature"
 
 - name: "bugfix"
   color: "d73a4a"
-  description: "Bug fix"
-
-- name: "fix"
-  color: "d73a4a"
-  description: "A fix for an issue"
-
-# 🚀 Enhancements
-- name: "enhancement"
-  color: "84b6eb"
-  description: "Improvement to existing functionality"
+  description: "Bugfix"
 
 - name: "refactor"
   color: "84b6eb"
-  description: "Code refactoring"
+  description: "Refactor (no behaviour change)"
+
+- name: "documentation"
+  color: "0075ca"
+  description: "Documentation only"
+
+- name: "maintenance"
+  color: "fef2c0"
+  description: "Maintenance / chore"
+
+- name: "ci"
+  color: "fef2c0"
+  description: "CI / workflow change"
+
+- name: "dependencies"
+  color: "0366d6"
+  description: "Dependencies bump"
+
+- name: "skip-changelog"
+  color: "ededed"
+  description: "Skip changelog"
+
+# --- Release-drafter aliases (legacy PRs; not in PR template) ---
+
+- name: "feature"
+  color: "a2eeef"
+  description: "New feature (alias — use new-feature in PR template)"
+
+- name: "bug"
+  color: "d73a4a"
+  description: "Bugfix (alias — use bugfix in PR template)"
+
+- name: "fix"
+  color: "d73a4a"
+  description: "Bugfix (alias — use bugfix in PR template)"
+
+- name: "chore"
+  color: "fef2c0"
+  description: "Maintenance (alias — use maintenance in PR template)"
+
+- name: "docs"
+  color: "0075ca"
+  description: "Documentation (alias — use documentation in PR template)"
 
 - name: "performance"
   color: "84b6eb"
   description: "Performance improvement"
 
-# 🧰 Maintenance
-- name: "maintenance"
-  color: "fef2c0"
-  description: "Maintenance tasks"
+# --- Version bumps (manual / release tooling) ---
 
-- name: "chore"
-  color: "fef2c0"
-  description: "Routine tasks and chores"
-
-- name: "ci"
-  color: "fef2c0"
-  description: "CI/CD and workflow changes"
-
-# 📚 Documentation
-- name: "documentation"
-  color: "0075ca"
-  description: "Improvements or additions to documentation"
-
-- name: "docs"
-  color: "0075ca"
-  description: "Documentation changes"
-
-# ⬆️ Dependencies
-- name: "dependencies"
-  color: "0366d6"
-  description: "Dependency updates"
-
-# Version control (for release-drafter)
 - name: "major"
   color: "b60205"
   description: "Major version bump"
@@ -79,12 +85,8 @@
   color: "fbca04"
   description: "Minor version bump"
 
-# Skip changelog
-- name: "skip-changelog"
-  color: "ededed"
-  description: "Skip this PR in the changelog"
+# --- Issues ---
 
-# Issue-specific labels
 - name: "question"
   color: "d876e3"
   description: "Further information is requested"

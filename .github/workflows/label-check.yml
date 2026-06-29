@@ -20,16 +20,17 @@ jobs:
           labels: |
             breaking-change
             new-feature
-            feature
-            bug
-            bugfix
-            fix
             enhancement
+            bugfix
             refactor
-            performance
-            maintenance
-            chore
-            ci
             documentation
+            maintenance
+            ci
             dependencies
             skip-changelog
+            feature
+            bug
+            fix
+            chore
+            docs
+            performance
