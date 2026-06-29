@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.number import NumberEntity, NumberMode, RestoreNumber
 from homeassistant.const import EntityCategory
+from homeassistant.exceptions import HomeAssistantError
 
 from .const import (
     CONF_HAS_SUBWOOFER,
@@ -25,7 +26,13 @@ from .const import (
     MIN_BASS_LEVEL,
     MIN_REAR_LEVEL,
 )
-from .helpers import BraviaQuadNotificationMixin, VolumeTransitionMixin, get_device_info
+from .helpers import (
+    BraviaQuadNotificationMixin,
+    VolumeTransitionMixin,
+    get_device_info,
+    raise_set_rejected,
+    verify_feature_value,
+)
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -273,15 +280,25 @@ class BraviaQuadAvSyncNumber(BraviaQuadNotificationMixin, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set AV sync delay."""
         int_value = int(value)
-        success = await self._client.async_set_av_sync(int_value)
-        if not success:
-            _LOGGER.error("Failed to set AV sync to %d", int_value)
-            return
+        if not await self._client.async_set_av_sync(int_value):
+            raise_set_rejected("AV sync", str(int_value))
         try:
             actual = await self._client.async_get_av_sync()
-            self._attr_native_value = actual
-        except (OSError, TimeoutError):
-            self._attr_native_value = int_value
+        except (OSError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="verify_read_failed",
+                translation_placeholders={
+                    "feature": "AV sync",
+                    "requested": str(int_value),
+                },
+            ) from err
+        self._attr_native_value = verify_feature_value(
+            requested=int_value,
+            actual=actual,
+            feature_label="AV sync",
+            mismatch_hint="The device may only accept 0 ms on the current input path.",
+        )
         self.async_write_ha_state()
 
     async def async_update(self) -> None:
@@ -328,15 +345,25 @@ class BraviaQuadTvAvSyncNumber(BraviaQuadNotificationMixin, NumberEntity):
     async def async_set_native_value(self, value: float) -> None:
         """Set TV AV sync delay."""
         int_value = int(value)
-        success = await self._client.async_set_tv_av_sync(int_value)
-        if not success:
-            _LOGGER.error("Failed to set TV AV sync to %d", int_value)
-            return
+        if not await self._client.async_set_tv_av_sync(int_value):
+            raise_set_rejected("TV AV sync", str(int_value))
         try:
             actual = await self._client.async_get_tv_av_sync()
-            self._attr_native_value = actual
-        except (OSError, TimeoutError):
-            self._attr_native_value = int_value
+        except (OSError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="verify_read_failed",
+                translation_placeholders={
+                    "feature": "TV AV sync",
+                    "requested": str(int_value),
+                },
+            ) from err
+        self._attr_native_value = verify_feature_value(
+            requested=int_value,
+            actual=actual,
+            feature_label="TV AV sync",
+            mismatch_hint="The device may only accept 0 ms on the current input path.",
+        )
         self.async_write_ha_state()
 
     async def async_update(self) -> None:

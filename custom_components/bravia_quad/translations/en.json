@@ -251,6 +251,21 @@
     },
     "firmware_update_failed": {
       "message": "Failed to trigger firmware update. The device may be busy or unreachable. Please try again later."
+    },
+    "verify_set_rejected": {
+      "message": "Device rejected {feature} value {requested!r}"
+    },
+    "verify_read_failed": {
+      "message": "Failed to verify {feature} after setting {requested!r}"
+    },
+    "verify_unexpected_value": {
+      "message": "Device returned unexpected {feature} value {actual!r}"
+    },
+    "verify_value_mismatch": {
+      "message": "Device kept {feature} at {actual!r} (requested {requested!r})"
+    },
+    "verify_value_mismatch_hint": {
+      "message": "Device kept {feature} at {actual!r} (requested {requested!r}). {hint}"
     }
   }
 }

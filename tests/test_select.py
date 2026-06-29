@@ -701,9 +701,9 @@ async def test_audio_return_channel_select_option(
     mock_bravia_quad_client: MagicMock,
     entity_registry: er.EntityRegistry,
 ) -> None:
-    """Test selecting audio return channel option with re-read."""
+    """Test selecting a stable audio return channel option with re-read."""
     mock_bravia_quad_client.async_get_audio_return_channel = AsyncMock(
-        return_value="arc"
+        return_value="off"
     )
     entity_id = get_entity_id_by_unique_id_suffix(
         entity_registry, "_audio_return_channel"
@@ -712,16 +712,15 @@ async def test_audio_return_channel_select_option(
     await hass.services.async_call(
         "select",
         "select_option",
-        {"entity_id": entity_id, "option": "earc"},
+        {"entity_id": entity_id, "option": "off"},
         blocking=True,
     )
     mock_bravia_quad_client.async_set_audio_return_channel.assert_called_once_with(
-        "earc"
+        "off"
     )
-    # Should re-read after SET; device fell back to arc
     state = hass.states.get(entity_id)
     assert state is not None
-    assert state.state == "arc"
+    assert state.state == "off"
 
 
 @pytest.mark.usefixtures("init_integration")
@@ -806,3 +805,35 @@ async def test_imax_mode_select_option_reverts(
 
     assert hass.states.get(entity_id).state == "auto"
     mock_bravia_quad_client.async_set_imax_mode.assert_called_once_with("off")
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_audio_return_channel_earc_reverts(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test eARC selection fails when device reports arc."""
+    mock_bravia_quad_client.async_get_audio_return_channel = AsyncMock(
+        return_value="arc"
+    )
+    mock_bravia_quad_client.async_set_audio_return_channel = AsyncMock(
+        return_value=True
+    )
+    entity_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, "_audio_return_channel"
+    )
+    assert entity_id is not None
+
+    with pytest.raises(Exception, match="kept audio return channel"):
+        await hass.services.async_call(
+            "select",
+            "select_option",
+            {"entity_id": entity_id, "option": "earc"},
+            blocking=True,
+        )
+
+    assert hass.states.get(entity_id).state == "arc"
+    mock_bravia_quad_client.async_set_audio_return_channel.assert_called_once_with(
+        "earc"
+    )

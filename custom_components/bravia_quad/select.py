@@ -33,7 +33,12 @@ from .const import (
     IMAX_MODE_OPTIONS,
     INPUT_OPTIONS,
 )
-from .helpers import BraviaQuadNotificationMixin, get_device_info
+from .helpers import (
+    BraviaQuadNotificationMixin,
+    get_device_info,
+    raise_set_rejected,
+    verify_feature_value,
+)
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -390,31 +395,30 @@ class BraviaQuadImaxModeSelect(BraviaQuadNotificationMixin, SelectEntity):
             return
 
         if not await self._client.async_set_imax_mode(option):
-            msg = f"Device rejected IMAX mode {option!r}"
-            raise HomeAssistantError(msg)
+            raise_set_rejected("IMAX mode", option)
 
         try:
             actual = await self._client.async_get_imax_mode()
         except (OSError, TimeoutError) as err:
-            msg = f"Failed to verify IMAX mode after setting {option!r}"
-            raise HomeAssistantError(msg) from err
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="verify_read_failed",
+                translation_placeholders={
+                    "feature": "IMAX mode",
+                    "requested": option,
+                },
+            ) from err
 
-        if actual not in IMAX_MODE_OPTIONS:
-            _LOGGER.warning("Unexpected IMAX mode from device: %s", actual)
-            self._attr_current_option = "auto"
-            self.async_write_ha_state()
-            msg = f"Device returned unexpected IMAX mode {actual!r}"
-            raise HomeAssistantError(msg)
-
-        self._attr_current_option = actual
-        self.async_write_ha_state()
-
-        if actual != option:
-            msg = (
-                f"Device kept IMAX mode {actual!r} (requested {option!r}). "
+        self._attr_current_option = verify_feature_value(
+            requested=option,
+            actual=actual,
+            valid_values=set(IMAX_MODE_OPTIONS),
+            feature_label="IMAX mode",
+            mismatch_hint=(
                 "IMAX Enhanced may require a compatible TV and Sony wireless subwoofer."
-            )
-            raise HomeAssistantError(msg)
+            ),
+        )
+        self.async_write_ha_state()
 
     async def async_update(self) -> None:
         """Update the current IMAX mode."""
@@ -631,19 +635,26 @@ class BraviaQuadAudioReturnChannelSelect(BraviaQuadNotificationMixin, SelectEnti
         if option not in AUDIO_RETURN_CHANNEL_OPTIONS:
             _LOGGER.error("Invalid audio return channel option: %s", option)
             return
-        success = await self._client.async_set_audio_return_channel(option)
-        if not success:
-            _LOGGER.error("Failed to set audio return channel to %s", option)
-            return
-        # Re-read to verify device accepted the value
+        if not await self._client.async_set_audio_return_channel(option):
+            raise_set_rejected("audio return channel", option)
         try:
             actual = await self._client.async_get_audio_return_channel()
-            if actual in AUDIO_RETURN_CHANNEL_OPTIONS:
-                self._attr_current_option = actual
-            else:
-                self._attr_current_option = option
-        except (OSError, TimeoutError):
-            self._attr_current_option = option
+        except (OSError, TimeoutError) as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="verify_read_failed",
+                translation_placeholders={
+                    "feature": "audio return channel",
+                    "requested": option,
+                },
+            ) from err
+        self._attr_current_option = verify_feature_value(
+            requested=option,
+            actual=actual,
+            valid_values=set(AUDIO_RETURN_CHANNEL_OPTIONS),
+            feature_label="audio return channel",
+            mismatch_hint="eARC may report as ARC on some devices.",
+        )
         self.async_write_ha_state()
 
     async def async_update(self) -> None:

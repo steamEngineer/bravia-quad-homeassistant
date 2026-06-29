@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from homeassistant.const import CONF_HOST, CONF_MAC, Platform
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import CONNECTION_NETWORK_MAC
@@ -20,6 +21,7 @@ from custom_components.bravia_quad.const import (
 from custom_components.bravia_quad.helpers import (
     get_device_info,
     migrate_legacy_identifiers,
+    verify_feature_value,
 )
 
 if TYPE_CHECKING:
@@ -813,6 +815,81 @@ async def test_setup_ip_entry_migrates_without_duplicates(
     ]
     assert len(power_entities) == 1
     assert power_entities[0].unique_id == f"{DOMAIN}_{target_serial}_power"
+
+
+# =============================================================================
+# verify_feature_value Tests
+# =============================================================================
+
+
+def test_verify_feature_value_match() -> None:
+    """Test verify_feature_value returns actual when values match."""
+    assert (
+        verify_feature_value(
+            requested="on",
+            actual="on",
+            feature_label="test feature",
+        )
+        == "on"
+    )
+
+
+def test_verify_feature_value_mismatch_raises() -> None:
+    """Test verify_feature_value raises on mismatch."""
+    with pytest.raises(HomeAssistantError) as exc_info:
+        verify_feature_value(
+            requested="off",
+            actual="on",
+            feature_label="test feature",
+        )
+    assert exc_info.value.translation_key == "verify_value_mismatch"
+
+
+def test_verify_feature_value_mismatch_with_hint() -> None:
+    """Test verify_feature_value includes hint in mismatch error."""
+    with pytest.raises(HomeAssistantError) as exc_info:
+        verify_feature_value(
+            requested="earc",
+            actual="arc",
+            feature_label="audio return channel",
+            mismatch_hint="hint text",
+        )
+    assert exc_info.value.translation_key == "verify_value_mismatch_hint"
+    assert exc_info.value.translation_placeholders["hint"] == "hint text"
+
+
+def test_verify_feature_value_none_actual_raises() -> None:
+    """Test verify_feature_value raises when actual is None."""
+    with pytest.raises(HomeAssistantError) as exc_info:
+        verify_feature_value(
+            requested="off",
+            actual=None,
+            feature_label="external control",
+        )
+    assert exc_info.value.translation_key == "verify_read_failed"
+
+
+def test_verify_feature_value_invalid_actual_raises() -> None:
+    """Test verify_feature_value raises when actual is not in valid_values."""
+    with pytest.raises(HomeAssistantError, match="unexpected"):
+        verify_feature_value(
+            requested="on",
+            actual="invalid",
+            feature_label="IMAX mode",
+            valid_values={"auto", "on", "off"},
+        )
+
+
+def test_verify_feature_value_int() -> None:
+    """Test verify_feature_value works with integer values."""
+    assert (
+        verify_feature_value(
+            requested=10,
+            actual=10,
+            feature_label="AV sync",
+        )
+        == 10
+    )
 
 
 # =============================================================================

@@ -463,3 +463,27 @@ async def test_voice_zoom_switch_turn_on(
         SWITCH_DOMAIN, SERVICE_TURN_ON, {ATTR_ENTITY_ID: entity_id}, blocking=True
     )
     mock_bravia_quad_client.async_set_voice_zoom.assert_called_once_with("on")
+
+
+@pytest.mark.usefixtures("init_integration_all")
+async def test_external_control_turn_off_reverts(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test external control stays on when device rejects off."""
+    mock_bravia_quad_client.async_get_external_control = AsyncMock(return_value="on")
+    mock_bravia_quad_client.async_set_external_control = AsyncMock(return_value=True)
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_external_control")
+    assert entity_id is not None
+
+    with pytest.raises(Exception, match="kept external control"):
+        await hass.services.async_call(
+            SWITCH_DOMAIN,
+            SERVICE_TURN_OFF,
+            {ATTR_ENTITY_ID: entity_id},
+            blocking=True,
+        )
+
+    assert hass.states.get(entity_id).state == "on"
+    mock_bravia_quad_client.async_set_external_control.assert_called_once_with("off")

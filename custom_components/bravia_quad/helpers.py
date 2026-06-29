@@ -8,6 +8,7 @@ import time
 from typing import TYPE_CHECKING
 
 from homeassistant.const import CONF_HOST, CONF_MAC
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -22,6 +23,69 @@ if TYPE_CHECKING:
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
+
+
+def verify_feature_value[T: (str, int)](
+    *,
+    requested: T,
+    actual: T | None,
+    feature_label: str,
+    valid_values: set[T] | None = None,
+    mismatch_hint: str | None = None,
+) -> T:
+    """Raise HomeAssistantError if the device value differs from what was requested."""
+    if actual is None:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="verify_read_failed",
+            translation_placeholders={
+                "feature": feature_label,
+                "requested": str(requested),
+            },
+        )
+
+    if valid_values is not None and actual not in valid_values:
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="verify_unexpected_value",
+            translation_placeholders={
+                "feature": feature_label,
+                "actual": str(actual),
+            },
+        )
+
+    if actual != requested:
+        placeholders: dict[str, str] = {
+            "feature": feature_label,
+            "requested": str(requested),
+            "actual": str(actual),
+        }
+        if mismatch_hint:
+            placeholders["hint"] = mismatch_hint
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="verify_value_mismatch_hint",
+                translation_placeholders=placeholders,
+            )
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="verify_value_mismatch",
+            translation_placeholders=placeholders,
+        )
+
+    return actual
+
+
+def raise_set_rejected(feature_label: str, requested: str) -> None:
+    """Raise HomeAssistantError when the device rejects a SET command."""
+    raise HomeAssistantError(
+        translation_domain=DOMAIN,
+        translation_key="verify_set_rejected",
+        translation_placeholders={
+            "feature": feature_label,
+            "requested": requested,
+        },
+    )
 
 
 def require_unique_id(entry: ConfigEntry) -> str:
