@@ -14,7 +14,7 @@
 ## Development
 
 - `./scripts/setup` — dependencies and pre-commit hooks
-- `uv run pytest` — test suite
+- `uv run pytest` — test suite (`-n auto` for parallel runs)
 - `uv run ty custom_components tests` — type checking
 - `./scripts/lint` — Ruff lint and format
 - `./scripts/develop` — local Home Assistant (http://localhost:8123)

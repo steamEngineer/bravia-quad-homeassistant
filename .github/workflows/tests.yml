@@ -86,4 +86,4 @@ jobs:
         if: >-
           github.event_name == 'push' ||
           needs.changes.outputs.code == 'true'
-        run: uv run pytest tests/ -v --tb=short
+        run: uv run pytest tests/ -v --tb=short -n auto
