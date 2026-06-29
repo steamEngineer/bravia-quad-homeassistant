@@ -1,0 +1,130 @@
+---
+name: PR Labels
+
+# Apply a release label from the PR template checkbox, then verify the PR
+# carries an allowed label. Both jobs run in one workflow so verification
+# sees labels applied in the prior job (GITHUB_TOKEN label events do not
+# re-trigger separate pull_request workflows).
+
+# yamllint disable-line rule:truthy
+on:
+  pull_request_target:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - labeled
+      - unlabeled
+      - reopened
+      - ready_for_review
+    branches:
+      - main
+
+permissions:
+  pull-requests: read
+
+jobs:
+  apply_label:
+    name: Apply
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.user.type != 'Bot'
+    permissions:
+      pull-requests: write
+    steps:
+      - name: 🏷 Apply label from PR description checkbox
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+        with:
+          script: |
+            const known = [
+              'breaking-change', 'bugfix', 'refactor',
+              'new-feature', 'enhancement',
+              'maintenance', 'ci', 'dependencies', 'documentation',
+              'skip-changelog',
+            ];
+
+            const { owner, repo } = context.repo;
+            const issue_number = context.payload.pull_request.number;
+            const current = (context.payload.pull_request.labels || [])
+              .map(l => l.name);
+
+            const alreadyLabelled = current.filter(n => known.includes(n));
+            if (alreadyLabelled.length === 1) {
+              core.info(
+                `Skipping: PR already labelled '${alreadyLabelled[0]}'.`
+              );
+              return;
+            }
+
+            const body = context.payload.pull_request.body || '';
+            const re = /^\s*-\s*\[x\][^`\n]*`([^`]+)`/gim;
+            const ticked = [];
+            for (const m of body.matchAll(re)) {
+              const name = m[1];
+              if (known.includes(name) && !ticked.includes(name)) {
+                ticked.push(name);
+              }
+            }
+
+            if (ticked.length === 0) {
+              core.setFailed(
+                'No "Types of changes" checkbox is ticked in the PR ' +
+                'description. Edit the description and tick exactly ' +
+                'one box so this PR can be release-noted.'
+              );
+              return;
+            }
+            if (ticked.length > 1) {
+              core.setFailed(
+                `Multiple "Types of changes" checkboxes are ticked ` +
+                `(${ticked.join(', ')}). Tick exactly one.`
+              );
+              return;
+            }
+
+            const desired = ticked[0];
+
+            for (const name of current) {
+              if (known.includes(name) && name !== desired) {
+                await github.rest.issues.removeLabel({
+                  owner, repo, issue_number, name,
+                }).catch(() => {});
+              }
+            }
+            if (!current.includes(desired)) {
+              await github.rest.issues.addLabels({
+                owner, repo, issue_number, labels: [desired],
+              });
+            }
+
+  verify_label:
+    name: 🏷️ Verify PR has label
+    needs: apply_label
+    if: >-
+      always() &&
+      needs.apply_label.result != 'failure' &&
+      needs.apply_label.result != 'cancelled'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔍 Verify PR has at least one label
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+        with:
+          script: |
+            const allowed = [
+              'breaking-change', 'new-feature', 'enhancement', 'bugfix',
+              'refactor', 'documentation', 'maintenance', 'ci',
+              'dependencies', 'skip-changelog',
+              'feature', 'bug', 'fix', 'chore', 'docs', 'performance',
+            ];
+
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request.number;
+            const { data: pr } = await github.rest.pulls.get({
+              owner, repo, pull_number,
+            });
+            const labels = pr.labels.map(l => l.name);
+            if (!labels.some(n => allowed.includes(n))) {
+              core.setFailed(
+                'PR needs at least one release or maintenance label. ' +
+                'Tick a change type in the PR template or add a label manually.'
+              );
+            }

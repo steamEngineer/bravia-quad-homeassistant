@@ -30,6 +30,11 @@
       "enabled": false
     },
     {
+      "matchManagers": ["pep621"],
+      "matchPackageNames": ["aiohttp"],
+      "enabled": false
+    },
+    {
       "matchManagers": ["github-actions"],
       "addLabels": ["github_actions"],
       "rangeStrategy": "pin"

@@ -340,6 +340,39 @@ def platforms() -> list[Platform]:
     ]
 
 
+async def _setup_integration_with_suffixes_enabled(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    platforms: list[Platform],
+    suffixes: list[str],
+) -> MockConfigEntry:
+    """Set up the integration and enable disabled entities matching suffixes."""
+    mock_config_entry.add_to_hass(hass)
+
+    with patch("custom_components.bravia_quad.PLATFORMS", platforms):
+        await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    entity_registry = er.async_get(hass)
+    entities_to_enable = []
+    for suffix in suffixes:
+        entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
+        if entity_id is None:
+            continue
+        entry = entity_registry.async_get(entity_id)
+        if entry and entry.disabled_by is not None:
+            entities_to_enable.append(entity_id)
+
+    if entities_to_enable:
+        for entity_id in entities_to_enable:
+            entity_registry.async_update_entity(entity_id, disabled_by=None)
+        with patch("custom_components.bravia_quad.PLATFORMS", platforms):
+            await hass.config_entries.async_reload(mock_config_entry.entry_id)
+            await hass.async_block_till_done()
+
+    return mock_config_entry
+
+
 @pytest.fixture
 async def init_integration(
     hass: HomeAssistant,
@@ -356,6 +389,23 @@ async def init_integration(
         await hass.async_block_till_done()
 
     return mock_config_entry
+
+
+@pytest.fixture
+async def init_integration_volume(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_bravia_quad_client: MagicMock,
+    mock_bravia_http_client: MagicMock,
+    platforms: list[Platform],
+) -> MockConfigEntry:
+    """Set up the integration with the volume step interval entity enabled."""
+    return await _setup_integration_with_suffixes_enabled(
+        hass,
+        mock_config_entry,
+        platforms,
+        ["_volume", "_volume_step_interval"],
+    )
 
 
 @pytest.fixture

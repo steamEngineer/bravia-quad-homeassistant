@@ -502,16 +502,16 @@ s.close()
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions are welcome! Open a pull request against `main` and complete [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md) (change type and test plan).
 
 ### Development Guidelines
 
 1. **Code Style**: Follow the existing code style and use Ruff for formatting
 2. **Testing**: Test your changes thoroughly before submitting
 3. **Pull Requests**:
-   - Ensure all CI checks pass (Hassfest, Lint)
+   - Tick exactly one change type in the PR template (CI applies the release label automatically)
+   - Ensure all CI checks pass (Hassfest, Lint, Tests)
    - Update documentation if needed
-   - Follow conventional commit messages when possible
 4. **Issues**: If you find a bug or have a feature request, please open an issue first to discuss
 
 ## License

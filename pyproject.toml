@@ -21,6 +21,7 @@ dev = [
     "codespell>=2.4.1",
     "ty>=0.0.21",
     "pytest-homeassistant-custom-component>=0.13.297",
+    "pytest-xdist>=3.8.0",
     "ruff>=0.14.0",
 ]
 
