@@ -11,24 +11,54 @@ on:
 permissions: {}
 
 jobs:
+  changes:
+    if: github.event_name == 'pull_request'
+    uses: ./.github/workflows/ci-changes.yml
+
   pytest:
     name: 🧪 pytest
     runs-on: "ubuntu-latest"
+    needs: [changes]
+    if: >-
+      always() &&
+      !cancelled() &&
+      (github.event_name == 'push' || needs.changes.result != 'failure')
 
     steps:
+      - name: Skip pytest (no code changes)
+        if: >-
+          github.event_name == 'pull_request' &&
+          needs.changes.outputs.code != 'true'
+        run: echo "No testable paths changed; pytest skipped."
+
       - name: Checkout the repository
+        if: >-
+          github.event_name == 'push' ||
+          needs.changes.outputs.code == 'true'
         uses: actions/checkout@v7.0.0
 
       - name: Install uv
+        if: >-
+          github.event_name == 'push' ||
+          needs.changes.outputs.code == 'true'
         uses: astral-sh/setup-uv@v8.2.0
         with:
           enable-cache: true
 
       - name: Set up Python
+        if: >-
+          github.event_name == 'push' ||
+          needs.changes.outputs.code == 'true'
         run: uv python install 3.14.2
 
       - name: Install dependencies
+        if: >-
+          github.event_name == 'push' ||
+          needs.changes.outputs.code == 'true'
         run: uv sync --dev
 
       - name: Run tests
+        if: >-
+          github.event_name == 'push' ||
+          needs.changes.outputs.code == 'true'
         run: uv run pytest tests/ -v --tb=short
