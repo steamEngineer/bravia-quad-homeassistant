@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.switch import SwitchEntity
@@ -13,16 +14,26 @@ from .const import (
     AAV_ON,
     AUTO_STANDBY_OFF,
     AUTO_STANDBY_ON,
+    AUTO_UPDATE_OFF,
+    AUTO_UPDATE_ON,
     DOMAIN,
+    EXTERNAL_CONTROL_OFF,
+    EXTERNAL_CONTROL_ON,
     FEATURE_AAV,
     FEATURE_AUTO_STANDBY,
+    FEATURE_AUTO_UPDATE,
+    FEATURE_EXTERNAL_CONTROL,
     FEATURE_HDMI_CEC,
+    FEATURE_NET_BT_STANDBY,
     FEATURE_NIGHT_MODE,
     FEATURE_POWER,
     FEATURE_SOUND_FIELD,
     FEATURE_VOICE_ENHANCER,
+    FEATURE_VOICE_ZOOM,
     HDMI_CEC_OFF,
     HDMI_CEC_ON,
+    NET_BT_STANDBY_OFF,
+    NET_BT_STANDBY_ON,
     NIGHT_MODE_OFF,
     NIGHT_MODE_ON,
     POWER_OFF,
@@ -31,6 +42,8 @@ from .const import (
     SOUND_FIELD_ON,
     VOICE_ENHANCER_OFF,
     VOICE_ENHANCER_ON,
+    VOICE_ZOOM_OFF,
+    VOICE_ZOOM_ON,
 )
 from .helpers import BraviaQuadNotificationMixin, get_device_info
 
@@ -39,9 +52,13 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
+    from . import BraviaQuadData
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
+
+SCAN_INTERVAL = timedelta(seconds=60)
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
@@ -50,7 +67,8 @@ async def async_setup_entry(
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Quad switches from a config entry."""
-    client: BraviaQuadClient = hass.data[DOMAIN][entry.entry_id]
+    data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+    client = data.tcp_client
 
     # Create all switch entities
     entities = [
@@ -61,9 +79,13 @@ async def async_setup_entry(
         BraviaQuadSoundFieldSwitch(client, entry),
         BraviaQuadNightModeSwitch(client, entry),
         BraviaQuadAdvancedAutoVolumeSwitch(client, entry),
+        BraviaQuadAutoUpdateSwitch(client, entry),
+        BraviaQuadNetBtStandbySwitch(client, entry),
+        BraviaQuadVoiceZoomSwitch(client, entry),
+        BraviaQuadExternalControlSwitch(client, entry),
     ]
 
-    async_add_entities(entities)
+    async_add_entities(entities, update_before_add=True)
 
 
 class BraviaQuadPowerSwitch(BraviaQuadNotificationMixin, SwitchEntity):
@@ -401,3 +423,225 @@ class BraviaQuadAdvancedAutoVolumeSwitch(BraviaQuadNotificationMixin, SwitchEnti
             self._attr_is_on = aav_state == AAV_ON
         except (OSError, TimeoutError):
             _LOGGER.exception("Failed to update Advanced Auto Volume state")
+
+
+class BraviaQuadAutoUpdateSwitch(BraviaQuadNotificationMixin, SwitchEntity):
+    """Representation of a Bravia Quad auto update switch."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_translation_key = "auto_update"
+    _notification_feature = FEATURE_AUTO_UPDATE
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the auto update switch."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_auto_update"
+        self._attr_is_on = client.auto_update == AUTO_UPDATE_ON
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle auto update notification."""
+        self._attr_is_on = value == AUTO_UPDATE_ON
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **_kwargs: Any) -> None:
+        """Enable auto update."""
+        success = await self._client.async_set_auto_update(AUTO_UPDATE_ON)
+        if success:
+            await self._verify_state()
+        else:
+            _LOGGER.error("Failed to enable auto update")
+
+    async def async_turn_off(self, **_kwargs: Any) -> None:
+        """Disable auto update."""
+        success = await self._client.async_set_auto_update(AUTO_UPDATE_OFF)
+        if success:
+            await self._verify_state()
+        else:
+            _LOGGER.error("Failed to disable auto update")
+
+    async def _verify_state(self) -> None:
+        """Re-read state from device to verify SET was accepted."""
+        try:
+            value = await self._client.async_get_auto_update()
+            self._attr_is_on = value == AUTO_UPDATE_ON
+        except (OSError, TimeoutError):
+            pass
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Update auto update state."""
+        try:
+            value = await self._client.async_get_auto_update()
+            self._attr_is_on = value == AUTO_UPDATE_ON
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update auto update state")
+
+
+class BraviaQuadNetBtStandbySwitch(BraviaQuadNotificationMixin, SwitchEntity):
+    """Representation of a Bravia Quad network/Bluetooth standby switch."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+    _attr_translation_key = "net_bt_standby"
+    _notification_feature = FEATURE_NET_BT_STANDBY
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the network/Bluetooth standby switch."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_net_bt_standby"
+        self._attr_is_on = None
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle network/Bluetooth standby notification."""
+        self._attr_is_on = value == NET_BT_STANDBY_ON
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **_kwargs: Any) -> None:
+        """Enable network/Bluetooth standby."""
+        success = await self._client.async_set_net_bt_standby(NET_BT_STANDBY_ON)
+        if success:
+            await self._verify_state()
+        else:
+            _LOGGER.error("Failed to enable network/Bluetooth standby")
+
+    async def async_turn_off(self, **_kwargs: Any) -> None:
+        """Disable network/Bluetooth standby."""
+        success = await self._client.async_set_net_bt_standby(NET_BT_STANDBY_OFF)
+        if success:
+            await self._verify_state()
+        else:
+            _LOGGER.error("Failed to disable network/Bluetooth standby")
+
+    async def _verify_state(self) -> None:
+        """Re-read state from device to verify SET was accepted."""
+        try:
+            value = await self._client.async_get_net_bt_standby()
+            self._attr_is_on = value == NET_BT_STANDBY_ON
+        except (OSError, TimeoutError):
+            pass
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Update network/Bluetooth standby state."""
+        try:
+            value = await self._client.async_get_net_bt_standby()
+            self._attr_is_on = value == NET_BT_STANDBY_ON
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update network/Bluetooth standby state")
+
+
+class BraviaQuadVoiceZoomSwitch(BraviaQuadNotificationMixin, SwitchEntity):
+    """Representation of a Bravia Quad voice zoom switch."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_entity_registry_enabled_default = False
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_translation_key = "voice_zoom"
+    _notification_feature = FEATURE_VOICE_ZOOM
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the voice zoom switch."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_voice_zoom"
+        self._attr_is_on = client.voice_zoom == VOICE_ZOOM_ON
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle voice zoom notification."""
+        self._attr_is_on = value == VOICE_ZOOM_ON
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **_kwargs: Any) -> None:
+        """Enable voice zoom."""
+        success = await self._client.async_set_voice_zoom(VOICE_ZOOM_ON)
+        if success:
+            await self._verify_state()
+        else:
+            _LOGGER.error("Failed to enable voice zoom")
+
+    async def async_turn_off(self, **_kwargs: Any) -> None:
+        """Disable voice zoom."""
+        success = await self._client.async_set_voice_zoom(VOICE_ZOOM_OFF)
+        if success:
+            await self._verify_state()
+        else:
+            _LOGGER.error("Failed to disable voice zoom")
+
+    async def _verify_state(self) -> None:
+        """Re-read state from device to verify SET was accepted."""
+        try:
+            value = await self._client.async_get_voice_zoom()
+            self._attr_is_on = value == VOICE_ZOOM_ON
+        except (OSError, TimeoutError):
+            pass
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Update voice zoom state."""
+        try:
+            value = await self._client.async_get_voice_zoom()
+            self._attr_is_on = value == VOICE_ZOOM_ON
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update voice zoom state")
+
+
+class BraviaQuadExternalControlSwitch(BraviaQuadNotificationMixin, SwitchEntity):
+    """Representation of a Bravia Quad external control switch."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_entity_registry_enabled_default = False
+    _attr_has_entity_name = True
+    _attr_should_poll = True
+    _attr_translation_key = "external_control"
+    _notification_feature = FEATURE_EXTERNAL_CONTROL
+
+    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
+        """Initialize the external control switch."""
+        self._client = client
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_external_control"
+        self._attr_is_on = None
+        self._attr_device_info = get_device_info(entry)
+
+    async def _on_notification(self, value: str) -> None:
+        """Handle external control notification."""
+        self._attr_is_on = value == EXTERNAL_CONTROL_ON
+        self.async_write_ha_state()
+
+    async def async_turn_on(self, **_kwargs: Any) -> None:
+        """Enable external control."""
+        success = await self._client.async_set_external_control(EXTERNAL_CONTROL_ON)
+        if success:
+            await self._verify_state()
+        else:
+            _LOGGER.error("Failed to enable external control")
+
+    async def async_turn_off(self, **_kwargs: Any) -> None:
+        """Disable external control."""
+        success = await self._client.async_set_external_control(EXTERNAL_CONTROL_OFF)
+        if success:
+            await self._verify_state()
+        else:
+            _LOGGER.error("Failed to disable external control")
+
+    async def _verify_state(self) -> None:
+        """Re-read state from device to verify SET was accepted."""
+        try:
+            value = await self._client.async_get_external_control()
+            self._attr_is_on = value == EXTERNAL_CONTROL_ON
+        except (OSError, TimeoutError):
+            pass
+        self.async_write_ha_state()
+
+    async def async_update(self) -> None:
+        """Update external control state."""
+        try:
+            value = await self._client.async_get_external_control()
+            self._attr_is_on = value == EXTERNAL_CONTROL_ON
+        except (OSError, TimeoutError):
+            _LOGGER.exception("Failed to update external control state")

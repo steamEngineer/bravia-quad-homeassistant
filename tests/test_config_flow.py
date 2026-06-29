@@ -7,16 +7,19 @@ from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
 from homeassistant.config_entries import SOURCE_USER, SOURCE_ZEROCONF
-from homeassistant.const import CONF_HOST, CONF_MAC
+from homeassistant.const import CONF_HOST, CONF_MAC, CONF_NAME
 from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.bravia_quad.const import (
     CONF_HAS_SUBWOOFER,
+    CONF_MANUFACTURER,
     CONF_MODEL,
-    DEFAULT_NAME,
+    CONF_MODEL_ID,
+    CONF_SERIAL,
     DOMAIN,
+    MODEL_ID_TO_NAME,
 )
 
 if TYPE_CHECKING:
@@ -25,6 +28,19 @@ if TYPE_CHECKING:
 TEST_HOST = "192.168.1.100"
 TEST_MAC_FORMATTED = "60:ff:9e:12:34:56"
 TEST_MODEL = "Bravia Theatre Quad"
+TEST_SERIAL = "1234567"
+TEST_MODEL_ID = "HT-A9M2"
+TEST_MANUFACTURER = "SONY"
+TEST_DEVICE_NAME = "Living Room BRAVIA Theatre Quad"
+
+
+def _setup_client_identity(client: AsyncMock) -> None:
+    """Configure identity method return values on a client mock."""
+    client.async_get_serial_number = AsyncMock(return_value=TEST_SERIAL)
+    client.async_get_model_type = AsyncMock(return_value=TEST_MODEL_ID)
+    client.async_get_manufacturer = AsyncMock(return_value=TEST_MANUFACTURER)
+    client.async_get_mac_address = AsyncMock(return_value=TEST_MAC_FORMATTED)
+    client.async_get_device_name = AsyncMock(return_value=TEST_DEVICE_NAME)
 
 
 async def test_user_flow_success(hass: HomeAssistant, mock_setup_entry: None) -> None:
@@ -45,6 +61,7 @@ async def test_user_flow_success(hass: HomeAssistant, mock_setup_entry: None) ->
         client.async_disconnect = AsyncMock()
         client.async_test_connection = AsyncMock(return_value=True)
         client.async_detect_subwoofer = AsyncMock(return_value=True)
+        _setup_client_identity(client)
 
         # First step: enter IP address
         result = await hass.config_entries.flow.async_configure(
@@ -73,13 +90,18 @@ async def test_user_flow_success(hass: HomeAssistant, mock_setup_entry: None) ->
         await hass.async_block_till_done()
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == DEFAULT_NAME
+    assert result["title"] == TEST_DEVICE_NAME
     assert result["data"] == {
         CONF_HOST: TEST_HOST,
         CONF_HAS_SUBWOOFER: True,
+        CONF_SERIAL: TEST_SERIAL,
+        CONF_MODEL_ID: TEST_MODEL_ID,
+        CONF_MODEL: MODEL_ID_TO_NAME[TEST_MODEL_ID],
+        CONF_MANUFACTURER: TEST_MANUFACTURER,
+        CONF_MAC: TEST_MAC_FORMATTED,
+        CONF_NAME: TEST_DEVICE_NAME,
     }
-    # User flow uses host as unique_id (no MAC available)
-    assert result["result"].unique_id == TEST_HOST
+    assert result["result"].unique_id == TEST_SERIAL
 
 
 async def test_user_flow_success_no_subwoofer(
@@ -99,6 +121,7 @@ async def test_user_flow_success_no_subwoofer(
         client.async_disconnect = AsyncMock()
         client.async_test_connection = AsyncMock(return_value=True)
         client.async_detect_subwoofer = AsyncMock(return_value=False)
+        _setup_client_identity(client)
 
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"],
@@ -204,10 +227,24 @@ async def test_user_flow_timeout_error(hass: HomeAssistant) -> None:
 
 async def test_user_flow_duplicate_entry(
     hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
 ) -> None:
     """Test user flow when entry already exists."""
-    mock_config_entry.add_to_hass(hass)
+    existing_entry = MockConfigEntry(
+        title=TEST_DEVICE_NAME,
+        domain=DOMAIN,
+        data={
+            CONF_HOST: TEST_HOST,
+            CONF_HAS_SUBWOOFER: True,
+            CONF_SERIAL: TEST_SERIAL,
+            CONF_MODEL_ID: TEST_MODEL_ID,
+            CONF_MODEL: MODEL_ID_TO_NAME[TEST_MODEL_ID],
+            CONF_MANUFACTURER: TEST_MANUFACTURER,
+            CONF_MAC: TEST_MAC_FORMATTED,
+            CONF_NAME: TEST_DEVICE_NAME,
+        },
+        unique_id=TEST_SERIAL,
+    )
+    existing_entry.add_to_hass(hass)
 
     result = await hass.config_entries.flow.async_init(
         DOMAIN, context={"source": SOURCE_USER}
@@ -222,6 +259,7 @@ async def test_user_flow_duplicate_entry(
         client.async_disconnect = AsyncMock()
         client.async_test_connection = AsyncMock(return_value=True)
         client.async_detect_subwoofer = AsyncMock(return_value=True)
+        _setup_client_identity(client)
 
         # Enter IP
         result = await hass.config_entries.flow.async_configure(
@@ -309,6 +347,7 @@ async def test_zeroconf_discovery(hass: HomeAssistant, mock_setup_entry: None) -
         client.async_disconnect = AsyncMock()
         client.async_test_connection = AsyncMock(return_value=True)
         client.async_detect_subwoofer = AsyncMock(return_value=True)
+        _setup_client_identity(client)
 
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], user_input={}
@@ -319,8 +358,12 @@ async def test_zeroconf_discovery(hass: HomeAssistant, mock_setup_entry: None) -
     assert result["data"][CONF_HOST] == TEST_HOST
     assert result["data"][CONF_MAC] == TEST_MAC_FORMATTED
     assert result["data"][CONF_MODEL] == TEST_MODEL
-    # Unique ID should be MAC address
-    assert result["result"].unique_id == TEST_MAC_FORMATTED
+    assert result["data"][CONF_SERIAL] == TEST_SERIAL
+    assert result["data"][CONF_MODEL_ID] == TEST_MODEL_ID
+    assert result["data"][CONF_MANUFACTURER] == TEST_MANUFACTURER
+    assert result["data"][CONF_NAME] == TEST_DEVICE_NAME
+    # Unique ID should be serial number
+    assert result["result"].unique_id == TEST_SERIAL
 
 
 async def test_zeroconf_discovery_without_deviceid(
@@ -356,6 +399,7 @@ async def test_zeroconf_discovery_without_deviceid(
         client.async_disconnect = AsyncMock()
         client.async_test_connection = AsyncMock(return_value=True)
         client.async_detect_subwoofer = AsyncMock(return_value=True)
+        _setup_client_identity(client)
 
         result = await hass.config_entries.flow.async_configure(
             result["flow_id"], user_input={}
@@ -364,10 +408,14 @@ async def test_zeroconf_discovery_without_deviceid(
 
     assert result["type"] is FlowResultType.CREATE_ENTRY
     assert result["data"][CONF_HOST] == TEST_HOST
-    # No MAC in data when deviceid is missing
-    assert CONF_MAC not in result["data"]
-    # Unique ID falls back to host IP
-    assert result["result"].unique_id == TEST_HOST
+    # MAC comes from validate_input even when zeroconf deviceid is missing
+    assert result["data"][CONF_MAC] == TEST_MAC_FORMATTED
+    assert result["data"][CONF_SERIAL] == TEST_SERIAL
+    assert result["data"][CONF_MODEL_ID] == TEST_MODEL_ID
+    assert result["data"][CONF_MANUFACTURER] == TEST_MANUFACTURER
+    assert result["data"][CONF_NAME] == TEST_DEVICE_NAME
+    # Unique ID should be serial number
+    assert result["result"].unique_id == TEST_SERIAL
 
 
 async def test_zeroconf_discovery_migrates_existing_ip_entry(
@@ -403,13 +451,11 @@ async def test_zeroconf_discovery_migrates_existing_ip_entry(
         DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
     )
 
-    # Flow should abort after migrating
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
 
-    # Verify the entry was migrated
-    assert existing_entry.unique_id == TEST_MAC_FORMATTED
-    assert existing_entry.data[CONF_MAC] == TEST_MAC_FORMATTED
+    # Verify the existing entry was updated with the discovered host
+    assert existing_entry.data[CONF_HOST] == TEST_HOST
 
 
 async def test_zeroconf_discovery_already_configured_by_mac(
@@ -446,7 +492,6 @@ async def test_zeroconf_discovery_already_configured_by_mac(
         DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
     )
 
-    # Flow should abort - already configured
     assert result["type"] is FlowResultType.ABORT
     assert result["reason"] == "already_configured"
 

@@ -630,3 +630,41 @@ async def test_volume_notification_accepted_after_transition(
     state = hass.states.get(volume_id)
     assert state is not None
     assert state.state == "45"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_av_sync_number_entities(
+    hass: HomeAssistant,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test that AV sync number entities are created."""
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_av_sync")
+    assert entity_id is not None
+    state = hass.states.get(entity_id)
+    assert state is not None
+    assert state.state == "0"
+
+    # TV AV sync should be disabled by default
+    tv_entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_tv_av_sync")
+    assert tv_entity_id is not None
+    state = hass.states.get(tv_entity_id)
+    assert state is None  # Disabled
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_av_sync_set_value(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Test setting AV sync value."""
+    mock_bravia_quad_client.async_get_av_sync = AsyncMock(return_value=100)
+    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_av_sync")
+    assert entity_id is not None
+    await hass.services.async_call(
+        "number",
+        "set_value",
+        {"entity_id": entity_id, "value": 100},
+        blocking=True,
+    )
+    mock_bravia_quad_client.async_set_av_sync.assert_called_once_with(100)

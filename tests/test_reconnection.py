@@ -10,6 +10,10 @@ import pytest
 from homeassistant.const import STATE_UNAVAILABLE, Platform
 
 from custom_components.bravia_quad.bravia_quad_client import BraviaQuadClient
+from custom_components.bravia_quad.const import (
+    RECONNECT_INITIAL_DELAY,
+    RECONNECT_MAX_DELAY,
+)
 
 from .conftest import get_entity_id_by_unique_id_suffix
 
@@ -117,8 +121,8 @@ class TestClientReconnection:
         # Should not raise
         client.unregister_availability_callback(callback)
 
-    async def test_notification_loop_stops_on_eof(self) -> None:
-        """Test that the notification loop stops when EOF is received."""
+    async def test_notification_loop_exits_on_eof(self) -> None:
+        """Test that the notification loop exits on EOF."""
         client = BraviaQuadClient("192.168.1.100", "Test")
         availability_callback = MagicMock()
         client.register_availability_callback(availability_callback)
@@ -126,15 +130,13 @@ class TestClientReconnection:
         mock_reader = _setup_mock_stream(client)
         mock_reader.read = AsyncMock(return_value=b"")
 
-        client._listening = True
         await client._notification_loop()
 
         assert not client.is_connected
-        assert not client._listening
         availability_callback.assert_called_with(False)
 
-    async def test_notification_loop_stops_on_os_error(self) -> None:
-        """Test that the notification loop stops on OSError."""
+    async def test_notification_loop_exits_on_os_error(self) -> None:
+        """Test that the notification loop exits on OSError."""
         client = BraviaQuadClient("192.168.1.100", "Test")
         availability_callback = MagicMock()
         client.register_availability_callback(availability_callback)
@@ -142,12 +144,71 @@ class TestClientReconnection:
         mock_reader = _setup_mock_stream(client)
         mock_reader.read = AsyncMock(side_effect=OSError("Connection reset"))
 
-        client._listening = True
         await client._notification_loop()
 
         assert not client.is_connected
-        assert not client._listening
         availability_callback.assert_called_with(False)
+
+    async def test_reconnect_loop_exponential_backoff(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test that reconnect uses exponential backoff."""
+        client = BraviaQuadClient("192.168.1.100", "Test")
+
+        sleep_delays: list[float] = []
+        max_attempts = 5
+        connect_attempts = 0
+
+        async def _fake_sleep(delay: float) -> None:
+            sleep_delays.append(delay)
+
+        async def _fail_then_succeed() -> None:
+            nonlocal connect_attempts
+            connect_attempts += 1
+            if connect_attempts <= max_attempts:
+                msg = "refused"
+                raise ConnectionError(msg)
+            client._connected = True
+
+        monkeypatch.setattr(asyncio, "sleep", _fake_sleep)
+        monkeypatch.setattr(client, "async_connect", _fail_then_succeed)
+        monkeypatch.setattr(client, "async_fetch_all_states", AsyncMock())
+
+        await client._reconnect_loop()
+
+        assert sleep_delays[0] == RECONNECT_INITIAL_DELAY
+        for i in range(1, max_attempts):
+            expected = min(RECONNECT_INITIAL_DELAY * (2**i), RECONNECT_MAX_DELAY)
+            assert sleep_delays[i] == expected
+
+    async def test_reconnect_fetches_state_and_notifies(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """After reconnect, device state is fetched and availability restored."""
+        client = BraviaQuadClient("192.168.1.100", "Test")
+        availability_callback = MagicMock()
+        client.register_availability_callback(availability_callback)
+
+        fetch_called = asyncio.Event()
+
+        async def _succeed_connect() -> None:
+            client._connected = True
+
+        async def _fake_fetch() -> None:
+            fetch_called.set()
+
+        monkeypatch.setattr(asyncio, "sleep", AsyncMock())
+        monkeypatch.setattr(client, "async_connect", _succeed_connect)
+        monkeypatch.setattr(client, "async_fetch_all_states", _fake_fetch)
+
+        await client._reconnect_loop()
+        # Give any scheduled work a chance to run
+        try:
+            await asyncio.wait_for(fetch_called.wait(), timeout=1.0)
+        except TimeoutError:
+            pytest.fail("State fetch was not triggered after reconnect")
+
+        availability_callback.assert_called_with(True)
 
 
 # --- Integration-level entity availability tests ---

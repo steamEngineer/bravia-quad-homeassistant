@@ -56,6 +56,12 @@
       },
       "volume_step_interval": {
         "name": "Volume step interval"
+      },
+      "av_sync": {
+        "name": "AV sync (HDMI)"
+      },
+      "tv_av_sync": {
+        "name": "AV sync (TV)"
       }
     },
     "select": {
@@ -67,6 +73,53 @@
       },
       "drc": {
         "name": "Dynamic Range Compressor"
+      },
+      "imax_mode": {
+        "name": "IMAX Enhanced",
+        "state": {
+          "auto": "Automatic",
+          "on": "On",
+          "off": "Off"
+        }
+      },
+      "hdmi_passthrough": {
+        "name": "HDMI signal pass through",
+        "state": {
+          "auto": "Auto",
+          "on": "On",
+          "off": "Off"
+        }
+      },
+      "dual_mono": {
+        "name": "Dual mono",
+        "state": {
+          "main": "Main",
+          "sub": "Sub",
+          "main_sub": "Main/Sub"
+        }
+      },
+      "bt_connection_quality": {
+        "name": "Bluetooth connection quality",
+        "state": {
+          "prioritysound": "Priority on sound quality",
+          "priorityconnection": "Priority on stable connection"
+        }
+      },
+      "hdmi_standby_link": {
+        "name": "HDMI standby link",
+        "state": {
+          "auto": "Auto",
+          "on": "On",
+          "off": "Off"
+        }
+      },
+      "audio_return_channel": {
+        "name": "Audio Return Channel",
+        "state": {
+          "off": "Off",
+          "arc": "ARC",
+          "earc": "eARC"
+        }
       }
     },
     "media_player": {
@@ -82,6 +135,11 @@
             }
           }
         }
+      }
+    },
+    "update": {
+      "firmware": {
+        "name": "Firmware update"
       }
     },
     "switch": {
@@ -105,6 +163,65 @@
       },
       "auto_volume": {
         "name": "Auto Volume"
+      },
+      "auto_update": {
+        "name": "Auto update"
+      },
+      "net_bt_standby": {
+        "name": "Network/Bluetooth standby"
+      },
+      "voice_zoom": {
+        "name": "Voice Zoom"
+      },
+      "external_control": {
+        "name": "External control"
+      }
+    },
+    "sensor": {
+      "temperature": {
+        "name": "Temperature"
+      },
+      "timezone": {
+        "name": "Timezone"
+      },
+      "ssm_360": {
+        "name": "360 Spatial Sound Mapping"
+      },
+      "voice_zoom_level": {
+        "name": "Voice Zoom level"
+      },
+      "network_mode": {
+        "name": "Network mode"
+      },
+      "ip_address": {
+        "name": "IP address"
+      },
+      "device_name": {
+        "name": "Device name"
+      },
+      "destination": {
+        "name": "Region"
+      },
+      "language": {
+        "name": "Language"
+      },
+      "dhcp": {
+        "name": "DHCP"
+      },
+      "internet": {
+        "name": "Internet"
+      },
+      "ipv6_address": {
+        "name": "IP address (IPv6)"
+      },
+      "wifi_signal": {
+        "name": "WiFi signal"
+      },
+      "mac_wired": {
+        "name": "MAC address (wired)"
+      },
+      "mac_wireless": {
+        "name": "MAC address (wireless)"
       }
     }
   },
@@ -114,6 +231,9 @@
     },
     "detection_failed": {
       "message": "Failed to detect subwoofer due to a connection error. Please try again."
+    },
+    "firmware_update_failed": {
+      "message": "Failed to trigger firmware update. The device may be busy or unreachable. Please try again later."
     }
   }
 }
