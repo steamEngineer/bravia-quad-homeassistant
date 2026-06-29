@@ -1,11 +1,10 @@
 ---
-name: PR Label Apply
+name: PR Labels
 
-# Each PR must carry exactly one of the labels release-drafter knows how
-# to slot into a section. We derive that label from the "Types of changes"
-# checkbox in the PR template and apply it automatically — most external
-# contributors can't label their own PRs. The job fails when zero or more
-# than one checkbox is ticked.
+# Apply a release label from the PR template checkbox, then verify the PR
+# carries an allowed label. Both jobs run in one workflow so verification
+# sees labels applied in the prior job (GITHUB_TOKEN label events do not
+# re-trigger separate pull_request workflows).
 
 # yamllint disable-line rule:truthy
 on:
@@ -22,15 +21,15 @@ on:
       - main
 
 permissions:
-  pull-requests: write
+  pull-requests: read
 
 jobs:
   apply_label:
     name: Apply
     runs-on: ubuntu-latest
-    # GitHub-typed bots (Dependabot, etc.) don't follow the PR template
-    # and apply their own labels — skip them outright.
     if: github.event.pull_request.user.type != 'Bot'
+    permissions:
+      pull-requests: write
     steps:
       - name: 🏷 Apply label from PR description checkbox
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
@@ -48,11 +47,6 @@ jobs:
             const current = (context.payload.pull_request.labels || [])
               .map(l => l.name);
 
-            // If the PR already carries exactly one known-set label
-            // (e.g. applied by tooling that doesn't use the PR template),
-            // trust it and exit. Zero or 2+ known labels still fall through
-            // to the checkbox-driven path so a stray manual label can't hide
-            // a missing template tick.
             const alreadyLabelled = current.filter(n => known.includes(n));
             if (alreadyLabelled.length === 1) {
               core.info(
@@ -61,8 +55,6 @@ jobs:
               return;
             }
 
-            // Match a ticked checkbox bullet whose line ends with a
-            // backticked label, e.g.  - [x] CI / workflow change — `ci`
             const body = context.payload.pull_request.body || '';
             const re = /^\s*-\s*\[x\][^`\n]*`([^`]+)`/gim;
             const ticked = [];
@@ -91,8 +83,6 @@ jobs:
 
             const desired = ticked[0];
 
-            // Strip stale labels from the known set when the contributor
-            // changes their mind in the description.
             for (const name of current) {
               if (known.includes(name) && name !== desired) {
                 await github.rest.issues.removeLabel({
@@ -104,4 +94,37 @@ jobs:
               await github.rest.issues.addLabels({
                 owner, repo, issue_number, labels: [desired],
               });
+            }
+
+  verify_label:
+    name: 🏷️ Verify PR has label
+    needs: apply_label
+    if: >-
+      always() &&
+      needs.apply_label.result != 'failure' &&
+      needs.apply_label.result != 'cancelled'
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔍 Verify PR has at least one label
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3  # v9.0.0
+        with:
+          script: |
+            const allowed = [
+              'breaking-change', 'new-feature', 'enhancement', 'bugfix',
+              'refactor', 'documentation', 'maintenance', 'ci',
+              'dependencies', 'skip-changelog',
+              'feature', 'bug', 'fix', 'chore', 'docs', 'performance',
+            ];
+
+            const { owner, repo } = context.repo;
+            const pull_number = context.payload.pull_request.number;
+            const { data: pr } = await github.rest.pulls.get({
+              owner, repo, pull_number,
+            });
+            const labels = pr.labels.map(l => l.name);
+            if (!labels.some(n => allowed.includes(n))) {
+              core.setFailed(
+                'PR needs at least one release or maintenance label. ' +
+                'Tick a change type in the PR template or add a label manually.'
+              );
             }
