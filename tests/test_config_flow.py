@@ -32,6 +32,9 @@ TEST_SERIAL = "1234567"
 TEST_MODEL_ID = "HT-A9M2"
 TEST_MANUFACTURER = "SONY"
 TEST_DEVICE_NAME = "Living Room BRAVIA Theatre Quad"
+TEST_A9_HOST = "192.168.1.101"
+TEST_A9_MAC_FORMATTED = "aa:bb:cc:dd:ee:11"
+TEST_A9_SERIAL = "7654321"
 
 
 def _setup_client_identity(client: AsyncMock) -> None:
@@ -497,6 +500,154 @@ async def test_zeroconf_discovery_already_configured_by_mac(
 
     # Verify the host was updated to the new IP
     assert existing_entry.data[CONF_HOST] == TEST_HOST
+
+
+async def test_zeroconf_does_not_hijack_unrelated_serial_entry(
+    hass: HomeAssistant,
+) -> None:
+    """Test unrelated zeroconf discovery does not repoint a serial-based entry."""
+    quad_entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=TEST_DEVICE_NAME,
+        data={
+            CONF_HOST: TEST_HOST,
+            CONF_MAC: TEST_MAC_FORMATTED,
+            CONF_HAS_SUBWOOFER: True,
+            CONF_SERIAL: TEST_SERIAL,
+            CONF_MODEL_ID: TEST_MODEL_ID,
+            CONF_MODEL: MODEL_ID_TO_NAME[TEST_MODEL_ID],
+            CONF_MANUFACTURER: TEST_MANUFACTURER,
+            CONF_NAME: TEST_DEVICE_NAME,
+        },
+        unique_id=TEST_SERIAL,
+    )
+    quad_entry.add_to_hass(hass)
+
+    discovery_info = ZeroconfServiceInfo(
+        ip_address=make_ip_address(TEST_A9_HOST),
+        ip_addresses=[make_ip_address(TEST_A9_HOST)],
+        port=7000,
+        hostname="ht-a9.local",
+        type="_airplay._tcp.local.",
+        name="HT-A9._airplay._tcp.local.",
+        properties={
+            "model": "HT-A9",
+            "deviceid": "AA:BB:CC:DD:EE:11",
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "zeroconf_confirm"
+    assert quad_entry.data[CONF_HOST] == TEST_HOST
+
+
+async def test_zeroconf_updates_serial_entry_on_mac_match(
+    hass: HomeAssistant,
+) -> None:
+    """Test zeroconf discovery updates host for serial entry with matching MAC."""
+    existing_entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=TEST_DEVICE_NAME,
+        data={
+            CONF_HOST: "192.168.1.50",
+            CONF_MAC: TEST_MAC_FORMATTED,
+            CONF_HAS_SUBWOOFER: True,
+            CONF_SERIAL: TEST_SERIAL,
+            CONF_MODEL_ID: TEST_MODEL_ID,
+            CONF_MODEL: MODEL_ID_TO_NAME[TEST_MODEL_ID],
+            CONF_MANUFACTURER: TEST_MANUFACTURER,
+            CONF_NAME: TEST_DEVICE_NAME,
+        },
+        unique_id=TEST_SERIAL,
+    )
+    existing_entry.add_to_hass(hass)
+
+    discovery_info = ZeroconfServiceInfo(
+        ip_address=make_ip_address(TEST_HOST),
+        ip_addresses=[make_ip_address(TEST_HOST)],
+        port=7000,
+        hostname="bravia-quad.local",
+        type="_airplay._tcp.local.",
+        name="Living Room._airplay._tcp.local.",
+        properties={
+            "model": "Bravia Theatre Quad",
+            "deviceid": "60:FF:9E:12:34:56",
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert existing_entry.data[CONF_HOST] == TEST_HOST
+
+
+async def test_zeroconf_two_serial_entries_updates_correct_one(
+    hass: HomeAssistant,
+) -> None:
+    """Test zeroconf only updates the entry whose MAC matches discovery."""
+    quad_entry = MockConfigEntry(
+        domain=DOMAIN,
+        title=TEST_DEVICE_NAME,
+        entry_id="quad_entry",
+        data={
+            CONF_HOST: TEST_HOST,
+            CONF_MAC: TEST_MAC_FORMATTED,
+            CONF_HAS_SUBWOOFER: True,
+            CONF_SERIAL: TEST_SERIAL,
+            CONF_MODEL_ID: TEST_MODEL_ID,
+            CONF_MODEL: MODEL_ID_TO_NAME[TEST_MODEL_ID],
+            CONF_MANUFACTURER: TEST_MANUFACTURER,
+            CONF_NAME: TEST_DEVICE_NAME,
+        },
+        unique_id=TEST_SERIAL,
+    )
+    a9_entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="HT-A9",
+        entry_id="a9_entry",
+        data={
+            CONF_HOST: "192.168.1.50",
+            CONF_MAC: TEST_A9_MAC_FORMATTED,
+            CONF_HAS_SUBWOOFER: True,
+            CONF_SERIAL: TEST_A9_SERIAL,
+            CONF_MODEL_ID: "HT-A9",
+            CONF_MODEL: "HT-A9",
+            CONF_MANUFACTURER: TEST_MANUFACTURER,
+            CONF_NAME: "HT-A9",
+        },
+        unique_id=TEST_A9_SERIAL,
+    )
+    quad_entry.add_to_hass(hass)
+    a9_entry.add_to_hass(hass)
+
+    discovery_info = ZeroconfServiceInfo(
+        ip_address=make_ip_address(TEST_A9_HOST),
+        ip_addresses=[make_ip_address(TEST_A9_HOST)],
+        port=7000,
+        hostname="ht-a9.local",
+        type="_airplay._tcp.local.",
+        name="HT-A9._airplay._tcp.local.",
+        properties={
+            "model": "HT-A9",
+            "deviceid": "AA:BB:CC:DD:EE:11",
+        },
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert quad_entry.data[CONF_HOST] == TEST_HOST
+    assert a9_entry.data[CONF_HOST] == TEST_A9_HOST
 
 
 async def test_zeroconf_confirm_connection_error(hass: HomeAssistant) -> None:

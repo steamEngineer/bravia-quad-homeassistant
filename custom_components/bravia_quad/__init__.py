@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from homeassistant.const import CONF_MAC, CONF_NAME, Platform
-from homeassistant.exceptions import ConfigEntryNotReady
+from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
@@ -69,6 +69,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except (OSError, TimeoutError) as err:
         await client.async_disconnect()
         raise ConfigEntryNotReady from err
+
+    entry_serial = entry.data.get(CONF_SERIAL)
+    if entry.unique_id and entry_serial and entry.unique_id == entry_serial:
+        try:
+            device_serial = await client.async_get_serial_number()
+        except (OSError, TimeoutError):
+            device_serial = None
+        if device_serial and device_serial != entry.unique_id:
+            host = entry.data["host"]
+            _LOGGER.error(
+                "Device at %s reports serial %s but config entry expects %s",
+                host,
+                device_serial,
+                entry.unique_id,
+            )
+            await client.async_disconnect()
+            msg = (
+                f"Device identity mismatch at {host}: "
+                f"expected serial {entry.unique_id}, got {device_serial}"
+            )
+            raise ConfigEntryError(msg)
 
     # Let the connection stabilize, then start the notification listener
     # so command responses are routed correctly
