@@ -7,7 +7,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
+from homeassistant.config_entries import ConfigEntry, ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_HOST, CONF_MAC, CONF_NAME
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.device_registry import format_mac
@@ -34,6 +34,37 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
         vol.Required(CONF_HOST): str,
     }
 )
+
+
+class CannotConnectError(HomeAssistantError):
+    """Error to indicate we cannot connect."""
+
+
+def _discovery_matches_entry(
+    entry: ConfigEntry,
+    discovered_host: str | None,
+    discovered_mac: str | None,
+) -> bool:
+    """Return True if zeroconf discovery belongs to this config entry."""
+    unique_id = entry.unique_id
+    if unique_id is None:
+        return False
+
+    if discovered_host and unique_id == discovered_host:
+        return True
+
+    if discovered_mac and unique_id == discovered_mac:
+        return True
+
+    stored_serial = entry.data.get(CONF_SERIAL)
+    # ponytail: manual setup may store TCP active MAC instead of AirPlay WiFi MAC;
+    # host updates for those entries use the reauth flow instead.
+    return bool(
+        stored_serial
+        and unique_id == stored_serial
+        and discovered_mac
+        and entry.data.get(CONF_MAC) == discovered_mac
+    )
 
 
 async def validate_connection(host: str) -> None:
@@ -203,23 +234,10 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         self._discovered_model = discovery_info.properties.get("model")
 
         # Check if there's an existing entry for this device.
-        # Entries created with this version use serial as unique_id.
-        # Legacy entries use IP or MAC. Check all three.
         for entry in self._async_current_entries():
-            if entry.unique_id in (
-                self._discovered_host,
-                self._discovered_mac,
+            if _discovery_matches_entry(
+                entry, self._discovered_host, self._discovered_mac
             ):
-                # Legacy entry (IP or MAC based unique_id)
-                await self.async_set_unique_id(entry.unique_id)
-                self._abort_if_unique_id_configured(
-                    updates={CONF_HOST: self._discovered_host}
-                )
-                return self.async_abort(reason="already_configured")
-            if entry.data.get(CONF_SERIAL) and entry.unique_id == entry.data.get(
-                CONF_SERIAL
-            ):
-                # Serial-based entry; update host if IP changed
                 await self.async_set_unique_id(entry.unique_id)
                 self._abort_if_unique_id_configured(
                     updates={CONF_HOST: self._discovered_host}
@@ -310,7 +328,3 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
             description_placeholders={"name": reauth_entry.title},
             errors=errors,
         )
-
-
-class CannotConnectError(HomeAssistantError):
-    """Error to indicate we cannot connect."""

@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_MAC, Platform
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
@@ -16,6 +17,7 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.bravia_quad.const import (
     CONF_HAS_SUBWOOFER,
     CONF_MODEL,
+    CONF_SERIAL,
     DOMAIN,
 )
 from custom_components.bravia_quad.helpers import (
@@ -234,6 +236,39 @@ async def test_no_backfill_when_identity_present(
 
     # Firmware version should still be fetched (transient)
     mock_bravia_quad_client.async_get_firmware_version.assert_called_once()
+
+
+@pytest.mark.usefixtures("mock_bravia_quad_client")
+async def test_setup_fails_on_serial_identity_mismatch(
+    hass: HomeAssistant,
+    mock_bravia_quad_client: MagicMock,
+) -> None:
+    """Test setup fails when connected device serial does not match entry."""
+    entry = MockConfigEntry(
+        title="Bravia Quad",
+        domain=DOMAIN,
+        data={
+            CONF_HOST: "192.168.1.100",
+            CONF_HAS_SUBWOOFER: True,
+            CONF_SERIAL: "1234567",
+            CONF_MODEL: "BRAVIA Theatre Quad",
+            "model_id": "HT-A9M2",
+            CONF_MAC: "60:ff:9e:12:34:56",
+        },
+        unique_id="1234567",
+        entry_id="test_serial_mismatch",
+    )
+    entry.add_to_hass(hass)
+    mock_bravia_quad_client.async_get_serial_number = AsyncMock(
+        return_value="wrong_serial"
+    )
+
+    with patch("custom_components.bravia_quad.PLATFORMS", []):
+        result = await hass.config_entries.async_setup(entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert result is False
+    assert entry.state is ConfigEntryState.SETUP_ERROR
 
 
 # =============================================================================
