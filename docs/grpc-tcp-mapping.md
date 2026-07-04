@@ -1,5 +1,7 @@
 # gRPC ↔ TCP entity mapping
 
+Documentation index: [docs/README.md](README.md)
+
 Home Assistant **gRPC transport mode** exposes entities via mapping-driven factories (`grpc_mapped_entities.py`) and the gRPC media player (`grpc_media_player.py`). Unique ID suffixes match TCP mode where features are bridged so automations survive transport re-add.
 
 ## Architecture

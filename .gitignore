@@ -15,9 +15,16 @@ scripts/frida/dart_blutter_reader.js
 
 # Local dev / investigation (default: all docs private)
 docs/*
+!docs/README.md
+!docs/configuration.md
+!docs/device-compatibility.md
+!docs/development.md
+!docs/entities.md
 !docs/grpc-tcp-mapping.md
 !docs/reverse-engineering-bravia-connect.md
 !docs/sony-grpc-reference.md
+!docs/tcp-protocol.md
+!docs/troubleshooting.md
 
 scripts/grpc/session_keys.json
 *.pcap

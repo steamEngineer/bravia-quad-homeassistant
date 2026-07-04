@@ -1,5 +1,7 @@
 # Sony gRPC reference (Bravia Theatre)
 
+Documentation index: [docs/README.md](README.md)
+
 Quick reference for the BRAVIA Connect gRPC transport used in gRPC mode. See also [scripts/grpc/README.md](../scripts/grpc/README.md) for optional CLI key extraction.
 
 ## Service

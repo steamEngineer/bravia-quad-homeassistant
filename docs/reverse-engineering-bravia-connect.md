@@ -1,5 +1,7 @@
 # How I reverse-engineered BRAVIA Connect
 
+Documentation index: [docs/README.md](README.md)
+
 A field report on going from "Sony's phone app can control my Bravia Theatre Quad, so why can't Home Assistant?" to a standalone Python gRPC client that authenticates, reads live state, and writes settings — all without any public API.
 
 Target: **Sony HT-A9M2 (Bravia Theatre Quad)**, firmware `001.454`. App: **BRAVIA Connect** (`jp.co.sony.hes.home` 3.6.3, Android). This is the story; the byte-level reference lives in the sibling docs linked throughout.
@@ -11,6 +13,7 @@ And to be upfront about it: this was **AI-driven reverse engineering.** I didn't
 > This work was done for **interoperability** — making hardware I own talk to software I run — which is the purpose most explicitly protected for reverse engineering (e.g. the interoperability exemptions under 17 U.S.C. § 1201(f) in the US and Article 6 of the EU Software Directive). It was all done on **my own HT-A9M2, on my own LAN, with my own Sony account and my own credentials.** Nothing here touched anyone else's device, account, or network.
 >
 > What this project contains and doesn't:
+>
 > - **No Sony source code, binaries, or assets** were copied, decompiled for redistribution, or shipped. The integration is a clean-room reimplementation of the *wire protocol* — the observable bytes on the network — not of Sony's software.
 > - **No secrets are published.** The `client_id` and `x-api-key` values that appear here are non-secret identifiers already sent by the app on every request; they are not account credentials. Session keys, HMAC keys, OAuth tokens, and device IDs are per-user and per-device, are never committed, and are gitignored (see the redaction notes throughout).
 > - **No Sony service was attacked or overloaded.** Traffic capture was passive observation of my own sessions; the only requests made to Sony's cloud were the same OAuth/session-key calls the official app makes, at human scale.
@@ -49,7 +52,7 @@ flowchart TD
 
 - **HAR / browser DevTools** — for the OAuth redirect chain (the sign-in happens in a webview).
 - **Frida on a rooted Android phone** (LineageOS 15), driven from WSL over an adb bridge — for hooking the app's crypto and gRPC calls in memory. This was the workhorse. *(The Frida/pcap capture scripts are local investigation tooling and are not committed to the repo.)*
-- **A managed switch (Ubiquiti EdgeSwitch, "ES8") doing SPAN/RPCAP LAN capture** — for seeing traffic Frida couldn't attribute, and for answering the "does the phone even talk to the Quad?" question.
+- **A managed switch (Ubiquiti EdgeSwitch, "ES8") doing SPAN/RPCAP LAN capture** — for seeing traffic Frida couldn't attribute, and for answering the "does the phone talk to the Quads or something else for this data?" question.
 - **A standalone Python client** (`[grpc/client.py](../custom_components/bravia_quad/grpc/client.py)`) — the thing under construction, and also the test harness. Every hypothesis got encoded as a single question: "can the standalone client reproduce the app's bytes and get a non-error response?"
 
 The one principle that mattered most: **byte-perfect diffing against real app captures.** Every request builder in `grpc/` was validated by comparing its output against a Frida-captured frame from BRAVIA Connect, byte for byte. If it didn't match, it was wrong — full stop. No amount of "protobuf should accept this" counted, because the device didn't.
@@ -60,7 +63,7 @@ The one principle that mattered most: **byte-perfect diffing against real app ca
 
 ## The AI workflow: skills, plans, and entry points
 
-The reason this went from "no public API" to a working client quickly isn't that the protocol was easy — it's that I stopped doing the analysis by hand and built **AI entry points** so a Cursor agent could run the capture-hypothesize-diff-probe loop mostly on its own. This section is the honest accounting of that, because it was the actual method.
+The reason this went from "no public API" to a working client (fairly) quickly isn't that the protocol was easy — it's that I stopped doing the analysis by hand and built **AI entry points** so a Cursor agent could run the capture-hypothesize-diff-probe loop mostly on its own. This section is the honest accounting of that, because it was the actual method.
 
 *(All of the artifacts below live under* `.cursor/` *and are gitignored — they're my local agent setup, not part of the shipped integration. Treat the descriptions here as the record; the files themselves aren't committed.)*
 

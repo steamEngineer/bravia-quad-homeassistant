@@ -4,7 +4,7 @@ Optional CLI helpers for Sony Seeds OAuth and session key extraction. The Home A
 
 ## Home Assistant integration
 
-Setup chooses **TCP** (default, full entity set) or **gRPC** (experimental subset) at config time — not both. See the main [README](../../README.md#transport-modes) for transport details.
+Setup chooses **TCP** (default, full entity set) or **gRPC** (experimental subset) at config time — not both. See [docs/configuration.md](../../docs/configuration.md#transport-modes) for transport details.
 
 | Doc | Purpose |
 |-----|---------|
