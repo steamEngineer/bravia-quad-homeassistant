@@ -18,6 +18,9 @@
       "bass_level": {
         "default": "mdi:speaker"
       },
+      "subwoofer_level": {
+        "default": "mdi:subwoofer"
+      },
       "volume_step_interval": {
         "default": "mdi:timer-outline"
       },
@@ -26,6 +29,9 @@
       },
       "tv_av_sync": {
         "default": "mdi:timer-outline"
+      },
+      "voice_zoom_level": {
+        "default": "mdi:account-voice"
       }
     },
     "select": {

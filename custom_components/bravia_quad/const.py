@@ -11,6 +11,18 @@ CONF_MODEL = "model"
 CONF_MODEL_ID = "model_id"
 CONF_SERIAL = "serial_number"
 CONF_VOLUME_STEP_INTERVAL = "volume_step_interval"
+CONF_TRANSPORT = "transport"
+CONF_USE_GRPC = "use_grpc"  # legacy options key; migrated to CONF_TRANSPORT
+CONF_GRPC_KEYS = "grpc_keys"
+CONF_GRPC_OAUTH_REDIRECT = "grpc_oauth_redirect"
+CONF_GRPC_DEVICE_ID = "grpc_device_id"
+CONF_GRPC_DEBUG = "grpc_debug"
+
+TRANSPORT_TCP = "tcp"
+TRANSPORT_GRPC = "grpc"
+
+# gRPC (BRAVIA Connect control plane)
+DEFAULT_GRPC_PORT = 55051
 
 # Default values
 DEFAULT_MODEL = "Bravia Theatre"
@@ -147,12 +159,17 @@ NET_BT_STANDBY_OFF = "off"
 # Voice Zoom states
 VOICE_ZOOM_ON = "on"
 VOICE_ZOOM_OFF = "off"
+MIN_VOICE_ZOOM_LEVEL = 0
+MAX_VOICE_ZOOM_LEVEL = 2
 
 # Input options (API values used as translation keys)
 INPUT_OPTIONS: list[str] = ["tv", "hdmi1", "spotify", "bluetooth", "airplay2"]
 
 # Bass level options for non-subwoofer mode (API value -> int)
 BASS_LEVEL_OPTIONS: dict[str, int] = {"min": 0, "mid": 1, "max": 2}
+BASS_LEVEL_VALUES_TO_OPTIONS: dict[int, str] = {
+    v: k for k, v in BASS_LEVEL_OPTIONS.items()
+}
 
 # DRC options (API values used as translation keys)
 DRC_OPTIONS: list[str] = ["auto", "on", "off"]
@@ -172,9 +189,23 @@ HDMI_STANDBY_LINK_OPTIONS: list[str] = ["auto", "on", "off"]
 # Audio Return Channel options (API values used as translation keys)
 AUDIO_RETURN_CHANNEL_OPTIONS: list[str] = ["off", "arc", "earc"]
 
+# gRPC sound effect modes (BRAVIA Connect UI "Sound Field" selection)
+SOUND_EFFECT_OPTIONS: list[str] = [
+    "Dolby Speaker Virtualizer",
+    "Neural:X",
+    "360SSM",
+]
+
+# gRPC 360SSM height (speaker_sound_setting.360ssm_height)
+SSM360_HEIGHT_OPTIONS: list[str] = ["high", "mid", "low"]
+
+# gRPC center speaker mode — extend at runtime if device reports other values
+CENTER_SPEAKER_MODE_OPTIONS: list[str] = ["off", "on"]
+
 # AV Sync limits (milliseconds)
 MAX_AV_SYNC = 300
 MIN_AV_SYNC = 0
+AV_SYNC_STEP = 25
 
 # Model ID to friendly name fallback (used when HTTP/zeroconf unavailable)
 MODEL_ID_TO_NAME: dict[str, str] = {

@@ -6,7 +6,7 @@ import logging
 from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
-from homeassistant.components.number import NumberEntity, NumberMode, RestoreNumber
+from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
 
@@ -21,13 +21,15 @@ from .const import (
     MAX_AV_SYNC,
     MAX_BASS_LEVEL,
     MAX_REAR_LEVEL,
-    MAX_VOLUME_STEP_INTERVAL,
     MIN_AV_SYNC,
     MIN_BASS_LEVEL,
     MIN_REAR_LEVEL,
+    TRANSPORT_GRPC,
+    TRANSPORT_TCP,
 )
 from .helpers import (
     BraviaQuadNotificationMixin,
+    BraviaQuadVolumeStepIntervalNumber,
     VolumeTransitionMixin,
     get_device_info,
     raise_set_rejected,
@@ -58,13 +60,27 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bravia Quad number entities from a config entry."""
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+
+    if data.transport == TRANSPORT_GRPC:
+        assert data.grpc_client is not None
+        from .grpc_mapped_entities import mapped_number_entities
+
+        async_add_entities(
+            mapped_number_entities(data.grpc_client, entry),
+            update_before_add=True,
+        )
+        return
+
+    if data.transport != TRANSPORT_TCP or data.tcp_client is None:
+        return
+
     client = data.tcp_client
 
     # Create number entities
     entities: list[NumberEntity] = [
         BraviaQuadVolumeNumber(client, entry),
         BraviaQuadRearLevelNumber(client, entry),
-        BraviaQuadVolumeStepIntervalNumber(client, entry),
+        BraviaQuadVolumeStepIntervalNumber(entry, client),
     ]
 
     # Only add bass level slider if subwoofer is detected
@@ -82,6 +98,7 @@ class BraviaQuadVolumeNumber(
 ):
     """Representation of a Bravia Quad volume control."""
 
+    _attr_entity_category = EntityCategory.CONFIG
     _attr_entity_registry_enabled_default = False
     _attr_has_entity_name = True
     _attr_mode = NumberMode.SLIDER
@@ -372,38 +389,3 @@ class BraviaQuadTvAvSyncNumber(BraviaQuadNotificationMixin, NumberEntity):
             self._attr_native_value = await self._client.async_get_tv_av_sync()
         except (OSError, TimeoutError):
             _LOGGER.exception("Failed to update TV AV sync state")
-
-
-class BraviaQuadVolumeStepIntervalNumber(RestoreNumber):
-    """Representation of a Bravia Quad volume step interval control."""
-
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_has_entity_name = True
-    _attr_mode = NumberMode.BOX
-    _attr_native_max_value = MAX_VOLUME_STEP_INTERVAL
-    _attr_native_min_value = 0
-    _attr_native_step = 1
-    _attr_native_unit_of_measurement = "ms"
-    _attr_translation_key = "volume_step_interval"
-
-    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
-        """Initialize the volume step interval number entity."""
-        self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_volume_step_interval"
-        self._attr_native_value = client.volume_step_interval
-        self._attr_device_info = get_device_info(entry)
-
-    async def async_added_to_hass(self) -> None:
-        """Restore previous state on restart."""
-        await super().async_added_to_hass()
-        if (
-            last_state := await self.async_get_last_number_data()
-        ) is not None and last_state.native_value is not None:
-            self._attr_native_value = last_state.native_value
-            self._client.volume_step_interval = int(last_state.native_value)
-
-    async def async_set_native_value(self, value: float) -> None:
-        """Set the volume step interval."""
-        self._client.volume_step_interval = int(value)
-        self._attr_native_value = value
-        self.async_write_ha_state()

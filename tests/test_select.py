@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NamedTuple
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, patch
 
 import pytest
@@ -10,7 +10,12 @@ from homeassistant.const import ATTR_ENTITY_ID, CONF_HOST, Platform
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.bravia_quad.const import CONF_HAS_SUBWOOFER, DOMAIN
+from custom_components.bravia_quad.const import (
+    CONF_HAS_SUBWOOFER,
+    CONF_TRANSPORT,
+    DOMAIN,
+    TRANSPORT_TCP,
+)
 
 from .conftest import get_entity_id_by_unique_id_suffix
 
@@ -20,23 +25,6 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
 
 SELECT_DOMAIN = "select"
-
-
-class InputSelectTestCase(NamedTuple):
-    """Test case for input select options."""
-
-    option: str
-    expected_value: str
-
-
-# Options are now the API values directly (used as translation keys)
-INPUT_SELECT_TEST_CASES = [
-    InputSelectTestCase("hdmi1", "hdmi1"),
-    InputSelectTestCase("spotify", "spotify"),
-    InputSelectTestCase("bluetooth", "bluetooth"),
-    InputSelectTestCase("airplay2", "airplay2"),
-    InputSelectTestCase("tv", "tv"),
-]
 
 
 @pytest.fixture
@@ -54,6 +42,7 @@ def mock_config_entry_no_subwoofer() -> MockConfigEntry:
         data={
             CONF_HOST: "192.168.1.100",
             CONF_HAS_SUBWOOFER: False,
+            CONF_TRANSPORT: TRANSPORT_TCP,
         },
         unique_id="192.168.1.100",
         entry_id="test_entry_id_no_sub",
@@ -61,7 +50,7 @@ def mock_config_entry_no_subwoofer() -> MockConfigEntry:
 
 
 # =============================================================================
-# Input Select Tests
+# Select entity setup
 # =============================================================================
 
 
@@ -71,11 +60,9 @@ async def test_select_entities(
     entity_registry: er.EntityRegistry,
 ) -> None:
     """Test select entities are created correctly."""
-    # Verify expected select entities exist
     expected_entities = {
         "_drc": "auto",
     }
-    disabled_entities = ["_input"]
 
     for suffix, expected_state in expected_entities.items():
         entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
@@ -85,187 +72,7 @@ async def test_select_entities(
         assert state is not None, f"State for {entity_id} not found"
         assert state.state == expected_state, f"Expected {expected_state} for {suffix}"
 
-    for suffix in disabled_entities:
-        entity_id = get_entity_id_by_unique_id_suffix(entity_registry, suffix)
-        assert entity_id is not None, f"Entity with suffix {suffix} not found"
-        state = hass.states.get(entity_id)
-        assert state is None, f"Expected {suffix} to be disabled"
-
-
-@pytest.mark.usefixtures("init_integration_all")
-async def test_input_select_option(
-    hass: HomeAssistant,
-    mock_bravia_quad_client: MagicMock,
-    entity_registry: er.EntityRegistry,
-) -> None:
-    """Test selecting an input option."""
-    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_input")
-    assert entity_id is not None
-
-    # Verify initial state
-    state = hass.states.get(entity_id)
-    assert state is not None
-    assert state.state == "tv"  # Mock returns "tv"
-
-    mock_bravia_quad_client.async_set_input.return_value = True
-
-    await hass.services.async_call(
-        SELECT_DOMAIN,
-        "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "hdmi1"},
-        blocking=True,
-    )
-
-    mock_bravia_quad_client.async_set_input.assert_called_once_with("hdmi1")
-
-
-@pytest.mark.parametrize(
-    ("option", "expected_value"),
-    INPUT_SELECT_TEST_CASES,
-    ids=[tc.option for tc in INPUT_SELECT_TEST_CASES],
-)
-@pytest.mark.usefixtures("init_integration_all")
-async def test_input_select_options_parametrized(
-    hass: HomeAssistant,
-    mock_bravia_quad_client: MagicMock,
-    entity_registry: er.EntityRegistry,
-    option: str,
-    expected_value: str,
-) -> None:
-    """Test selecting various input options."""
-    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_input")
-    assert entity_id is not None
-
-    mock_bravia_quad_client.async_set_input.return_value = True
-
-    await hass.services.async_call(
-        SELECT_DOMAIN,
-        "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": option},
-        blocking=True,
-    )
-
-    mock_bravia_quad_client.async_set_input.assert_called_once_with(expected_value)
-
-
-@pytest.mark.usefixtures("init_integration_all")
-async def test_input_select_spotify(
-    hass: HomeAssistant,
-    mock_bravia_quad_client: MagicMock,
-    entity_registry: er.EntityRegistry,
-) -> None:
-    """Test selecting Spotify input."""
-    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_input")
-    assert entity_id is not None
-
-    mock_bravia_quad_client.async_set_input.return_value = True
-
-    await hass.services.async_call(
-        SELECT_DOMAIN,
-        "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "spotify"},
-        blocking=True,
-    )
-
-    mock_bravia_quad_client.async_set_input.assert_called_once_with("spotify")
-
-
-@pytest.mark.usefixtures("init_integration_all")
-async def test_input_select_bluetooth(
-    hass: HomeAssistant,
-    mock_bravia_quad_client: MagicMock,
-    entity_registry: er.EntityRegistry,
-) -> None:
-    """Test selecting Bluetooth input."""
-    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_input")
-    assert entity_id is not None
-
-    mock_bravia_quad_client.async_set_input.return_value = True
-
-    await hass.services.async_call(
-        SELECT_DOMAIN,
-        "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "bluetooth"},
-        blocking=True,
-    )
-
-    mock_bravia_quad_client.async_set_input.assert_called_once_with("bluetooth")
-
-
-@pytest.mark.usefixtures("init_integration_all")
-async def test_input_select_airplay(
-    hass: HomeAssistant,
-    mock_bravia_quad_client: MagicMock,
-    entity_registry: er.EntityRegistry,
-) -> None:
-    """Test selecting Airplay input."""
-    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_input")
-    assert entity_id is not None
-
-    mock_bravia_quad_client.async_set_input.return_value = True
-
-    await hass.services.async_call(
-        SELECT_DOMAIN,
-        "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "airplay2"},
-        blocking=True,
-    )
-
-    mock_bravia_quad_client.async_set_input.assert_called_once_with("airplay2")
-
-
-@pytest.mark.usefixtures("init_integration_all")
-async def test_input_select_fails(
-    hass: HomeAssistant,
-    mock_bravia_quad_client: MagicMock,
-    entity_registry: er.EntityRegistry,
-) -> None:
-    """Test input select when API call fails."""
-    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_input")
-    assert entity_id is not None
-
-    # Mock API failure
-    mock_bravia_quad_client.async_set_input.return_value = False
-
-    # Get initial state
-    initial_state = hass.states.get(entity_id)
-    assert initial_state is not None
-
-    await hass.services.async_call(
-        SELECT_DOMAIN,
-        "select_option",
-        {ATTR_ENTITY_ID: entity_id, "option": "hdmi1"},
-        blocking=True,
-    )
-
-    # State should remain unchanged after failure
-    state = hass.states.get(entity_id)
-    assert state is not None
-    assert state.state == initial_state.state
-
-
-@pytest.mark.usefixtures("init_integration_all")
-async def test_input_notification_unknown_value(
-    hass: HomeAssistant,
-    mock_bravia_quad_client: MagicMock,
-    entity_registry: er.EntityRegistry,
-) -> None:
-    """Test input notification with unknown value logs warning."""
-    entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_input")
-    assert entity_id is not None
-
-    # Get the registered callback
-    callback = mock_bravia_quad_client.register_notification_callback.call_args_list[0][
-        0
-    ][1]
-
-    # Trigger callback with unknown value
-    await callback("unknown_input")
-
-    # State should remain unchanged
-    state = hass.states.get(entity_id)
-    assert state is not None
-    assert state.state == "tv"
+    assert get_entity_id_by_unique_id_suffix(entity_registry, "_input") is None
 
 
 # =============================================================================

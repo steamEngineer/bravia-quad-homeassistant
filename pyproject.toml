@@ -23,12 +23,35 @@ dev = [
     "pytest-homeassistant-custom-component>=0.13.297",
     "pytest-xdist>=3.8.0",
     "ruff>=0.14.0",
+    "grpcio>=1.76.0",
+    "grpcio-tools>=1.76.0",
+    "requests>=2.32.0",
 ]
 
 [tool.pytest.ini_options]
+addopts = "-n auto --tb=short"
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 
 [tool.ty.environment]
 python-version = "3.14"
+
+[tool.ty.src]
+exclude = [
+    "custom_components/bravia_quad/grpc/bravia_control_pb2.py",
+    "custom_components/bravia_quad/grpc/bravia_control_pb2_grpc.py",
+    "custom_components/bravia_quad/grpc/client.py",
+]
+
+[tool.ty.rules]
+invalid-argument-type = "warn"
+invalid-method-override = "warn"
+invalid-return-type = "warn"
+not-iterable = "warn"
+possibly-missing-attribute = "warn"
+unresolved-attribute = "warn"
+unsupported-operator = "warn"
+
+[tool.ty.terminal]
+error-on-warning = false

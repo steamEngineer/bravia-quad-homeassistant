@@ -5,22 +5,33 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
-from homeassistant.const import CONF_HOST, CONF_MAC
+from homeassistant.components.number import NumberMode, RestoreNumber
+from homeassistant.const import CONF_HOST, CONF_MAC, EntityCategory
+from homeassistant.core import State
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
+from homeassistant.helpers.restore_state import (
+    StoredState,
+)
+from homeassistant.helpers.restore_state import (
+    async_get as async_get_restore_state,
+)
+from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import DOMAIN, MAX_VOLUME_STEP_INTERVAL
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
+    from .bravia_grpc_client import BraviaGrpcClientAsync
     from .bravia_quad_client import BraviaQuadClient
+    from .grpc_mapping import GrpcTcpMapping
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -223,6 +234,30 @@ def get_device_info(entry: ConfigEntry) -> DeviceInfo:
     return DeviceInfo(identifiers={(DOMAIN, require_unique_id(entry))})
 
 
+def remove_legacy_group_subdevices(
+    device_registry: dr.DeviceRegistry, entry: ConfigEntry
+) -> None:
+    """Remove Bravia Connect-style sub-devices from a prior grouping experiment."""
+    uid = require_unique_id(entry)
+    for suffix in ("playback", "sound", "sync", "wireless", "hdmi", "system"):
+        device = device_registry.async_get_device(identifiers={(DOMAIN, uid, suffix)})
+        if device is not None:
+            device_registry.async_remove_device(device.id)
+
+
+def remove_legacy_input_select(
+    entity_registry: er.EntityRegistry, entry: ConfigEntry
+) -> None:
+    """Remove standalone selects superseded by the media player."""
+    uid = require_unique_id(entry)
+    for suffix in ("input", "sound_effect"):
+        unique_id = f"{DOMAIN}_{uid}_{suffix}"
+        if entity_id := entity_registry.async_get_entity_id(
+            "select", DOMAIN, unique_id
+        ):
+            entity_registry.async_remove(entity_id)
+
+
 class BraviaQuadAvailabilityMixin(Entity):
     """
     Mixin that tracks connection availability for Bravia Quad entities.
@@ -287,6 +322,163 @@ class BraviaQuadNotificationMixin(BraviaQuadAvailabilityMixin):
         )
 
 
+class BraviaGrpcPathMixin(Entity):
+    """
+    Mixin for entities driven by gRPC field paths.
+
+    Subclasses must define:
+    - _grpc_client: BraviaGrpcClientAsync
+    - _grpc_path: str
+    - _on_grpc_state(value): async handler
+    """
+
+    _grpc_client: BraviaGrpcClientAsync
+    _grpc_path: str
+
+    @property
+    def available(self) -> bool:
+        """Entity is available when gRPC is connected."""
+        return self._grpc_client.is_connected
+
+    def _grpc_state_callback(self, update: Any) -> None:
+        """Filter notify stream updates for this entity's path."""
+        if update.path != self._grpc_path:
+            return
+        self.hass.async_create_task(self._on_grpc_state(update.value))
+
+    async def _on_grpc_state(self, value: Any) -> None:
+        """Handle gRPC state update. Override in subclass."""
+        raise NotImplementedError
+
+    async def async_added_to_hass(self) -> None:
+        """Register gRPC notify callback when entity is added."""
+        await super().async_added_to_hass()
+        self._grpc_client.add_state_callback(self._grpc_state_callback)
+        cached = self._grpc_client.notify_state.get(self._grpc_path)
+        if cached is not None:
+            await self._on_grpc_state(cached)
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Remove gRPC callback when entity is removed."""
+        self._grpc_client.remove_state_callback(self._grpc_state_callback)
+        await super().async_will_remove_from_hass()
+
+
+async def _async_get_entity_last_state(entity: Entity) -> State | None:
+    """Return persisted HA state from the previous run, if any."""
+    if entity.hass is None or entity.entity_id is None:
+        return None
+    stored = async_get_restore_state(entity.hass).last_states.get(entity.entity_id)
+    if stored is None:
+        return None
+    return stored.state
+
+
+def _coerce_select_option(value: Any, options: list[str]) -> str | None:
+    """Map a notify/exec value to a select option."""
+    if value is None:
+        return None
+    text = str(value)
+    if text in options:
+        return text
+    lower_map = {opt.lower(): opt for opt in options}
+    return lower_map.get(text.lower())
+
+
+def persist_notify_only_restore_state(entity: Entity, state: str | None) -> None:
+    """Keep last good HA state when unload saves unknown/unavailable."""
+    if (
+        not state
+        or state in ("unknown", "unavailable")
+        or entity.hass is None
+        or entity.entity_id is None
+    ):
+        return
+    async_get_restore_state(entity.hass).last_states[entity.entity_id] = StoredState(
+        State(entity.entity_id, state),
+        None,
+        dt_util.utcnow(),
+    )
+
+
+async def restore_last_select_option(entity: Entity, options: list[str]) -> bool:
+    """Apply last HA state to a select when gRPC has no initial value."""
+    last = await _async_get_entity_last_state(entity)
+    if last is None or last.state in ("unknown", "unavailable", ""):
+        return False
+    if last.state not in options:
+        options.append(last.state)
+        entity._attr_options = options  # type: ignore[attr-defined]
+    entity._attr_current_option = last.state  # type: ignore[attr-defined]
+    entity.async_write_ha_state()
+    return True
+
+
+async def restore_last_switch_state(entity: Entity) -> bool:
+    """Apply last HA on/off state when gRPC has no initial value."""
+    last = await _async_get_entity_last_state(entity)
+    if last is None or last.state not in ("on", "off"):
+        return False
+    entity._attr_is_on = last.state == "on"  # type: ignore[attr-defined]
+    entity.async_write_ha_state()
+    return True
+
+
+async def restore_notify_only_switch(
+    entity: Entity,
+    grpc_client: BraviaGrpcClientAsync,
+    grpc_path: str,
+) -> bool:
+    """Restore last HA on/off for unreadable gRPC paths and seed notify cache."""
+    last = await _async_get_entity_last_state(entity)
+    is_on: bool | None = None
+    if last is not None and last.state in ("on", "off"):
+        is_on = last.state == "on"
+    if is_on is None:
+        cached = grpc_client.notify_state.get(grpc_path)
+        if isinstance(cached, bool):
+            is_on = cached
+        elif isinstance(cached, int):
+            is_on = cached != 0
+    if is_on is None:
+        return False
+    entity._attr_is_on = is_on  # type: ignore[attr-defined]
+    grpc_client.merge_notify_cache({grpc_path: is_on})
+    return True
+
+
+async def restore_notify_only_select(
+    entity: Entity,
+    grpc_client: BraviaGrpcClientAsync,
+    grpc_path: str,
+    options: list[str],
+    *,
+    mapping: GrpcTcpMapping | None = None,
+) -> bool:
+    """Restore last HA option for unreadable gRPC paths and seed notify cache."""
+    last = await _async_get_entity_last_state(entity)
+    option: str | None = None
+    if last is not None and last.state not in ("unknown", "unavailable", ""):
+        option = last.state
+    if option is None:
+        option = _coerce_select_option(grpc_client.notify_state.get(grpc_path), options)
+    if option is None:
+        return False
+    if option not in options:
+        options.append(option)
+        entity._attr_options = options  # type: ignore[attr-defined]
+    entity._attr_current_option = option  # type: ignore[attr-defined]
+    if mapping is not None:
+        from .grpc_value_normalize import denormalize_for_exec
+
+        _, cache_value = denormalize_for_exec(mapping, option)
+    else:
+        cache_value = option
+    if cache_value is not None:
+        grpc_client.merge_notify_cache({grpc_path: cache_value})
+    return True
+
+
 # Grace period (seconds) after a transition ends during which device
 # notifications are still suppressed.  This prevents stale in-flight
 # notifications from snapping the slider back to an intermediate value.
@@ -298,9 +490,10 @@ class VolumeTransitionMixin:
     Mixin that provides smooth volume transition logic.
 
     Subclasses must have:
-    - self._client: BraviaQuadClient (with async_set_volume, volume_step_interval)
     - self.hass: HomeAssistant
     - self.async_write_ha_state(): method
+    - volume_step_interval property (ms between steps)
+    - _async_volume_step(volume: int) -> bool
 
     Device notifications are suppressed while a transition is running **and**
     for a short grace period after it finishes so that stale notifications
@@ -308,7 +501,6 @@ class VolumeTransitionMixin:
     actions (e.g. moving the slider) are never blocked.
     """
 
-    _client: BraviaQuadClient
     hass: HomeAssistant
 
     def _init_volume_transition(self) -> None:
@@ -317,6 +509,15 @@ class VolumeTransitionMixin:
         self._transition_in_progress: bool = False
         self._transition_generation: int = 0
         self._notification_suppressed_until: float = 0.0
+
+    @property
+    def volume_step_interval(self) -> int:
+        """Return configured volume step interval in milliseconds."""
+        return self._client.volume_step_interval  # type: ignore[attr-defined]
+
+    async def _async_volume_step(self, volume: int) -> bool:
+        """Set volume on the device; override for non-TCP transports."""
+        return await self._client.async_set_volume(volume)  # type: ignore[attr-defined]
 
     @property
     def volume_transition_in_progress(self) -> bool:
@@ -359,14 +560,14 @@ class VolumeTransitionMixin:
         immediate set_volume call fails.
         Callers should set optimistic state before calling this method.
         """
-        interval_ms = self._client.volume_step_interval
+        interval_ms = self.volume_step_interval
 
         # Cancel any existing transition
         self._cancel_volume_transition()
 
         if interval_ms <= 0 or current_volume == target_volume:
             self._transition_in_progress = False
-            return await self._client.async_set_volume(target_volume)
+            return await self._async_volume_step(target_volume)
 
         # Start background transition
         self._transition_in_progress = True
@@ -400,7 +601,7 @@ class VolumeTransitionMixin:
             for i in range(1, steps + 1):
                 await asyncio.sleep(delay)
                 next_volume = start_volume + (i * step_increment)
-                success = await self._client.async_set_volume(next_volume)
+                success = await self._async_volume_step(next_volume)
                 if not success:
                     _LOGGER.warning("Failed to set volume step to %d", next_volume)
                     break
@@ -413,3 +614,44 @@ class VolumeTransitionMixin:
                     time.monotonic() + TRANSITION_NOTIFICATION_GRACE_PERIOD
                 )
                 self._transition_task = None
+
+
+class BraviaQuadVolumeStepIntervalNumber(RestoreNumber):
+    """Local volume step interval for smooth volume transitions."""
+
+    _attr_entity_category = EntityCategory.CONFIG
+    _attr_has_entity_name = True
+    _attr_mode = NumberMode.BOX
+    _attr_native_max_value = MAX_VOLUME_STEP_INTERVAL
+    _attr_native_min_value = 0
+    _attr_native_step = 1
+    _attr_native_unit_of_measurement = "ms"
+    _attr_should_poll = False
+    _attr_translation_key = "volume_step_interval"
+
+    def __init__(
+        self,
+        entry: ConfigEntry,
+        volume_step_client: BraviaQuadClient | BraviaGrpcClientAsync,
+        *,
+        enabled_default: bool = True,
+    ) -> None:
+        self._volume_step_client = volume_step_client
+        self._attr_entity_registry_enabled_default = enabled_default
+        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_volume_step_interval"
+        self._attr_device_info = get_device_info(entry)
+        self._attr_native_value = volume_step_client.volume_step_interval
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        if (
+            last_state := await self.async_get_last_number_data()
+        ) is not None and last_state.native_value is not None:
+            self._attr_native_value = last_state.native_value
+        self._volume_step_client.volume_step_interval = int(self._attr_native_value)
+
+    async def async_set_native_value(self, value: float) -> None:
+        interval = int(value)
+        self._volume_step_client.volume_step_interval = interval
+        self._attr_native_value = value
+        self.async_write_ha_state()

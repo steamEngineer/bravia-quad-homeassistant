@@ -24,6 +24,8 @@ from .const import (
     MUTE_ON,
     POWER_OFF,
     POWER_ON,
+    TRANSPORT_GRPC,
+    TRANSPORT_TCP,
 )
 from .helpers import BraviaQuadAvailabilityMixin, VolumeTransitionMixin, get_device_info
 
@@ -45,6 +47,17 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bravia Quad media player from a config entry."""
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+
+    if data.transport == TRANSPORT_GRPC:
+        assert data.grpc_client is not None
+        from .grpc_media_player import BraviaGrpcMediaPlayer
+
+        async_add_entities([BraviaGrpcMediaPlayer(data.grpc_client, entry)])
+        return
+
+    if data.transport != TRANSPORT_TCP or data.tcp_client is None:
+        return
+
     client = data.tcp_client
     async_add_entities([BraviaQuadMediaPlayer(client, entry)])
 

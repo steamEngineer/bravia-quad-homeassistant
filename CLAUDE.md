@@ -14,7 +14,7 @@
 ## Development
 
 - `./scripts/setup` — dependencies and pre-commit hooks
-- `uv run pytest` — test suite
+- `uv run pytest` — test suite (parallel via pytest-xdist; use `-n0` for serial debugging)
 - `uv run ty custom_components tests` — type checking
 - `./scripts/lint` — Ruff lint and format
 - `./scripts/develop` — local Home Assistant (http://localhost:8123)
@@ -24,3 +24,5 @@ Run `./scripts/lint` and `uv run pytest` after code changes.
 ## Code standards
 
 Integration patterns, entity conventions, and review guidance: [`.github/copilot-instructions.md`](.github/copilot-instructions.md).
+
+HA framework API behavior and Context7 lookup: [`.cursor/skills/ha-framework-docs/SKILL.md`](.cursor/skills/ha-framework-docs/SKILL.md) (also `.cursor/rules/ha-framework-internals.mdc` when editing integration/tests).

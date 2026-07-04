@@ -8,6 +8,35 @@
           "host": "IP address"
         }
       },
+      "transport": {
+        "title": "Connection method",
+        "description": "Choose how Home Assistant controls your Bravia Theatre.\n\n**gRPC — BRAVIA Connect (recommended, EXPERIMENTAL)**\nSame control plane as the Sony Home Entertainment Connect app: live push updates, now-playing metadata, play/pause/next on Spotify and AirPlay, sound field mode, DSEE Ultimate, 360SSM height, center speaker mode, DTS Dialog Control, and subwoofer level. Requires a one-time Sony account sign-in. This mode is **experimental** — expect rough edges, parity gaps, and breaking changes between releases.\n\n**TCP — legacy IP control**\nOriginal reverse-engineered protocol (port 33336). No Sony sign-in, but fewer features: no streaming transport controls, no now-playing metadata, and no BRAVIA Connect-only sound settings. TCP still exposes a few extras such as the Bluetooth pairing button, HDMI passthrough, temperature, and detailed network diagnostics.\n\nBoth modes use HTTP for firmware and network sensors. To switch later, remove and re-add the integration.",
+        "data": {
+          "transport": {
+            "label": "Connection method",
+            "grpc": "gRPC — BRAVIA Connect (recommended, EXPERIMENTAL)",
+            "tcp": "TCP — legacy IP control"
+          }
+        }
+      },
+      "grpc_oauth": {
+        "title": "Sign in to Sony (EXPERIMENTAL)",
+        "description": "**gRPC is experimental.** Use **Chrome** (recommended) and open developer tools **before** you sign in:\n\n1. Press **F12** → **Network** → enable **Preserve log**\n2. Open this sign-in link and complete Sony login for Home Entertainment & Sound Service:\n\n{authorize_url}\n\n3. After login, Chrome tries to open `ssh-app://signin?...` and fails on desktop. That is expected — the URL is **not** shown in the address bar.\n4. In **Network**, filter `signin` and find the request to `ssh-app://signin?code=...`. Copy the full URL from **Request URL** or the **Location** header.\n5. Select **Submit** below and paste the URL (or just the `code` value) on the next step."
+      },
+      "grpc_oauth_callback": {
+        "title": "Paste Sony sign-in redirect",
+        "description": "Paste the `ssh-app://signin?code=...` URL from Chrome **Network** tools, or paste only the `code` value.\n\n**Chrome:** **F12** → **Network** → filter `signin` → select the `ssh-app://signin` request → copy **Request URL** or the **Location** response header.",
+        "data": {
+          "grpc_oauth_redirect": "Redirect URL or authorization code"
+        }
+      },
+      "grpc_oauth_device": {
+        "title": "Choose Sony device",
+        "description": "Your Sony account has more than one device. Select the Bravia Theatre you are setting up.",
+        "data": {
+          "grpc_device_id": "Sony device"
+        }
+      },
       "user_confirm": {
         "title": "Confirm setup",
         "description": "Connection to {host} was successful. Do you want to add this device?"
@@ -18,21 +47,36 @@
       },
       "reauth_confirm": {
         "title": "Re-authenticate {name}",
-        "description": "The device is no longer reachable. Update the IP address if it has changed.",
+        "description": "The device is no longer reachable. Update the IP address if it has changed. gRPC entries will sign in to Sony again on the next steps.",
         "data": {
           "host": "IP address"
         }
       }
     },
     "error": {
-      "cannot_connect": "Unable to connect to the Bravia Theatre device. Please verify:\n- The IP address is correct\n- IP control is enabled on the device\n- Port 33336 is accessible",
+      "cannot_connect": "Unable to connect to the Bravia Theatre device. Please verify:\n- The IP address is correct\n- The device is on your network\n- For TCP: IP control is enabled and port 33336 is reachable\n- For gRPC: port 55051 is reachable and External control is enabled in the Sony app",
+      "invalid_grpc_keys": "Invalid Sony Seeds credentials after sign-in.",
+      "invalid_oauth_redirect": "Could not read an authorization code from your input. In Chrome **Network** tools, copy the full `ssh-app://signin?...` URL or paste only the `code` value.",
+      "oauth_failed": "Sony sign-in failed. Start again and use a fresh login link.",
       "unknown": "Unexpected error occurred"
     },
     "abort": {
       "already_configured": "Device is already configured",
       "not_bravia_theatre": "Discovered device is not a Bravia Theatre speaker",
       "cannot_connect": "Could not connect to device",
-      "reauth_successful": "Re-authentication was successful"
+      "reauth_successful": "Re-authentication was successful",
+      "not_grpc_transport": "gRPC options are only available for gRPC transport entries"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "gRPC debug logging",
+        "description": "Enable verbose logging for gRPC notify and ExecCommand traffic. Useful when diagnosing BRAVIA Connect session issues.",
+        "data": {
+          "grpc_debug": "Verbose gRPC debug logging"
+        }
+      }
     }
   },
   "entity": {
@@ -54,6 +98,9 @@
       "bass_level": {
         "name": "Bass level"
       },
+      "subwoofer_level": {
+        "name": "Subwoofer level"
+      },
       "volume_step_interval": {
         "name": "Volume step interval"
       },
@@ -62,6 +109,9 @@
       },
       "tv_av_sync": {
         "name": "AV sync (TV)"
+      },
+      "voice_zoom_level": {
+        "name": "Voice Zoom level"
       }
     },
     "select": {
@@ -137,6 +187,25 @@
           "arc": "ARC",
           "earc": "eARC"
         }
+      },
+      "sound_effect": {
+        "name": "Sound field mode",
+        "state": {
+          "Dolby Speaker Virtualizer": "Dolby Speaker Virtualizer",
+          "Neural:X": "DTS Neural:X",
+          "360SSM": "360 Spatial Sound Mapping"
+        }
+      },
+      "ssm_360_height": {
+        "name": "360SSM height",
+        "state": {
+          "high": "High",
+          "mid": "Mid",
+          "low": "Low"
+        }
+      },
+      "center_speaker_mode": {
+        "name": "Center speaker mode"
       }
     },
     "media_player": {
@@ -150,6 +219,45 @@
               "bluetooth": "Bluetooth",
               "airplay2": "AirPlay"
             }
+          },
+          "audio_format": {
+            "name": "Audio format"
+          },
+          "audio_channel": {
+            "name": "Audio channel"
+          },
+          "sampling_rate": {
+            "name": "Sampling rate"
+          },
+          "is_360ra": {
+            "name": "360 Reality Audio"
+          },
+          "upmixer": {
+            "name": "Upmixer"
+          },
+          "virtualizer": {
+            "name": "Virtualizer"
+          },
+          "bt_codec": {
+            "name": "Bluetooth codec"
+          },
+          "bt_device_name": {
+            "name": "Bluetooth device"
+          },
+          "bt_signal_strength": {
+            "name": "Bluetooth signal"
+          },
+          "hdmi_error": {
+            "name": "HDMI error"
+          },
+          "no_audio": {
+            "name": "No audio"
+          },
+          "spotify_status": {
+            "name": "Spotify status"
+          },
+          "source_unavailable_reason": {
+            "name": "Source unavailable"
           }
         }
       }
@@ -192,6 +300,12 @@
       },
       "external_control": {
         "name": "External control"
+      },
+      "dsee_ultimate": {
+        "name": "DSEE Ultimate"
+      },
+      "dts_dialog_control": {
+        "name": "DTS Dialog Control"
       }
     },
     "sensor": {
@@ -239,6 +353,9 @@
       },
       "mac_wireless": {
         "name": "MAC address (wireless)"
+      },
+      "raee_measured": {
+        "name": "Room calibration measured"
       }
     }
   },
@@ -266,6 +383,12 @@
     },
     "verify_value_mismatch_hint": {
       "message": "Device kept {feature} at {actual} (requested {requested}). {hint}"
+    },
+    "grpc_exec_failed": {
+      "message": "gRPC command failed for {path}"
+    },
+    "grpc_feature_unavailable": {
+      "message": "gRPC command blocked for {path}: {reason}"
     }
   }
 }

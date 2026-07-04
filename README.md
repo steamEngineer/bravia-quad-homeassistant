@@ -24,6 +24,7 @@ _This integration may also be compatible with other Bravia audio devices - see t
 - **Volume Step Interval**: Configure a delay (0-10,000ms) between volume steps to smoothly increment/decrement volume, avoiding jarring changes
 - **Rear Level Control**: Adjust rear speaker level from -10-10 via a number entity
 - **Source Selection**: Switch between inputs (TV/eARC, HDMI In, Spotify, Bluetooth, Airplay)
+- **Streaming playback controls (gRPC only)**: Play, pause, and next track on Spotify, Bluetooth, and AirPlay sources via the media player entity (when active on a streaming input)
 - **Bass Level Control**: Automatically adapts based on subwoofer presence:
   - With subwoofer: Slider from -10 to +10
   - Without subwoofer: Select between MIN, MID, MAX
@@ -104,9 +105,34 @@ The integration supports automatic discovery of Bravia Theatre devices on your l
 During setup, you will be prompted to provide:
 
 - **IP Address**: The IP address of your Bravia Theatre device (required if not auto-discovered)
+- **Transport**: **gRPC** (recommended, **EXPERIMENTAL** — BRAVIA Connect via Sony sign-in) or **TCP** (legacy IP control, no sign-in)
+- **Sony sign-in** (gRPC only): Complete the in-integration OAuth flow when prompted (session keys refresh automatically when possible)
 - **Name** (optional): A friendly name for the device (defaults to "Bravia Theatre")
 
-The integration will automatically test the connection by sending a power status request. Make sure:
+#### Transport modes
+
+| Mode | Connection | Highlights |
+|------|------------|------------|
+| **gRPC** (recommended, **EXPERIMENTAL**) | gRPC port 55051 + HTTP | BRAVIA Connect control plane: live notify, now-playing metadata, play/pause/next on streaming inputs, sound field mode, DSEE Ultimate, 360SSM height, center speaker, DTS Dialog Control, subwoofer level (~40 entities). Expect parity gaps and breaking changes |
+| **TCP** (legacy) | TCP port 33336 + HTTP | No Sony sign-in; fewer streaming and sound features (~44 entities). Extras include Bluetooth pairing button, HDMI passthrough, temperature, and network diagnostics |
+
+#### gRPC parity gaps (no confirmed path or semantic mismatch)
+
+| TCP feature | Notes |
+|-------------|--------|
+| Bluetooth pairing button | TCP-only unless an exec path is found |
+| HDMI passthrough | No confirmed gRPC path |
+| 360 Spatial Sound Mapping sensor | Distinct from 360SSM height select |
+| Temperature, network mode, DHCP, region, language | Not in gRPC GetStates field list |
+| Audio Return Channel tri-state | `system_setting.earc` is bool in proto; select ships disabled until live-verified |
+
+See [docs/grpc-tcp-mapping.md](docs/grpc-tcp-mapping.md) for the full mapping table.
+
+HTTP is always used for firmware update and network diagnostic sensors regardless of transport. Changing transport requires removing and re-adding the integration (entity set differs per mode).
+
+Legacy entries with **Enable gRPC state sync** in options are migrated automatically to gRPC transport on reload.
+
+The integration will automatically test the connection during setup. For TCP mode, make sure:
 
 - IP control is enabled on your Bravia Theatre device
 - The device is accessible on your network
@@ -151,13 +177,13 @@ The integration creates the following entities under your Bravia Theatre device:
 
 | Entity | Type | Description | Range/Options |
 |--------|------|-------------|---------------|
-| `switch.bravia_quad_*_power` | Switch | Control power on/off | on/off |
+| `media_player.bravia_quad_*` | Media player | Power, volume, mute, source, sound field mode (gRPC), now-playing and playback metadata (gRPC streaming) | Sources: TV (eARC), HDMI In, Spotify, Bluetooth, AirPlay |
+| `switch.bravia_quad_*_power` | Switch | Control power on/off (Configuration; use media player for playback) | on/off |
 | `number.bravia_quad_*_volume` | Number | Control main volume | 0-100 |
 | `number.bravia_quad_*_volume_step_interval` | Number | Delay between volume steps | 0-10000 ms (1ms steps) |
 | `number.bravia_quad_*_rear_level` | Number | Control rear speaker level | -10-10 |
 | `number.bravia_quad_*_bass_level` | Number | Control bass level (with subwoofer) | -10-10 |
 | `select.bravia_quad_*_bass_level` | Select | Control bass level (without subwoofer) | MIN, MID, MAX |
-| `select.bravia_quad_*_source` | Select | Select input source | TV (eARC), HDMI In, Spotify, Bluetooth, Airplay |
 | `switch.bravia_quad_*_voice_enhancer` | Switch | Toggle voice enhancer | on/off |
 | `switch.bravia_quad_*_sound_field` | Switch | Toggle sound field processing | on/off |
 | `switch.bravia_quad_*_night_mode` | Switch | Toggle night mode | on/off |
@@ -243,7 +269,7 @@ When maintaining an open connection, the device sends real-time notifications fo
 - `hdmi1` - HDMI In
 - `spotify` - Spotify
 - `bluetooth` - Bluetooth
-- `airplay2` - Airplay (Note: Can be detected when active, but cannot be set via command - only activated when an Airplay device casts to the Bravia)
+- `airplay2` - AirPlay (Note: gRPC reports `airplay`. Detected when active; cannot be set via command — only activated when an AirPlay client casts to the Bravia. HA omits it from the selectable source list until active.)
 
 ### Bass Level Control
 
@@ -446,16 +472,24 @@ Run linting locally:
 
 ### Testing
 
-The project includes a comprehensive test suite using pytest:
+The project includes a comprehensive test suite using pytest. Tests run in parallel by default (`pytest-xdist`); a full run takes roughly 10–15 seconds.
 
 ```bash
-# Run all tests
+# Run all tests (parallel)
 uv run pytest
 
-# Run tests with verbose output
-uv run pytest -v
+# Run a single file or test while iterating
+uv run pytest tests/test_config_flow.py
+uv run pytest tests/test_select.py::test_input_select_spotify
 
-# Run tests with coverage
+# Re-run only failures from the last run
+uv run pytest --lf
+
+# Serial run for debugging (disables parallel workers)
+uv run pytest -n0
+
+# Run with verbose output or coverage
+uv run pytest -v
 uv run pytest --cov=custom_components/bravia_quad
 ```
 

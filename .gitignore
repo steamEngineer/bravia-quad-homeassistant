@@ -6,12 +6,21 @@ __pycache__
 */dist/*
 
 # misc
+.cache/
+captures/
+scripts/frida/dart_blutter_reader.js
 .coverage
 .cursor
 .vscode
 
-# Local dev reports (device IPs, draft PR notes)
-docs/
+# Local dev / investigation (default: all docs private)
+docs/*
+!docs/grpc-tcp-mapping.md
+!docs/sony-grpc-reference.md
+
+scripts/grpc/session_keys.json
+*.pcap
+*.pcapng
 
 # Devcontainer auto-generated lock
 .devcontainer/devcontainer-lock.json

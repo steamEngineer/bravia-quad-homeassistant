@@ -10,7 +10,7 @@
   "integration_type": "device",
   "iot_class": "local_push",
   "issue_tracker": "https://github.com/steamEngineer/bravia-quad-homeassistant/issues",
-  "requirements": [],
+  "requirements": ["grpcio>=1.76.0"],
   "version": "0.0.0",
   "zeroconf": [
     {
