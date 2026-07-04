@@ -159,7 +159,8 @@ async def _grpc_fallback_enable(
         )
     else:
         _LOGGER.warning(
-            "Enabled external control on %s via gRPC fallback (TCP verify inconclusive)",
+            "Enabled external control on %s via gRPC fallback "
+            "(TCP verify inconclusive)",
             host,
         )
 

@@ -27,6 +27,7 @@ from .const import (
     TRANSPORT_GRPC,
     TRANSPORT_TCP,
 )
+from .grpc_mapped_entities import mapped_number_entities
 from .helpers import (
     BraviaQuadNotificationMixin,
     BraviaQuadVolumeStepIntervalNumber,
@@ -62,9 +63,8 @@ async def async_setup_entry(
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
 
     if data.transport == TRANSPORT_GRPC:
-        assert data.grpc_client is not None
-        from .grpc_mapped_entities import mapped_number_entities
-
+        if data.grpc_client is None:
+            return
         async_add_entities(
             mapped_number_entities(data.grpc_client, entry),
             update_before_add=True,

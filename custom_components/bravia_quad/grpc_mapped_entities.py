@@ -93,7 +93,7 @@ async def _async_exec(
         )
 
     kind, payload = denormalize_for_exec(spec.mapping, ha_value)
-    ok = await grpc_client.async_exec_command(spec.grpc_path, **{kind: payload})
+    ok = await grpc_client.async_exec_denormalized(spec.grpc_path, kind, payload)
     if not ok:
         raise HomeAssistantError(
             translation_domain=DOMAIN,
@@ -115,6 +115,7 @@ class BraviaGrpcMappedSwitch(BraviaGrpcPathMixin, RestoreEntity, SwitchEntity):
         entry: ConfigEntry,
         spec: EntitySpec,
     ) -> None:
+        """Initialize gRPC mapped switch."""
         self._grpc_client = grpc_client
         self._spec = spec
         self._grpc_path = spec.grpc_path
@@ -130,6 +131,7 @@ class BraviaGrpcMappedSwitch(BraviaGrpcPathMixin, RestoreEntity, SwitchEntity):
             self._attr_is_on = coerce_bool(normalized)
 
     async def async_added_to_hass(self) -> None:
+        """Restore state when added to Home Assistant."""
         await super().async_added_to_hass()
         if grpc_path_needs_ha_restore(self._grpc_path):
             await restore_notify_only_switch(self, self._grpc_client, self._grpc_path)
@@ -153,17 +155,20 @@ class BraviaGrpcMappedSwitch(BraviaGrpcPathMixin, RestoreEntity, SwitchEntity):
         if coerced is not None:
             self._attr_is_on = coerced
 
-    async def async_turn_on(self) -> None:
-        await _async_exec(self._grpc_client, self._spec, True)
+    async def async_turn_on(self, **_kwargs: Any) -> None:
+        """Turn the switch on."""
+        await _async_exec(self._grpc_client, self._spec, ha_value=True)
         self._sync_from_notify()
         self.async_write_ha_state()
 
-    async def async_turn_off(self) -> None:
-        await _async_exec(self._grpc_client, self._spec, False)
+    async def async_turn_off(self, **_kwargs: Any) -> None:
+        """Turn the switch off."""
+        await _async_exec(self._grpc_client, self._spec, ha_value=False)
         self._sync_from_notify()
         self.async_write_ha_state()
 
     async def async_will_remove_from_hass(self) -> None:
+        """Persist restore state for notify-only paths."""
         await super().async_will_remove_from_hass()
         if grpc_path_needs_ha_restore(self._grpc_path):
             state = (
@@ -194,6 +199,7 @@ class BraviaGrpcMappedSelect(BraviaGrpcPathMixin, RestoreEntity, SelectEntity):
         *,
         options: list[str] | None = None,
     ) -> None:
+        """Initialize gRPC mapped select."""
         self._grpc_client = grpc_client
         self._spec = spec
         self._grpc_path = spec.grpc_path
@@ -213,6 +219,7 @@ class BraviaGrpcMappedSelect(BraviaGrpcPathMixin, RestoreEntity, SelectEntity):
         self._attr_current_option = option if option in self._attr_options else None
 
     async def async_added_to_hass(self) -> None:
+        """Restore state when added to Home Assistant."""
         await super().async_added_to_hass()
         if grpc_path_needs_ha_restore(self._grpc_path):
             await restore_notify_only_select(
@@ -237,6 +244,7 @@ class BraviaGrpcMappedSelect(BraviaGrpcPathMixin, RestoreEntity, SelectEntity):
         self.async_write_ha_state()
 
     async def async_select_option(self, option: str) -> None:
+        """Change the selected option."""
         if option not in self._attr_options:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
@@ -263,6 +271,7 @@ class BraviaGrpcMappedSelect(BraviaGrpcPathMixin, RestoreEntity, SelectEntity):
         self._attr_current_option = option
 
     async def async_will_remove_from_hass(self) -> None:
+        """Persist restore state for notify-only paths."""
         await super().async_will_remove_from_hass()
         if grpc_path_needs_ha_restore(self._grpc_path):
             persist_notify_only_restore_state(self, self._attr_current_option)
@@ -285,6 +294,7 @@ class BraviaGrpcMappedNumber(BraviaGrpcPathMixin, NumberEntity):
         native_min_value: float,
         native_max_value: float,
     ) -> None:
+        """Initialize gRPC mapped number."""
         self._grpc_client = grpc_client
         self._spec = spec
         self._grpc_path = spec.grpc_path
@@ -311,6 +321,7 @@ class BraviaGrpcMappedNumber(BraviaGrpcPathMixin, NumberEntity):
             self._attr_native_value = None
 
     async def async_added_to_hass(self) -> None:
+        """Write initial state when added to Home Assistant."""
         await super().async_added_to_hass()
         self.async_write_ha_state()
 
@@ -325,6 +336,7 @@ class BraviaGrpcMappedNumber(BraviaGrpcPathMixin, NumberEntity):
         self.async_write_ha_state()
 
     async def async_set_native_value(self, value: float) -> None:
+        """Set the number value."""
         int_value = int(value)
         await _async_exec(self._grpc_client, self._spec, int_value)
         self._sync_number_from_notify()
@@ -356,6 +368,7 @@ class BraviaGrpcMappedSensor(BraviaGrpcPathMixin, SensorEntity):
         entity_category: EntityCategory | None = EntityCategory.DIAGNOSTIC,
         enabled_default: bool | None = None,
     ) -> None:
+        """Initialize gRPC mapped sensor."""
         self._grpc_client = grpc_client
         self._spec = spec
         self._grpc_path = spec.grpc_path
@@ -386,6 +399,7 @@ class BraviaGrpcBassLevelSelect(BraviaGrpcMappedSelect):
         entry: ConfigEntry,
         spec: EntitySpec,
     ) -> None:
+        """Initialize bass level select."""
         super().__init__(
             grpc_client,
             entry,
@@ -408,7 +422,7 @@ class BraviaGrpcBassLevelSelect(BraviaGrpcMappedSelect):
         self.async_write_ha_state()
 
 
-def _number_range(mapping: GrpcTcpMapping) -> tuple[float, float]:
+def _number_range(mapping: GrpcTcpMapping) -> tuple[float, float]:  # noqa: PLR0911
     if mapping.grpc_path == "sound_setting.volume.subwoofer":
         return (MIN_BASS_LEVEL, MAX_BASS_LEVEL)
     if mapping.tcp_feature == FEATURE_REAR_LEVEL:
@@ -434,10 +448,10 @@ def mapped_switch_entities(
         entities.append(
             BraviaGrpcMappedSwitch(grpc_client, entry, entity_spec_for_mapping(power))
         )
-    for mapping in mappings_for_platform("switch", writable=True):
-        entities.append(
-            BraviaGrpcMappedSwitch(grpc_client, entry, entity_spec_for_mapping(mapping))
-        )
+    entities.extend(
+        BraviaGrpcMappedSwitch(grpc_client, entry, entity_spec_for_mapping(mapping))
+        for mapping in mappings_for_platform("switch", writable=True)
+    )
     return entities
 
 

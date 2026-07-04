@@ -33,6 +33,7 @@ from .const import (
     IMAX_MODE_OPTIONS,
     TRANSPORT_GRPC,
 )
+from .grpc_mapped_entities import mapped_select_entities
 from .helpers import (
     BraviaQuadNotificationMixin,
     get_device_info,
@@ -63,16 +64,16 @@ async def async_setup_entry(
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
 
     if data.transport == TRANSPORT_GRPC:
-        assert data.grpc_client is not None
-        from .grpc_mapped_entities import mapped_select_entities
-
+        if data.grpc_client is None:
+            return
         async_add_entities(
             mapped_select_entities(data.grpc_client, entry),
             update_before_add=True,
         )
         return
 
-    assert data.tcp_client is not None
+    if data.tcp_client is None:
+        return
     client = data.tcp_client
 
     # Remove legacy switch entity after IMAX mode became a select

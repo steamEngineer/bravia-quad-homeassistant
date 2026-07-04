@@ -29,6 +29,7 @@ from .const import (
     FEATURE_VOICE_ZOOM_LEVEL,
     TRANSPORT_GRPC,
 )
+from .grpc_mapped_entities import mapped_sensor_entities
 from .helpers import BraviaQuadNotificationMixin, get_device_info
 
 if TYPE_CHECKING:
@@ -107,12 +108,12 @@ async def async_setup_entry(
     entities: list[SensorEntity] = []
 
     if data.transport == TRANSPORT_GRPC:
-        assert data.grpc_client is not None
-        from .grpc_mapped_entities import mapped_sensor_entities
-
+        if data.grpc_client is None:
+            return
         entities.extend(mapped_sensor_entities(data.grpc_client, entry))
     else:
-        assert data.tcp_client is not None
+        if data.tcp_client is None:
+            return
         client = data.tcp_client
         entities.extend(
             [

@@ -44,6 +44,7 @@ class BraviaGrpcClientAsync:
         hmac_key: str | None = None,
         debug: bool = False,
     ) -> None:
+        """Initialize async gRPC client wrapper."""
         self.host = host
         self.port = port
         self.device_id = device_id
@@ -129,7 +130,7 @@ class BraviaGrpcClientAsync:
         if not self._trace_enabled():
             return
         if self.debug:
-            _LOGGER.info("[gRPC debug] " + msg, *args)
+            _LOGGER.info("[gRPC debug] %s", msg, *args)
         else:
             _LOGGER.debug(msg, *args)
 
@@ -140,7 +141,7 @@ class BraviaGrpcClientAsync:
 
     def merge_notify_cache(self, updates: dict[str, Any]) -> None:
         """Merge values into the underlying notify cache (GetStates/TCP seed)."""
-        self._client._notify_state.update(updates)
+        self._client.update_notify_cache(updates)
 
     @property
     def is_connected(self) -> bool:
@@ -254,7 +255,7 @@ class BraviaGrpcClientAsync:
         if not snapshot:
             _LOGGER.warning("gRPC GetStates snapshot failed for %s", self.host)
             return 0
-        self._client._notify_state.update(snapshot)
+        self._client.update_notify_cache(snapshot)
         self._debug(
             "GetStates snapshot seeded %d fields on %s", len(snapshot), self.host
         )
@@ -284,7 +285,7 @@ class BraviaGrpcClientAsync:
                 quiet=True,
             )
             if result and result.get(path) is not None:
-                self._client._notify_state.update(result)
+                self._client.update_notify_cache(result)
                 bulk_resolved += 1
 
         notify_only_resolved = await async_seed_notify_only_from_tcp(self.host, self)
@@ -315,7 +316,7 @@ class BraviaGrpcClientAsync:
         return missing_entity_paths(self._client.notify_state)
 
     async def async_fetch_field_paths(self, paths: list[str]) -> int:
-        """GetStates per path (skips ``NOTIFY_ONLY_GRPC_PATHS`` — device rejects reads)."""
+        """GetStates per path (skips notify-only paths the device rejects)."""
         if not self._connected or not paths:
             return 0
         notify_only = set(NOTIFY_ONLY_GRPC_PATHS)
@@ -332,7 +333,7 @@ class BraviaGrpcClientAsync:
                 quiet=True,
             )
             if snapshot and snapshot.get(path) is not None:
-                self._client._notify_state.update(snapshot)
+                self._client.update_notify_cache(snapshot)
                 resolved += 1
         if resolved:
             self._debug(
@@ -420,6 +421,33 @@ class BraviaGrpcClientAsync:
         ok = await asyncio.to_thread(_run)
         self._debug("ExecCommand %s -> %s", command_path, ok)
         return ok
+
+    async def async_exec_denormalized(
+        self,
+        command_path: str,
+        kind: str,
+        payload: bool | int | str | None,
+    ) -> bool:
+        """Execute ExecCommand using a denormalize_for_exec kind/payload pair."""
+        if kind == "bool_value":
+            if not isinstance(payload, bool):
+                if payload is None:
+                    return False
+                bool_payload = bool(payload)
+            else:
+                bool_payload = payload
+            return await self.async_exec_command(command_path, bool_value=bool_payload)
+        if kind == "int_value":
+            if payload is None:
+                return False
+            return await self.async_exec_command(command_path, int_value=int(payload))
+        if kind == "string_value":
+            if payload is None:
+                return False
+            return await self.async_exec_command(
+                command_path, string_value=str(payload)
+            )
+        return False
 
     async def async_start_notify(self) -> None:
         """Start background connection manager (notify stream + auto-reconnect)."""

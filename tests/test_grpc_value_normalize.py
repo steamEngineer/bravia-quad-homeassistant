@@ -124,6 +124,8 @@ def test_sound_effect_mapping_is_grpc_only() -> None:
     assert mapping is not None
     assert mapping.tcp_feature is None
     assert mapping.ha_platform == "select"
+    assert normalize_grpc_value(mapping, "Neural:X") == "neural_x"
+    assert denormalize_for_exec(mapping, "neural_x") == ("string_value", "Neural:X")
 
 
 def test_skip_availability_paths() -> None:

@@ -47,6 +47,7 @@ from .const import (
     VOICE_ZOOM_OFF,
     VOICE_ZOOM_ON,
 )
+from .grpc_mapped_entities import mapped_switch_entities
 from .helpers import BraviaQuadNotificationMixin, get_device_info, verify_feature_value
 
 if TYPE_CHECKING:
@@ -72,16 +73,16 @@ async def async_setup_entry(
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
 
     if data.transport == TRANSPORT_GRPC:
-        assert data.grpc_client is not None
-        from .grpc_mapped_entities import mapped_switch_entities
-
+        if data.grpc_client is None:
+            return
         async_add_entities(
             mapped_switch_entities(data.grpc_client, entry),
             update_before_add=True,
         )
         return
 
-    assert data.tcp_client is not None
+    if data.tcp_client is None:
+        return
     client = data.tcp_client
 
     entities = [

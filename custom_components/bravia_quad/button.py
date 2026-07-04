@@ -36,7 +36,8 @@ async def async_setup_entry(
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
 
     if data.transport == TRANSPORT_GRPC:
-        assert data.grpc_client is not None
+        if data.grpc_client is None:
+            return
         async_add_entities(
             [BraviaGrpcDetectSubwooferButton(hass, data.grpc_client, entry)]
         )

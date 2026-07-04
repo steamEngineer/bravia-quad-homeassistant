@@ -12,11 +12,7 @@
         "title": "Connection method",
         "description": "Choose how Home Assistant controls your Bravia Theatre.\n\n**gRPC — BRAVIA Connect (recommended, EXPERIMENTAL)**\nSame control plane as the Sony Home Entertainment Connect app: live push updates, now-playing metadata, play/pause/next on Spotify and AirPlay, sound field mode, DSEE Ultimate, 360SSM height, center speaker mode, DTS Dialog Control, and subwoofer level. Requires a one-time Sony account sign-in. This mode is **experimental** — expect rough edges, parity gaps, and breaking changes between releases.\n\n**TCP — legacy IP control**\nOriginal reverse-engineered protocol (port 33336). No Sony sign-in, but fewer features: no streaming transport controls, no now-playing metadata, and no BRAVIA Connect-only sound settings. TCP still exposes a few extras such as the Bluetooth pairing button, HDMI passthrough, temperature, and detailed network diagnostics.\n\nBoth modes use HTTP for firmware and network sensors. To switch later, remove and re-add the integration.",
         "data": {
-          "transport": {
-            "label": "Connection method",
-            "grpc": "gRPC — BRAVIA Connect (recommended, EXPERIMENTAL)",
-            "tcp": "TCP — legacy IP control"
-          }
+          "transport": "Connection method"
         }
       },
       "grpc_oauth": {
@@ -172,7 +168,12 @@
         }
       },
       "sound_effect": {
-        "name": "Sound field mode"
+        "name": "Sound field mode",
+        "state": {
+          "dolby_speaker_virtualizer": "Dolby Speaker Virtualizer",
+          "neural_x": "DTS Neural:X",
+          "ssm_360": "360 Spatial Sound Mapping"
+        }
       },
       "ssm_360_height": {
         "name": "360SSM height"
@@ -356,6 +357,14 @@
     },
     "verify_value_mismatch_hint": {
       "message": "Device kept {feature} at {actual} (requested {requested}). {hint}"
+    }
+  },
+  "selector": {
+    "transport": {
+      "options": {
+        "grpc": "gRPC — BRAVIA Connect (recommended, EXPERIMENTAL)",
+        "tcp": "TCP — legacy IP control"
+      }
     }
   }
 }

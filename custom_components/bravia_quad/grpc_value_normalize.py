@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from .const import (
     AAV_OFF,
@@ -41,6 +41,9 @@ from .const import (
     NIGHT_MODE_ON,
     POWER_OFF,
     POWER_ON,
+    SOUND_EFFECT_DEVICE_TO_HA,
+    SOUND_EFFECT_HA_TO_DEVICE,
+    SOUND_EFFECT_OPTIONS,
     SOUND_FIELD_OFF,
     SOUND_FIELD_ON,
     SSM360_HEIGHT_OPTIONS,
@@ -52,6 +55,9 @@ from .const import (
 
 if TYPE_CHECKING:
     from .grpc_mapping import GrpcTcpMapping
+
+ExecValueKind = Literal["bool_value", "int_value", "string_value"]
+ExecPayload = bool | int | str | None
 
 _ON_OFF_BY_FEATURE: dict[str, tuple[str, str]] = {
     "main.power": (POWER_ON, POWER_OFF),
@@ -173,7 +179,7 @@ def normalize_grpc_value(mapping: GrpcTcpMapping, raw_value: Any) -> Any | None:
 
     if grpc_path == "sound_setting.sound_effect":
         text = str(raw_value)
-        return text or None
+        return SOUND_EFFECT_DEVICE_TO_HA.get(text, text) or None
 
     if tcp_feature is None:
         return None
@@ -263,7 +269,7 @@ def grpc_exec_unavailable_reason(
 
 def denormalize_for_exec(
     mapping: GrpcTcpMapping, ha_value: Any
-) -> tuple[str, int | bool | str | None]:
+) -> tuple[ExecValueKind, ExecPayload]:
     """Convert HA/TCP value to ExecCommand kwargs (int_value, bool_value, string_value)."""
     grpc_path = mapping.grpc_path
     tcp_feature = mapping.tcp_feature
@@ -316,6 +322,12 @@ def denormalize_for_exec(
         text = str(ha_value).lower()
         return ("string_value", _TCP_BT_TO_GRPC.get(text, text))
 
+    if grpc_path == "sound_setting.sound_effect":
+        return (
+            "string_value",
+            SOUND_EFFECT_HA_TO_DEVICE.get(str(ha_value), str(ha_value)),
+        )
+
     if mapping.ha_platform == "number":
         return ("int_value", int(ha_value))
 
@@ -346,4 +358,6 @@ def ha_options_for_mapping(mapping: GrpcTcpMapping) -> list[str] | None:
         return list(SSM360_HEIGHT_OPTIONS)
     if mapping.grpc_path == "speaker_sound_setting.center_speaker_mode":
         return list(CENTER_SPEAKER_MODE_OPTIONS)
+    if mapping.grpc_path == "sound_setting.sound_effect":
+        return list(SOUND_EFFECT_OPTIONS)
     return None

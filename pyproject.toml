@@ -54,4 +54,4 @@ unresolved-attribute = "warn"
 unsupported-operator = "warn"
 
 [tool.ty.terminal]
-error-on-warning = false
+error-on-warning = true

@@ -26,6 +26,7 @@ from .const import (
     MUTE_ON,
     POWER_OFF,
     POWER_ON,
+    SOUND_EFFECT_HA_TO_DEVICE,
     SOUND_EFFECT_OPTIONS,
 )
 from .grpc_entity_registry import entity_spec_for_path
@@ -301,7 +302,7 @@ def _source_selection_blocked(reason: str | None) -> bool:
     return reason.lower() not in ("none", "")
 
 
-def _coerce_availability_flag(availability: Any) -> bool | None:
+def _coerce_availability_flag(availability: Any) -> bool | None:  # noqa: PLR0911
     """Return True/False when availability is a bool-like scalar, else None."""
     if availability is None:
         return None
@@ -347,6 +348,7 @@ class BraviaGrpcMediaPlayer(
     _attr_media_image_remotely_accessible = True
 
     def __init__(self, grpc_client: BraviaGrpcClientAsync, entry: ConfigEntry) -> None:
+        """Initialize the gRPC media player."""
         self._grpc_client = grpc_client
         self._entry = entry
         self._grpc_path = _PATH_POWER
@@ -362,6 +364,7 @@ class BraviaGrpcMediaPlayer(
 
     @property
     def volume_step_interval(self) -> int:
+        """Return volume step interval from the gRPC client."""
         return self._grpc_client.volume_step_interval
 
     async def _async_volume_step(self, volume: int) -> bool:
@@ -412,7 +415,9 @@ class BraviaGrpcMediaPlayer(
 
     def _mapping(self, path: str) -> GrpcTcpMapping:
         spec = entity_spec_for_path(path)
-        assert spec is not None
+        if spec is None:
+            msg = f"Missing gRPC entity spec for path {path!r}"
+            raise RuntimeError(msg)
         return spec.mapping
 
     def _power_is_on(self) -> bool:
@@ -477,9 +482,12 @@ class BraviaGrpcMediaPlayer(
             )
         if self._attr_source not in self._attr_source_list:
             self._attr_source_list = [*self._attr_source_list, self._attr_source]
-        sound_effect = _coerce_str(state.get(_PATH_SOUND_EFFECT))
-        if sound_effect and sound_effect in self._attr_sound_mode_list:
-            self._attr_sound_mode = sound_effect
+        sound_effect = normalize_grpc_value(
+            self._mapping(_PATH_SOUND_EFFECT), state.get(_PATH_SOUND_EFFECT)
+        )
+        sound_mode_list = self._attr_sound_mode_list or []
+        if sound_effect and sound_effect in sound_mode_list:
+            self._attr_sound_mode = str(sound_effect)
         self._seed_metadata_from_cache()
         self._seed_playback_from_cache()
         self._update_media_player_state()
@@ -658,8 +666,9 @@ class BraviaGrpcMediaPlayer(
     async def _handle_source_transition(self, previous: str | None, new: str) -> None:
         """Apply source-change side effects shared by notify and user selection."""
         self._attr_source = new
-        if new not in self._attr_source_list:
-            self._attr_source_list = [*self._attr_source_list, new]
+        source_list = self._attr_source_list or []
+        if new not in source_list:
+            self._attr_source_list = [*source_list, new]
         if previous in _STREAMING_SOURCES and new not in _STREAMING_SOURCES:
             self._clear_playback_metadata()
             self._clear_source_context_metadata()
@@ -684,6 +693,8 @@ class BraviaGrpcMediaPlayer(
                 return
             self._attr_is_volume_muted = normalized == MUTE_ON
         elif path == _PATH_VOLUME:
+            if normalized is None:
+                return
             try:
                 volume = int(normalized)
                 if 0 <= volume <= MAX_VOLUME:
@@ -691,9 +702,10 @@ class BraviaGrpcMediaPlayer(
             except (TypeError, ValueError):
                 return
         elif path == _PATH_SOUND_EFFECT:
-            mode = _coerce_str(value)
-            if mode and mode in self._attr_sound_mode_list:
-                self._attr_sound_mode = mode
+            mode = normalize_grpc_value(self._mapping(path), value)
+            sound_mode_list = self._attr_sound_mode_list or []
+            if mode and mode in sound_mode_list:
+                self._attr_sound_mode = str(mode)
         elif path == _PATH_INPUT:
             previous = self._attr_source
             option = str(normalized) if normalized is not None else None
@@ -708,7 +720,7 @@ class BraviaGrpcMediaPlayer(
     async def _async_exec_path(self, path: str, ha_value: Any) -> bool:
         mapping = self._mapping(path)
         kind, payload = denormalize_for_exec(mapping, ha_value)
-        return await self._grpc_client.async_exec_command(path, **{kind: payload})
+        return await self._grpc_client.async_exec_denormalized(path, kind, payload)
 
     async def _async_exec_playback(self, action: str) -> bool:
         if not self._transport_controls_available():
@@ -719,14 +731,13 @@ class BraviaGrpcMediaPlayer(
         if spec is None:
             return False
         path, value_kind, payload = spec
-        before_state = self._grpc_client.notify_state.get(_PATH_PLAYBACK_STATE)
         before_title = self._grpc_client.notify_state.get(_PATH_TITLE)
-        ok = await self._grpc_client.async_exec_command(path, **{value_kind: payload})
+        ok = await self._grpc_client.async_exec_denormalized(path, value_kind, payload)
         if ok:
             await self._await_playback_confirm(
                 action,
-                before_state=before_state,
                 before_title=before_title,
+                confirm_seconds=2.0,
             )
         return ok
 
@@ -734,12 +745,11 @@ class BraviaGrpcMediaPlayer(
         self,
         action: str,
         *,
-        before_state: Any,
         before_title: Any,
-        timeout: float = 2.0,
+        confirm_seconds: float = 2.0,
     ) -> None:
         """Refresh HA state after transport exec once notify confirms (or timeout)."""
-        deadline = time.monotonic() + timeout
+        deadline = time.monotonic() + confirm_seconds
         while time.monotonic() < deadline:
             if action == "next_track":
                 if self._grpc_client.notify_state.get(_PATH_TITLE) != before_title:
@@ -765,34 +775,43 @@ class BraviaGrpcMediaPlayer(
             self.async_write_ha_state()
 
     async def async_media_play(self) -> None:
+        """Send media play command."""
         await self._async_exec_playback("play")
 
     async def async_media_pause(self) -> None:
+        """Send media pause command."""
         await self._async_exec_playback("pause")
 
     async def async_media_next_track(self) -> None:
+        """Skip to the next track."""
         await self._async_exec_playback("next_track")
 
     async def async_select_sound_mode(self, sound_mode: str) -> None:
-        if sound_mode not in self._attr_sound_mode_list:
+        """Select sound field mode."""
+        sound_mode_list = self._attr_sound_mode_list or []
+        if sound_mode not in sound_mode_list:
             return
+        device_value = SOUND_EFFECT_HA_TO_DEVICE.get(sound_mode, sound_mode)
         if await self._grpc_client.async_exec_command(
-            _PATH_SOUND_EFFECT, string_value=sound_mode
+            _PATH_SOUND_EFFECT, string_value=device_value
         ):
             self._attr_sound_mode = sound_mode
             self.async_write_ha_state()
 
     async def async_turn_on(self) -> None:
+        """Turn the soundbar on."""
         if await self._async_exec_path(_PATH_POWER, POWER_ON):
             self._update_media_player_state()
             self.async_write_ha_state()
 
     async def async_turn_off(self) -> None:
+        """Turn the soundbar off."""
         if await self._async_exec_path(_PATH_POWER, POWER_OFF):
             self._update_media_player_state()
             self.async_write_ha_state()
 
     async def async_set_volume_level(self, volume: float) -> None:
+        """Set volume level (0.0 to 1.0)."""
         clamped = min(max(volume, 0.0), 1.0)
         target = round(clamped * MAX_VOLUME)
         previous = self._attr_volume_level
@@ -804,6 +823,7 @@ class BraviaGrpcMediaPlayer(
             self.async_write_ha_state()
 
     async def async_volume_up(self) -> None:
+        """Increase volume by one step."""
         current = round((self._attr_volume_level or 0) * MAX_VOLUME)
         target = min(current + 1, MAX_VOLUME)
         if await self._async_exec_path(_PATH_VOLUME, target):
@@ -811,6 +831,7 @@ class BraviaGrpcMediaPlayer(
             self.async_write_ha_state()
 
     async def async_volume_down(self) -> None:
+        """Decrease volume by one step."""
         current = round((self._attr_volume_level or 0) * MAX_VOLUME)
         target = max(current - 1, 0)
         if await self._async_exec_path(_PATH_VOLUME, target):
@@ -818,21 +839,25 @@ class BraviaGrpcMediaPlayer(
             self.async_write_ha_state()
 
     async def async_select_source(self, source: str) -> None:
+        """Select the active input source."""
         if source in _DETECT_ONLY_SOURCES and self._attr_source != source:
             return
-        if source not in self._attr_source_list:
+        source_list = self._attr_source_list or []
+        if source not in source_list:
             return
         if await self._async_exec_path(_PATH_INPUT, source):
             await self._handle_source_transition(self._attr_source, source)
             self.async_write_ha_state()
 
     async def async_mute_volume(self, mute: bool) -> None:  # noqa: FBT001
+        """Mute or unmute the device volume."""
         state = MUTE_ON if mute else MUTE_OFF
         if await self._async_exec_path(_PATH_MUTE, state):
             self._attr_is_volume_muted = mute
             self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
+        """Register gRPC callbacks and backfill playback state."""
         await super().async_added_to_hass()
         self._grpc_client.add_state_callback(self._grpc_state_callback)
         await self._grpc_client.async_fetch_field_paths(list(_PLAYBACK_BACKFILL_PATHS))
@@ -841,6 +866,7 @@ class BraviaGrpcMediaPlayer(
         self.async_write_ha_state()
 
     async def async_will_remove_from_hass(self) -> None:
+        """Unregister gRPC callbacks."""
         self._grpc_client.remove_state_callback(self._grpc_state_callback)
         self._cancel_volume_transition()
         if self._position_write_task:

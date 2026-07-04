@@ -27,6 +27,7 @@ from .const import (
     TRANSPORT_GRPC,
     TRANSPORT_TCP,
 )
+from .grpc_media_player import BraviaGrpcMediaPlayer
 from .helpers import BraviaQuadAvailabilityMixin, VolumeTransitionMixin, get_device_info
 
 if TYPE_CHECKING:
@@ -49,9 +50,8 @@ async def async_setup_entry(
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
 
     if data.transport == TRANSPORT_GRPC:
-        assert data.grpc_client is not None
-        from .grpc_media_player import BraviaGrpcMediaPlayer
-
+        if data.grpc_client is None:
+            return
         async_add_entities([BraviaGrpcMediaPlayer(data.grpc_client, entry)])
         return
 

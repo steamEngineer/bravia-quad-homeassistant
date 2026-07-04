@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol, cast
 
 from homeassistant.components.number import NumberMode, RestoreNumber
 from homeassistant.const import CONF_HOST, CONF_MAC, EntityCategory
@@ -26,6 +26,8 @@ from homeassistant.util import dt as dt_util
 from .const import DOMAIN, MAX_VOLUME_STEP_INTERVAL
 
 if TYPE_CHECKING:
+    from homeassistant.components.select import SelectEntity
+    from homeassistant.components.switch import SwitchEntity
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
 
@@ -240,7 +242,8 @@ def remove_legacy_group_subdevices(
     """Remove Bravia Connect-style sub-devices from a prior grouping experiment."""
     uid = require_unique_id(entry)
     for suffix in ("playback", "sound", "sync", "wireless", "hdmi", "system"):
-        device = device_registry.async_get_device(identifiers={(DOMAIN, uid, suffix)})
+        legacy_ids = cast("set[tuple[str, str]]", {(DOMAIN, uid, suffix)})
+        device = device_registry.async_get_device(identifiers=legacy_ids)
         if device is not None:
             device_registry.async_remove_device(device.id)
 
@@ -401,31 +404,31 @@ def persist_notify_only_restore_state(entity: Entity, state: str | None) -> None
     )
 
 
-async def restore_last_select_option(entity: Entity, options: list[str]) -> bool:
+async def restore_last_select_option(entity: SelectEntity, options: list[str]) -> bool:
     """Apply last HA state to a select when gRPC has no initial value."""
     last = await _async_get_entity_last_state(entity)
     if last is None or last.state in ("unknown", "unavailable", ""):
         return False
     if last.state not in options:
         options.append(last.state)
-        entity._attr_options = options  # type: ignore[attr-defined]
-    entity._attr_current_option = last.state  # type: ignore[attr-defined]
+        entity._attr_options = options
+    entity._attr_current_option = last.state
     entity.async_write_ha_state()
     return True
 
 
-async def restore_last_switch_state(entity: Entity) -> bool:
+async def restore_last_switch_state(entity: SwitchEntity) -> bool:
     """Apply last HA on/off state when gRPC has no initial value."""
     last = await _async_get_entity_last_state(entity)
     if last is None or last.state not in ("on", "off"):
         return False
-    entity._attr_is_on = last.state == "on"  # type: ignore[attr-defined]
+    entity._attr_is_on = last.state == "on"
     entity.async_write_ha_state()
     return True
 
 
 async def restore_notify_only_switch(
-    entity: Entity,
+    entity: SwitchEntity,
     grpc_client: BraviaGrpcClientAsync,
     grpc_path: str,
 ) -> bool:
@@ -442,13 +445,13 @@ async def restore_notify_only_switch(
             is_on = cached != 0
     if is_on is None:
         return False
-    entity._attr_is_on = is_on  # type: ignore[attr-defined]
+    entity._attr_is_on = is_on
     grpc_client.merge_notify_cache({grpc_path: is_on})
     return True
 
 
 async def restore_notify_only_select(
-    entity: Entity,
+    entity: SelectEntity,
     grpc_client: BraviaGrpcClientAsync,
     grpc_path: str,
     options: list[str],
@@ -466,8 +469,8 @@ async def restore_notify_only_select(
         return False
     if option not in options:
         options.append(option)
-        entity._attr_options = options  # type: ignore[attr-defined]
-    entity._attr_current_option = option  # type: ignore[attr-defined]
+        entity._attr_options = options
+    entity._attr_current_option = option
     if mapping is not None:
         from .grpc_value_normalize import denormalize_for_exec
 
@@ -483,6 +486,16 @@ async def restore_notify_only_select(
 # notifications are still suppressed.  This prevents stale in-flight
 # notifications from snapping the slider back to an intermediate value.
 TRANSITION_NOTIFICATION_GRACE_PERIOD = 0.5
+
+
+class VolumeStepClient(Protocol):
+    """TCP client used by VolumeTransitionMixin default volume stepping."""
+
+    volume_step_interval: int
+
+    async def async_set_volume(self, volume: int) -> bool: ...
+
+    async def async_get_volume(self) -> int: ...
 
 
 class VolumeTransitionMixin:
@@ -503,6 +516,9 @@ class VolumeTransitionMixin:
 
     hass: HomeAssistant
 
+    if TYPE_CHECKING:
+        _client: VolumeStepClient
+
     def _init_volume_transition(self) -> None:
         """Initialize volume transition state. Call from __init__."""
         self._transition_task: asyncio.Task[None] | None = None
@@ -513,11 +529,11 @@ class VolumeTransitionMixin:
     @property
     def volume_step_interval(self) -> int:
         """Return configured volume step interval in milliseconds."""
-        return self._client.volume_step_interval  # type: ignore[attr-defined]
+        return self._client.volume_step_interval
 
     async def _async_volume_step(self, volume: int) -> bool:
         """Set volume on the device; override for non-TCP transports."""
-        return await self._client.async_set_volume(volume)  # type: ignore[attr-defined]
+        return await self._client.async_set_volume(volume)
 
     @property
     def volume_transition_in_progress(self) -> bool:
@@ -648,6 +664,8 @@ class BraviaQuadVolumeStepIntervalNumber(RestoreNumber):
             last_state := await self.async_get_last_number_data()
         ) is not None and last_state.native_value is not None:
             self._attr_native_value = last_state.native_value
+        if self._attr_native_value is None:
+            return
         self._volume_step_client.volume_step_interval = int(self._attr_native_value)
 
     async def async_set_native_value(self, value: float) -> None:

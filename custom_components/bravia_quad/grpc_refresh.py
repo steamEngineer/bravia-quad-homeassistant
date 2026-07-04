@@ -95,10 +95,6 @@ async def async_try_refresh_grpc_keys(
         return None
 
 
-def _raise_auth_failed_from_refresh_error(err: GrpcCredentialsRefreshError) -> None:
-    raise ConfigEntryAuthFailed(_REFRESH_FAILED_MSG) from err
-
-
 async def _maybe_refresh_credentials(
     hass: HomeAssistant,
     entry: ConfigEntry,
@@ -120,7 +116,7 @@ async def _maybe_refresh_credentials(
     except GrpcCredentialsError:
         raise
     except GrpcCredentialsRefreshError as err:
-        _raise_auth_failed_from_refresh_error(err)
+        raise ConfigEntryAuthFailed(_REFRESH_FAILED_MSG) from err
     else:
         return refreshed, True
 

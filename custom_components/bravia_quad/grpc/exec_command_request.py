@@ -1,7 +1,5 @@
 """Build ExecCommandWithAuth request bytes (wire format differs from .proto)."""
 
-# ruff: noqa: PLR2004
-
 from __future__ import annotations
 
 import hashlib

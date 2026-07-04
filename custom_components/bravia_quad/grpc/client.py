@@ -10,9 +10,8 @@ import os
 import threading
 import time
 import uuid
-from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import grpc
 
@@ -50,6 +49,9 @@ from .get_states_request import (
 from .get_states_response import parse_get_states_response
 from .notify_decode import decode_notify_delta
 
+if TYPE_CHECKING:
+    from collections.abc import Iterator
+
 _LOGGER = logging.getLogger(__name__)
 _DOMAIN_LOGGER = logging.getLogger("custom_components.bravia_quad")
 
@@ -63,11 +65,11 @@ class NotifyStateUpdate:
 
 
 class BraviaGrpcClient:
-    """Client for communicating with Bravia devices via gRPC over h2c"""
+    """Client for communicating with Bravia devices via gRPC over h2c."""
 
-    def __init__(self, host: str, port: int = 55051, debug: bool = False):
+    def __init__(self, host: str, port: int = 55051, debug: bool = False) -> None:
         """
-        Initialize the Bravia gRPC client
+        Initialize the Bravia gRPC client.
 
         Args:
             host: IP address or hostname of the Bravia device
@@ -97,6 +99,10 @@ class BraviaGrpcClient:
     def notify_state(self) -> dict[str, Any]:
         """Latest values from StartNotifyStates deltas (path → value)."""
         return dict(self._notify_state)
+
+    def update_notify_cache(self, updates: dict[str, Any]) -> None:
+        """Merge path values into the notify cache."""
+        self._notify_state.update(updates)
 
     def _say(self, msg: str) -> None:
         """Log normal gRPC client events."""
@@ -129,8 +135,8 @@ class BraviaGrpcClient:
         else:
             _LOGGER.debug("%s", msg)
 
-    def connect(self):
-        """Establish gRPC connection using h2c (HTTP/2 cleartext)"""
+    def connect(self) -> None:
+        """Establish gRPC connection using h2c (HTTP/2 cleartext)."""
         # Create insecure channel for h2c (HTTP/2 cleartext)
         # This is required for Bravia devices which use HTTP/2 without TLS
         target = f"{self.host}:{self.port}"
@@ -177,8 +183,8 @@ class BraviaGrpcClient:
         # Channel is lazy; TCP is not verified until the first RPC.
         self._debug(f"Created gRPC channel for {target}")
 
-    def disconnect(self):
-        """Close the gRPC connection"""
+    def disconnect(self) -> None:
+        """Close the gRPC connection."""
         if self._notify_stream is not None:
             self._notify_stream.cancel()
             self._notify_stream = None
@@ -198,7 +204,7 @@ class BraviaGrpcClient:
         skip_auth: bool = False,
     ) -> bool:
         """
-        Authenticate with the Bravia device
+        Authenticate with the Bravia device.
 
         Args:
             device_key: Optional device key/password (legacy parameter)
@@ -428,7 +434,7 @@ class BraviaGrpcClient:
 
     def _encode_varint(self, value: int) -> bytes:
         """
-        Encode an integer as a protobuf varint
+        Encode an integer as a protobuf varint.
 
         Args:
             value: Integer to encode
@@ -446,7 +452,7 @@ class BraviaGrpcClient:
 
     def _generate_auth_data(self, device_id: str) -> bytes:
         """
-        Generate authentication data from device ID
+        Generate authentication data from device ID.
 
         Args:
             device_id: Device ID (UUID string)
@@ -463,7 +469,7 @@ class BraviaGrpcClient:
 
     def _generate_key_data(self, hmac_key: str, session_id: str) -> bytes:
         """
-        Generate key confirmation data using HMAC key
+        Generate key confirmation data using HMAC key.
 
         Args:
             hmac_key: Hex-encoded HMAC key (64 chars = 32 bytes)
@@ -511,7 +517,7 @@ class BraviaGrpcClient:
         return True
 
     def _is_valid_uuid(self, uuid_string: str) -> bool:
-        """Check if string is a valid UUID"""
+        """Check if string is a valid UUID."""
         try:
             uuid.UUID(uuid_string)
             return True
@@ -1130,7 +1136,7 @@ class BraviaGrpcClient:
         return None
 
     def set_power(self, on: bool) -> bool:
-        """Set power state"""
+        """Set power state."""
         return self.exec_command("power", value=1 if on else 0)
 
     def get_mute_state(self) -> str | None:
@@ -1149,7 +1155,7 @@ class BraviaGrpcClient:
         return None
 
     def set_mute(self, muted: bool) -> bool:
-        """Set mute state"""
+        """Set mute state."""
         return self.exec_command("mute", value=1 if muted else 0)
 
     def get_volume(self) -> str | None:
@@ -1163,11 +1169,11 @@ class BraviaGrpcClient:
         return None
 
     def set_volume(self, volume: int) -> bool:
-        """Set volume level"""
+        """Set volume level."""
         return self.exec_command("volume", value=volume)
 
     def get_playback_info(self) -> dict[str, Any] | None:
-        """Get current playback information"""
+        """Get current playback information."""
         states = self.get_states()
         if states and hasattr(states, "playback_control") and states.playback_control:
             pc = states.playback_control
@@ -1185,7 +1191,7 @@ class BraviaGrpcClient:
 
 def load_keys_from_file(file_path: str) -> dict[str, str]:
     """
-    Load authentication keys from a JSON file
+    Load authentication keys from a JSON file.
 
     Args:
         file_path: Path to JSON file containing keys
@@ -1199,7 +1205,8 @@ def load_keys_from_file(file_path: str) -> dict[str, str]:
 
     """
     if not os.path.exists(file_path):
-        raise FileNotFoundError(f"Keys file not found: {file_path}")
+        msg = f"Keys file not found: {file_path}"
+        raise FileNotFoundError(msg)
 
     with open(file_path, encoding="utf-8") as f:
         data = json.load(f)
@@ -1208,9 +1215,8 @@ def load_keys_from_file(file_path: str) -> dict[str, str]:
     required_fields = ["session_key", "hmac_key"]
     missing_fields = [field for field in required_fields if field not in data]
     if missing_fields:
-        raise ValueError(
-            f"Missing required fields in keys file: {', '.join(missing_fields)}"
-        )
+        msg = f"Missing required fields in keys file: {', '.join(missing_fields)}"
+        raise ValueError(msg)
 
     return {
         "device_id": data.get("device_id"),

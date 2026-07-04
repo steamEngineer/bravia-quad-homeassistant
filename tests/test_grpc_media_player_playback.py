@@ -59,6 +59,7 @@ def grpc_client() -> MagicMock:
     client.is_connected = True
     client.notify_state = _base_notify_state()
     client.async_exec_command = AsyncMock(return_value=True)
+    client.async_exec_denormalized = AsyncMock(return_value=True)
     client.async_fetch_field_paths = AsyncMock(return_value=0)
     client.add_state_callback = MagicMock()
     client.remove_state_callback = MagicMock()
@@ -438,9 +439,10 @@ async def test_async_media_play_exec(grpc_client: MagicMock, entry: MagicMock) -
 
     await entity.async_media_play()
 
-    grpc_client.async_exec_command.assert_awaited_once_with(
+    grpc_client.async_exec_denormalized.assert_awaited_once_with(
         "playback_control.playback_command",
-        string_value="play",
+        "string_value",
+        "play",
     )
 
 
@@ -451,9 +453,10 @@ async def test_async_media_pause_exec(grpc_client: MagicMock, entry: MagicMock) 
 
     await entity.async_media_pause()
 
-    grpc_client.async_exec_command.assert_awaited_once_with(
+    grpc_client.async_exec_denormalized.assert_awaited_once_with(
         "playback_control.playback_command",
-        string_value="pause",
+        "string_value",
+        "pause",
     )
 
 
@@ -465,9 +468,10 @@ async def test_async_media_next_track_exec(
 
     await entity.async_media_next_track()
 
-    grpc_client.async_exec_command.assert_awaited_once_with(
+    grpc_client.async_exec_denormalized.assert_awaited_once_with(
         "playback_control.playback_command",
-        string_value="next",
+        "string_value",
+        "next",
     )
 
 
@@ -609,10 +613,10 @@ async def test_async_select_sound_mode_exec(
     entity.hass = MagicMock()
     entity.async_write_ha_state = MagicMock()
 
-    await entity.async_select_sound_mode("Neural:X")
+    await entity.async_select_sound_mode("neural_x")
 
     grpc_client.async_exec_command.assert_awaited_once_with(
         _PATH_SOUND_EFFECT,
         string_value="Neural:X",
     )
-    assert entity._attr_sound_mode == "Neural:X"
+    assert entity._attr_sound_mode == "neural_x"

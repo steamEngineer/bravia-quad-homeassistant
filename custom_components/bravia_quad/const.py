@@ -190,11 +190,15 @@ HDMI_STANDBY_LINK_OPTIONS: list[str] = ["auto", "on", "off"]
 AUDIO_RETURN_CHANNEL_OPTIONS: list[str] = ["off", "arc", "earc"]
 
 # gRPC sound effect modes (BRAVIA Connect UI "Sound Field" selection)
-SOUND_EFFECT_OPTIONS: list[str] = [
-    "Dolby Speaker Virtualizer",
-    "Neural:X",
-    "360SSM",
-]
+SOUND_EFFECT_DEVICE_TO_HA: dict[str, str] = {
+    "Dolby Speaker Virtualizer": "dolby_speaker_virtualizer",
+    "Neural:X": "neural_x",
+    "360SSM": "ssm_360",
+}
+SOUND_EFFECT_HA_TO_DEVICE: dict[str, str] = {
+    ha: device for device, ha in SOUND_EFFECT_DEVICE_TO_HA.items()
+}
+SOUND_EFFECT_OPTIONS: list[str] = list(SOUND_EFFECT_HA_TO_DEVICE.keys())
 
 # gRPC 360SSM height (speaker_sound_setting.360ssm_height)
 SSM360_HEIGHT_OPTIONS: list[str] = ["high", "mid", "low"]

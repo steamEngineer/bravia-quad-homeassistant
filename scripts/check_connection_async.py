@@ -98,14 +98,14 @@ async def check_async_connection(host: str, port: int = DEFAULT_PORT) -> bool:
 
 def main() -> None:
     """Run the async connection check."""
-    if len(sys.argv) < 2:  # noqa: PLR2004
+    if len(sys.argv) < 2:
         print(f"Usage: {sys.argv[0]} <host> [port]")
         print(f"Example: {sys.argv[0]} 192.168.1.100")
         sys.exit(1)
 
     host = sys.argv[1]
     try:
-        port = int(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_PORT  # noqa: PLR2004
+        port = int(sys.argv[2]) if len(sys.argv) > 2 else DEFAULT_PORT
     except ValueError:
         print(f"Error: Invalid port number '{sys.argv[2]}'")
         print(f"Usage: {sys.argv[0]} <host> [port]")

@@ -89,9 +89,10 @@ class BraviaQuadFirmwareUpdate(UpdateEntity):
         await super().async_added_to_hass()
         if self._tcp_client is None:
             return
-        self._tcp_client.register_availability_callback(self._on_tcp_availability)
+        tcp_client = self._tcp_client
+        tcp_client.register_availability_callback(self._on_tcp_availability)
         self.async_on_remove(
-            lambda: self._tcp_client.unregister_availability_callback(  # type: ignore[union-attr]
+            lambda: tcp_client.unregister_availability_callback(
                 self._on_tcp_availability
             )
         )

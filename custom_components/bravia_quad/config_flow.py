@@ -19,6 +19,11 @@ from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import format_mac
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from .bravia_grpc_client import BraviaGrpcClientAsync
 from .bravia_quad_client import BraviaQuadClient
@@ -64,8 +69,12 @@ STEP_USER_DATA_SCHEMA = vol.Schema(
 
 STEP_TRANSPORT_SCHEMA = vol.Schema(
     {
-        vol.Required(CONF_TRANSPORT, default=TRANSPORT_GRPC): vol.In(
-            [TRANSPORT_GRPC, TRANSPORT_TCP]
+        vol.Required(CONF_TRANSPORT, default=TRANSPORT_GRPC): SelectSelector(
+            SelectSelectorConfig(
+                options=[TRANSPORT_GRPC, TRANSPORT_TCP],
+                translation_key="transport",
+                mode=SelectSelectorMode.LIST,
+            )
         ),
     }
 )
