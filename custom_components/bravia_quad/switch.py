@@ -41,11 +41,13 @@ from .const import (
     POWER_ON,
     SOUND_FIELD_OFF,
     SOUND_FIELD_ON,
+    TRANSPORT_GRPC,
     VOICE_ENHANCER_OFF,
     VOICE_ENHANCER_ON,
     VOICE_ZOOM_OFF,
     VOICE_ZOOM_ON,
 )
+from .grpc_mapped_entities import mapped_switch_entities
 from .helpers import BraviaQuadNotificationMixin, get_device_info, verify_feature_value
 
 if TYPE_CHECKING:
@@ -69,9 +71,20 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bravia Quad switches from a config entry."""
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+
+    if data.transport == TRANSPORT_GRPC:
+        if data.grpc_client is None:
+            return
+        async_add_entities(
+            mapped_switch_entities(data.grpc_client, entry),
+            update_before_add=True,
+        )
+        return
+
+    if data.tcp_client is None:
+        return
     client = data.tcp_client
 
-    # Create all switch entities
     entities = [
         BraviaQuadPowerSwitch(client, entry),
         BraviaQuadHdmiCecSwitch(client, entry),
@@ -92,6 +105,7 @@ async def async_setup_entry(
 class BraviaQuadPowerSwitch(BraviaQuadNotificationMixin, SwitchEntity):
     """Representation of a Bravia Quad power switch."""
 
+    _attr_entity_category = EntityCategory.CONFIG
     _attr_entity_registry_enabled_default = False
     _attr_has_entity_name = True
     _attr_should_poll = False

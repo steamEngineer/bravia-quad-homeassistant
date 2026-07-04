@@ -7,9 +7,10 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from homeassistant.const import CONF_MAC, CONF_NAME, Platform
-from homeassistant.exceptions import ConfigEntryError, ConfigEntryNotReady
+from homeassistant.const import CONF_MAC, CONF_NAME, EVENT_HOMEASSISTANT_STOP, Platform
+from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .bravia_http_client import HTTP_API_PORT, BraviaHttpClient
@@ -24,20 +25,32 @@ from .const import (
     DEFAULT_NAME,
     DOMAIN,
     MODEL_ID_TO_NAME,
+    TRANSPORT_TCP,
 )
-from .helpers import migrate_legacy_identifiers, require_unique_id
+from .grpc_refresh import async_setup_grpc_client
+from .helpers import (
+    migrate_legacy_identifiers,
+    remove_legacy_group_subdevices,
+    remove_legacy_input_select,
+    require_unique_id,
+)
+from .transport import migrate_transport_entry, resolve_transport
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import HomeAssistant
+    from homeassistant.core import Event, HomeAssistant
+
+    from .bravia_grpc_client import BraviaGrpcClientAsync
 
 
 @dataclass
 class BraviaQuadData:
     """Runtime data for a Bravia Quad config entry."""
 
-    tcp_client: BraviaQuadClient
+    transport: str
     http_client: BraviaHttpClient
+    tcp_client: BraviaQuadClient | None = None
+    grpc_client: BraviaGrpcClientAsync | None = None
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,12 +70,70 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Bravia Quad from a config entry."""
     hass.data.setdefault(DOMAIN, {})
 
-    # Create client instance
+    migrate_transport_entry(hass, entry)
+    transport = resolve_transport(entry)
+
+    session = async_get_clientsession(hass)
+    http_client = BraviaHttpClient(entry.data["host"], session)
+
+    tcp_client: BraviaQuadClient | None = None
+    grpc_client: BraviaGrpcClientAsync | None = None
+
+    if transport == TRANSPORT_TCP:
+        tcp_client = await _setup_tcp_client(hass, entry)
+    else:
+        grpc_client = await async_setup_grpc_client(hass, entry)
+        if grpc_client is None:
+            raise ConfigEntryNotReady
+
+    migrate_legacy_identifiers(hass, entry)
+
+    if transport == TRANSPORT_TCP:
+        if tcp_client is None:
+            msg = "TCP transport requires tcp_client"
+            raise ConfigEntryNotReady(msg)
+        await _register_device(hass, entry, http_client, tcp_client=tcp_client)
+    else:
+        await _register_device(hass, entry, http_client, _grpc_client=grpc_client)
+
+    hass.data[DOMAIN][entry.entry_id] = BraviaQuadData(
+        transport=transport,
+        http_client=http_client,
+        tcp_client=tcp_client,
+        grpc_client=grpc_client,
+    )
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
+    if grpc_client is not None:
+        grpc_client.dispatch_snapshot_callbacks()
+
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+
+    if grpc_client is not None:
+
+        async def _async_stop_grpc(_event: Event) -> None:
+            await grpc_client.async_disconnect()
+
+        entry.async_on_unload(
+            hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STOP, _async_stop_grpc)
+        )
+
+    return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Reload when integration options change."""
+    await hass.config_entries.async_reload(entry.entry_id)
+
+
+async def _setup_tcp_client(
+    hass: HomeAssistant, entry: ConfigEntry
+) -> BraviaQuadClient:
+    """Connect TCP control plane and seed device state."""
     client = BraviaQuadClient(
         entry.data["host"], entry.data.get(CONF_NAME, DEFAULT_NAME)
     )
 
-    # Test connection - raise ConfigEntryNotReady on failure
     try:
         await client.async_connect()
         await client.async_test_connection()
@@ -70,46 +141,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await client.async_disconnect()
         raise ConfigEntryNotReady from err
 
-    entry_serial = entry.data.get(CONF_SERIAL)
-    if entry.unique_id and entry_serial and entry.unique_id == entry_serial:
-        try:
-            device_serial = await client.async_get_serial_number()
-        except (OSError, TimeoutError):
-            device_serial = None
-        if device_serial and device_serial != entry.unique_id:
-            host = entry.data["host"]
-            _LOGGER.error(
-                "Device at %s reports serial %s but config entry expects %s",
-                host,
-                device_serial,
-                entry.unique_id,
-            )
-            await client.async_disconnect()
-            msg = (
-                f"Device identity mismatch at {host}: "
-                f"expected serial {entry.unique_id}, got {device_serial}"
-            )
-            raise ConfigEntryError(msg)
-
-    # Let the connection stabilize, then start the notification listener
-    # so command responses are routed correctly
     await asyncio.sleep(0.2)
     await client.async_listen_for_notifications()
 
-    # Backfill permanent identity for entries created before this version
     await _backfill_identity(hass, entry, client)
-
-    # Migrate legacy device/entity identifiers (IP/MAC/entry_id -> serial)
-    migrate_legacy_identifiers(hass, entry)
-
-    # Register the device with identity from entry.data (permanent)
-    # plus firmware version and active MAC from TCP (transient)
-    await _register_device(hass, entry, client)
-
-    # Fetch all initial states from the device
     await client.async_fetch_all_states()
 
-    # Detect subwoofer if not already detected (for existing entries without this data)
     if CONF_HAS_SUBWOOFER not in entry.data:
         _LOGGER.info("Detecting subwoofer for existing entry...")
         try:
@@ -120,22 +157,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 "defaulting to False"
             )
             has_subwoofer = False
-        # Update entry data with detection result
         new_data = {**entry.data, CONF_HAS_SUBWOOFER: has_subwoofer}
         hass.config_entries.async_update_entry(entry, data=new_data)
         _LOGGER.info("Subwoofer detection complete: %s", has_subwoofer)
 
-    # Create HTTP client for management API and firmware updates
-    session = async_get_clientsession(hass)
-    http_client = BraviaHttpClient(entry.data["host"], session)
-
-    # Store runtime data and forward entry setup to platforms
-    hass.data[DOMAIN][entry.entry_id] = BraviaQuadData(
-        tcp_client=client, http_client=http_client
-    )
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-
-    return True
+    return client
 
 
 async def _backfill_identity(
@@ -179,7 +205,6 @@ async def _backfill_identity(
         _LOGGER.debug("Failed to fetch MAC address")
 
     if updates:
-        # Migrate unique_id to serial if we got one
         new_unique_id = updates.get(CONF_SERIAL)
         hass.config_entries.async_update_entry(
             entry,
@@ -190,34 +215,44 @@ async def _backfill_identity(
 
 
 async def _register_device(
-    hass: HomeAssistant, entry: ConfigEntry, client: BraviaQuadClient
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    http_client: BraviaHttpClient,
+    *,
+    tcp_client: BraviaQuadClient | None = None,
+    _grpc_client: BraviaGrpcClientAsync | None = None,
 ) -> None:
     """Create or update the device registry entry."""
-    # Permanent identity from entry.data (set by config flow or backfill)
     manufacturer = entry.data.get(CONF_MANUFACTURER, "Sony")
     model = entry.data.get(CONF_MODEL, DEFAULT_MODEL)
     model_id = entry.data.get(CONF_MODEL_ID)
     serial = entry.data.get(CONF_SERIAL)
 
-    # Transient data from TCP (may change between setups)
     firmware_version: str | None = None
     try:
-        firmware_version = await client.async_get_firmware_version()
-    except (OSError, TimeoutError):
-        _LOGGER.debug("Failed to fetch firmware version")
+        system_info = await http_client.async_get_system_info()
+        if system_info:
+            firmware_version = system_info.version
+    except OSError:
+        _LOGGER.debug("Failed to fetch firmware version from HTTP")
 
-    active_mac: str | None = None
-    try:
-        active_mac = await client.async_get_mac_address()
-    except (OSError, TimeoutError):
-        _LOGGER.debug("Failed to fetch active MAC")
+    if firmware_version is None and tcp_client is not None:
+        try:
+            firmware_version = await tcp_client.async_get_firmware_version()
+        except (OSError, TimeoutError):
+            _LOGGER.debug("Failed to fetch firmware version from TCP")
 
-    # Build connections from stored MAC and active MAC
     connections: set[tuple[str, str]] = set()
     if CONF_MAC in entry.data:
         connections.add((dr.CONNECTION_NETWORK_MAC, entry.data[CONF_MAC]))
-    if active_mac:
-        connections.add((dr.CONNECTION_NETWORK_MAC, dr.format_mac(active_mac)))
+
+    if tcp_client is not None:
+        try:
+            active_mac = await tcp_client.async_get_mac_address()
+            if active_mac:
+                connections.add((dr.CONNECTION_NETWORK_MAC, dr.format_mac(active_mac)))
+        except (OSError, TimeoutError):
+            _LOGGER.debug("Failed to fetch active MAC from TCP")
 
     dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
@@ -231,15 +266,23 @@ async def _register_device(
         sw_version=firmware_version,
         configuration_url=f"http://{entry.data['host']}:{HTTP_API_PORT}",
     )
+    remove_legacy_group_subdevices(dr.async_get(hass), entry)
+    remove_legacy_input_select(er.async_get(hass), entry)
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
+    domain_data = hass.data.get(DOMAIN)
+    if domain_data and entry.entry_id in domain_data:
+        data: BraviaQuadData = domain_data[entry.entry_id]
+        if data.tcp_client:
+            await data.tcp_client.async_disconnect()
+        if data.grpc_client:
+            await data.grpc_client.async_disconnect()
+
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
-    if entry.entry_id in hass.data[DOMAIN]:
-        data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
-        await data.tcp_client.async_disconnect()
-        hass.data[DOMAIN].pop(entry.entry_id)
+    if domain_data and entry.entry_id in domain_data:
+        domain_data.pop(entry.entry_id)
 
     return unload_ok

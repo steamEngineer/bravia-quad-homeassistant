@@ -18,7 +18,9 @@ from custom_components.bravia_quad.bravia_http_client import (
 )
 from custom_components.bravia_quad.const import (
     CONF_HAS_SUBWOOFER,
+    CONF_TRANSPORT,
     DOMAIN,
+    TRANSPORT_TCP,
 )
 
 if TYPE_CHECKING:
@@ -78,6 +80,7 @@ def mock_config_entry() -> MockConfigEntry:
         data={
             CONF_HOST: "192.168.1.100",
             CONF_HAS_SUBWOOFER: True,
+            CONF_TRANSPORT: TRANSPORT_TCP,
         },
         unique_id="192.168.1.100",
         entry_id="test_entry_id",  # Fixed entry_id for stable snapshots
@@ -93,6 +96,7 @@ def mock_config_entry_no_subwoofer() -> MockConfigEntry:
         data={
             CONF_HOST: "192.168.1.100",
             CONF_HAS_SUBWOOFER: False,
+            CONF_TRANSPORT: TRANSPORT_TCP,
         },
         unique_id="192.168.1.100",
         entry_id="test_entry_id_no_sub",  # Fixed entry_id for stable snapshots
@@ -290,7 +294,7 @@ def mock_bravia_quad_client() -> Generator[MagicMock]:
         yield client
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def mock_bravia_http_client() -> Generator[MagicMock]:
     """Return a mocked BraviaHttpClient."""
     with patch(
@@ -439,3 +443,25 @@ async def init_integration_all(
             await hass.async_block_till_done()
 
     return mock_config_entry
+
+
+@pytest.fixture
+def grpc_client() -> MagicMock:
+    """Return a mocked BraviaGrpcClientAsync for entity unit tests."""
+    client = MagicMock()
+    client.is_connected = True
+    client.notify_state = {}
+    client.volume_step_interval = 0
+    client.async_exec_command = AsyncMock(return_value=True)
+    client.add_state_callback = MagicMock()
+    client.remove_state_callback = MagicMock()
+    return client
+
+
+@pytest.fixture
+def grpc_entry() -> MagicMock:
+    """Return a mocked config entry for gRPC entity unit tests."""
+    entry = MagicMock()
+    entry.unique_id = "serial123"
+    entry.data = {}
+    return entry

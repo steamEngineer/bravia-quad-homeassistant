@@ -14,6 +14,7 @@ from homeassistant.helpers import entity_registry as er
 from .const import (
     AUDIO_RETURN_CHANNEL_OPTIONS,
     BASS_LEVEL_OPTIONS,
+    BASS_LEVEL_VALUES_TO_OPTIONS,
     BT_CONNECTION_QUALITY_OPTIONS,
     CONF_HAS_SUBWOOFER,
     DOMAIN,
@@ -27,12 +28,12 @@ from .const import (
     FEATURE_HDMI_PASSTHROUGH,
     FEATURE_HDMI_STANDBY_LINK,
     FEATURE_IMAX_MODE,
-    FEATURE_INPUT,
     HDMI_PASSTHROUGH_OPTIONS,
     HDMI_STANDBY_LINK_OPTIONS,
     IMAX_MODE_OPTIONS,
-    INPUT_OPTIONS,
+    TRANSPORT_GRPC,
 )
+from .grpc_mapped_entities import mapped_select_entities
 from .helpers import (
     BraviaQuadNotificationMixin,
     get_device_info,
@@ -53,11 +54,6 @@ _LOGGER = logging.getLogger(__name__)
 SCAN_INTERVAL = timedelta(seconds=60)
 PARALLEL_UPDATES = 1
 
-# Reverse mapping for bass level (int -> API value)
-BASS_LEVEL_VALUES_TO_OPTIONS: dict[int, str] = {
-    v: k for k, v in BASS_LEVEL_OPTIONS.items()
-}
-
 
 async def async_setup_entry(
     hass: HomeAssistant,
@@ -66,6 +62,18 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bravia Quad select entities from a config entry."""
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+
+    if data.transport == TRANSPORT_GRPC:
+        if data.grpc_client is None:
+            return
+        async_add_entities(
+            mapped_select_entities(data.grpc_client, entry),
+            update_before_add=True,
+        )
+        return
+
+    if data.tcp_client is None:
+        return
     client = data.tcp_client
 
     # Remove legacy switch entity after IMAX mode became a select
@@ -80,9 +88,7 @@ async def async_setup_entry(
             break
 
     # Create select entities
-    entities: list[SelectEntity] = [
-        BraviaQuadInputSelect(client, entry),
-    ]
+    entities: list[SelectEntity] = []
 
     # Add bass level select only if no subwoofer detected
     if not entry.data.get(CONF_HAS_SUBWOOFER, False):
@@ -100,59 +106,6 @@ async def async_setup_entry(
     entities.append(BraviaQuadAudioReturnChannelSelect(client, entry))
 
     async_add_entities(entities, update_before_add=True)
-
-
-class BraviaQuadInputSelect(BraviaQuadNotificationMixin, SelectEntity):
-    """Representation of a Bravia Quad input selector."""
-
-    _attr_entity_registry_enabled_default = False
-    _attr_has_entity_name = True
-    _attr_should_poll = False
-    _attr_translation_key = "input"
-    _notification_feature = FEATURE_INPUT
-
-    def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
-        """Initialize the input select entity."""
-        self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_input"
-        self._attr_options = INPUT_OPTIONS
-        current_input_value = client.input
-        self._attr_current_option = (
-            current_input_value if current_input_value in INPUT_OPTIONS else "tv"
-        )
-        self._attr_device_info = get_device_info(entry)
-
-    async def _on_notification(self, value: str) -> None:
-        """Handle input notification."""
-        if value in INPUT_OPTIONS:
-            self._attr_current_option = value
-            self.async_write_ha_state()
-        else:
-            _LOGGER.warning("Unknown input value received: %s", value)
-
-    async def async_select_option(self, option: str) -> None:
-        """Change the selected option."""
-        if option not in INPUT_OPTIONS:
-            _LOGGER.error("Invalid input option: %s", option)
-            return
-
-        success = await self._client.async_set_input(option)
-        if success:
-            self._attr_current_option = option
-            self.async_write_ha_state()
-        else:
-            _LOGGER.error("Failed to set input to %s", option)
-
-    async def async_update(self) -> None:
-        """Update the current input."""
-        try:
-            input_value = await self._client.async_get_input()
-            if input_value in INPUT_OPTIONS:
-                self._attr_current_option = input_value
-            else:
-                _LOGGER.warning("Unknown input value: %s", input_value)
-        except (OSError, TimeoutError):
-            _LOGGER.exception("Failed to update input")
 
 
 class BraviaQuadBassLevelSelect(BraviaQuadNotificationMixin, SelectEntity):

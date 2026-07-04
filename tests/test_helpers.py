@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
-from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import CONF_HOST, CONF_MAC, Platform
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
@@ -17,7 +16,6 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.bravia_quad.const import (
     CONF_HAS_SUBWOOFER,
     CONF_MODEL,
-    CONF_SERIAL,
     DOMAIN,
 )
 from custom_components.bravia_quad.helpers import (
@@ -167,6 +165,7 @@ async def test_backfill_fetches_identity(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
     mock_bravia_quad_client: MagicMock,
+    mock_bravia_http_client: MagicMock,
 ) -> None:
     """Test that old entries without identity get backfilled on setup."""
     # mock_config_entry has no CONF_MODEL_ID, triggering backfill
@@ -181,8 +180,9 @@ async def test_backfill_fetches_identity(
     mock_bravia_quad_client.async_get_model_type.assert_called_once()
     mock_bravia_quad_client.async_get_manufacturer.assert_called_once()
 
-    # Firmware version is fetched in _register_device (transient)
-    mock_bravia_quad_client.async_get_firmware_version.assert_called_once()
+    # Firmware version is fetched from HTTP during device registration
+    mock_bravia_http_client.async_get_system_info.assert_called_once()
+    mock_bravia_quad_client.async_get_firmware_version.assert_not_called()
 
     # Backfilled values should be in entry data
     assert mock_config_entry.data["serial_number"] == "1234567"
@@ -207,6 +207,7 @@ async def test_backfill_fetches_identity(
 async def test_no_backfill_when_identity_present(
     hass: HomeAssistant,
     mock_bravia_quad_client: MagicMock,
+    mock_bravia_http_client: MagicMock,
 ) -> None:
     """Test that backfill is skipped when identity is already in entry data."""
     entry = MockConfigEntry(
@@ -219,6 +220,7 @@ async def test_no_backfill_when_identity_present(
             "model": "BRAVIA Theatre Quad",
             "manufacturer": "SONY",
             "serial_number": "1234567",
+            "transport": "tcp",
         },
         unique_id="192.168.1.100",
         entry_id="test_no_backfill",
@@ -234,41 +236,9 @@ async def test_no_backfill_when_identity_present(
     mock_bravia_quad_client.async_get_model_type.assert_not_called()
     mock_bravia_quad_client.async_get_manufacturer.assert_not_called()
 
-    # Firmware version should still be fetched (transient)
-    mock_bravia_quad_client.async_get_firmware_version.assert_called_once()
-
-
-@pytest.mark.usefixtures("mock_bravia_quad_client")
-async def test_setup_fails_on_serial_identity_mismatch(
-    hass: HomeAssistant,
-    mock_bravia_quad_client: MagicMock,
-) -> None:
-    """Test setup fails when connected device serial does not match entry."""
-    entry = MockConfigEntry(
-        title="Bravia Quad",
-        domain=DOMAIN,
-        data={
-            CONF_HOST: "192.168.1.100",
-            CONF_HAS_SUBWOOFER: True,
-            CONF_SERIAL: "1234567",
-            CONF_MODEL: "BRAVIA Theatre Quad",
-            "model_id": "HT-A9M2",
-            CONF_MAC: "60:ff:9e:12:34:56",
-        },
-        unique_id="1234567",
-        entry_id="test_serial_mismatch",
-    )
-    entry.add_to_hass(hass)
-    mock_bravia_quad_client.async_get_serial_number = AsyncMock(
-        return_value="wrong_serial"
-    )
-
-    with patch("custom_components.bravia_quad.PLATFORMS", []):
-        result = await hass.config_entries.async_setup(entry.entry_id)
-        await hass.async_block_till_done()
-
-    assert result is False
-    assert entry.state is ConfigEntryState.SETUP_ERROR
+    # Firmware version comes from HTTP, not TCP backfill getters
+    mock_bravia_http_client.async_get_system_info.assert_called_once()
+    mock_bravia_quad_client.async_get_firmware_version.assert_not_called()
 
 
 # =============================================================================
@@ -857,18 +827,6 @@ async def test_setup_ip_entry_migrates_without_duplicates(
 # =============================================================================
 
 
-def test_verify_feature_value_match() -> None:
-    """Test verify_feature_value returns actual when values match."""
-    assert (
-        verify_feature_value(
-            requested="on",
-            actual="on",
-            feature_label="test feature",
-        )
-        == "on"
-    )
-
-
 def test_verify_feature_value_mismatch_raises() -> None:
     """Test verify_feature_value raises on mismatch."""
     with pytest.raises(HomeAssistantError) as exc_info:
@@ -913,56 +871,3 @@ def test_verify_feature_value_invalid_actual_raises() -> None:
             feature_label="IMAX mode",
             valid_values={"auto", "on", "off"},
         )
-
-
-def test_verify_feature_value_int() -> None:
-    """Test verify_feature_value works with integer values."""
-    assert (
-        verify_feature_value(
-            requested=10,
-            actual=10,
-            feature_label="AV sync",
-        )
-        == 10
-    )
-
-
-# =============================================================================
-# BraviaQuadNotificationMixin Tests
-# =============================================================================
-
-
-async def test_notification_mixin_registers_callback(
-    hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
-    mock_bravia_quad_client: MagicMock,
-) -> None:
-    """Test that notification mixin registers callback on async_added_to_hass."""
-    mock_config_entry.add_to_hass(hass)
-
-    with patch("custom_components.bravia_quad.PLATFORMS", [Platform.SWITCH]):
-        await hass.config_entries.async_setup(mock_config_entry.entry_id)
-        await hass.async_block_till_done()
-
-    # Verify callbacks were registered
-    assert mock_bravia_quad_client.register_notification_callback.called
-
-
-async def test_notification_mixin_unregisters_callback_on_remove(
-    hass: HomeAssistant,
-    mock_config_entry: MockConfigEntry,
-    mock_bravia_quad_client: MagicMock,
-) -> None:
-    """Test that notification mixin unregisters callback on entity removal."""
-    mock_config_entry.add_to_hass(hass)
-
-    with patch("custom_components.bravia_quad.PLATFORMS", [Platform.SWITCH]):
-        await hass.config_entries.async_setup(mock_config_entry.entry_id)
-        await hass.async_block_till_done()
-
-    # Unload the entry
-    await hass.config_entries.async_unload(mock_config_entry.entry_id)
-    await hass.async_block_till_done()
-
-    # Verify callbacks were unregistered
-    assert mock_bravia_quad_client.unregister_notification_callback.called

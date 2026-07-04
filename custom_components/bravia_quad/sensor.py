@@ -27,7 +27,9 @@ from .const import (
     FEATURE_TEMPERATURE,
     FEATURE_TIMEZONE,
     FEATURE_VOICE_ZOOM_LEVEL,
+    TRANSPORT_GRPC,
 )
+from .grpc_mapped_entities import mapped_sensor_entities
 from .helpers import BraviaQuadNotificationMixin, get_device_info
 
 if TYPE_CHECKING:
@@ -102,20 +104,31 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bravia Quad sensor entities."""
     data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
-    client = data.tcp_client
 
-    entities: list[SensorEntity] = [
-        BraviaQuadTemperatureSensor(client, entry),
-        BraviaQuadTimezoneSensor(client, entry),
-        BraviaQuad360SsmSensor(client, entry),
-        BraviaQuadVoiceZoomLevelSensor(client, entry),
-        BraviaQuadNetworkModeSensor(client, entry),
-        BraviaQuadIpAddressSensor(client, entry),
-        BraviaQuadDeviceNameSensor(client, entry),
-        BraviaQuadDestinationSensor(client, entry),
-        BraviaQuadLanguageSensor(client, entry),
-        BraviaQuadDhcpSensor(client, entry),
-    ]
+    entities: list[SensorEntity] = []
+
+    if data.transport == TRANSPORT_GRPC:
+        if data.grpc_client is None:
+            return
+        entities.extend(mapped_sensor_entities(data.grpc_client, entry))
+    else:
+        if data.tcp_client is None:
+            return
+        client = data.tcp_client
+        entities.extend(
+            [
+                BraviaQuadTemperatureSensor(client, entry),
+                BraviaQuadTimezoneSensor(client, entry),
+                BraviaQuad360SsmSensor(client, entry),
+                BraviaQuadVoiceZoomLevelSensor(client, entry),
+                BraviaQuadNetworkModeSensor(client, entry),
+                BraviaQuadIpAddressSensor(client, entry),
+                BraviaQuadDeviceNameSensor(client, entry),
+                BraviaQuadDestinationSensor(client, entry),
+                BraviaQuadLanguageSensor(client, entry),
+                BraviaQuadDhcpSensor(client, entry),
+            ]
+        )
 
     entities.extend(
         BraviaHttpSensor(data.http_client, entry, desc)

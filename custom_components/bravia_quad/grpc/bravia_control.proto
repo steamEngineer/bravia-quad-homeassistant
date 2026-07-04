@@ -1,0 +1,332 @@
+syntax = "proto3";
+
+package jp.co.sony.hes.ssh.controldevice.v1;
+
+// Authentication messages
+message ConfirmSigninRequest {
+  bytes auth_data = 1;
+}
+
+message ConfirmSigninResponse {
+  bool success = 1;
+}
+
+message ConfirmKeysRequest {
+  string session_id = 1;
+  bytes key_data = 2;
+}
+
+message ConfirmKeysResponse {
+  // Empty response
+}
+
+message GetSessionRandomRequest {
+  string session_id = 1;
+}
+
+message GetSessionRandomResponse {
+  bytes session_random = 1;  // 8 bytes
+  bytes auth_token = 2;      // 32 bytes
+  string session_id = 3;    // Session ID (may be returned)
+}
+
+// State management messages
+// NOTE: The actual request structure differs from this proto definition!
+// The proto was derived from response states, but the request has a different structure:
+//   - Field 1: A nested structure containing:
+//     * Nested field 1: repeated string field paths (e.g., "bluetooth_setting.connection_quality", "mute", etc.)
+//     * Field 2 (embedded): Contains session_random (8 bytes) and session_id (UUID string)
+//   - Field 2 (top-level): auth_token (32 bytes)
+// The code manually constructs the request to match the actual device expectations.
+message GetStatesWithAuthRequest {
+  FieldListRequest field_list = 1;  // Actually contains field paths + embedded session_random/session_id
+  bytes session_random = 2;  // Actually embedded inside field_list, not a separate field
+  string session_id = 3;  // Actually embedded inside field_list, not a separate field
+  bytes auth_token = 4;  // This is correct - separate top-level field
+}
+
+message GetStatesWithAuthResponse {
+  FieldListRequest states = 1;
+  bytes session_random = 2;
+  string session_id = 3;
+  bytes auth_token = 4;
+}
+
+message StartNotifyStatesRequest {
+  string session_id = 1;
+}
+
+message StartNotifyStatesResponse {
+  FieldListRequest states = 1;
+  bytes session_random = 2;
+  string session_id = 3;
+  bytes auth_token = 4;
+}
+
+// Command execution messages
+message ExecCommandWithAuthRequest {
+  string command_path = 1;
+  int32 command_value = 2;
+  string string_value = 3;
+  bytes session_random = 4;
+  string session_id = 5;
+  bytes auth_token = 6;
+}
+
+message ExecCommandWithAuthResponse {
+  bool success = 1;
+}
+
+// Field list structure (from generated.proto)
+message FieldListRequest {
+  string error_status = 1;
+  string fxO = 2;
+  string mute = 3;
+  string power = 4;
+  BluetoothSetting bluetooth_setting = 5;
+  EasySetup easy_setup = 6;
+  Ecia ecia = 7;
+  FwUpdate fw_update = 8;
+  Notification notification = 9;
+  PlaybackControl playback_control = 10;
+  SoundOptimization sound_optimization = 11;
+  SoundSetting sound_setting = 12;
+  string volume = 13;  // Volume (0-100)
+  SystemSetting system_setting = 14;
+  SpeakerConnectionSetting speaker_connection_setting = 15;
+  SpeakerSoundSetting speaker_sound_setting = 16;
+}
+
+message BluetoothSetting {
+  string connection_quality = 1;
+  string pairing_mode = 2;
+  ConnectionQuality connection_quality_obj = 3;
+  PairingA2dp0 pairing_a2dp_0 = 4;
+}
+
+message ConnectionQuality {
+  string availability = 1;
+}
+
+message PairingA2dp0 {
+  string btaddr_hash = 1;
+  string result = 2;
+  string status = 3;
+}
+
+message EasySetup {
+  All all = 1;
+}
+
+message All {
+  string in_setup = 1;
+}
+
+message Ecia {
+  string agreement_info = 1;
+  string country_and_region_code = 2;
+  string device_id = 3;
+  string pp_agreement_overall_status = 4;
+  string pp_baseurl = 5;
+  string pp_region = 6;
+  string pp_version = 7;
+}
+
+message FwUpdate {
+  string error = 1;
+  string progress = 2;
+  string state = 3;
+  string target_version = 4;
+  string update_exist_spk = 5;
+  CancelUpdate cancel_update = 6;
+  Error error_obj = 7;
+  Version version = 8;
+}
+
+message CancelUpdate {
+  string availability = 1;
+}
+
+message Error {
+  string main = 1;
+  string rl = 2;
+  string rr = 3;
+  string sw = 4;
+  Rl rl_obj = 5;
+  Rr rr_obj = 6;
+  Sw sw_obj = 7;
+}
+
+message Rl {
+  string availability = 1;
+}
+
+message Rr {
+  string availability = 1;
+}
+
+message Sw {
+  string availability = 1;
+}
+
+message Version {
+  string main = 1;
+}
+
+message Notification {
+  string cast_service = 1;
+  string settings_changed = 2;
+  string sound_dropout = 3;
+  string standby_power_status0 = 4;
+}
+
+message PlaybackControl {
+  string album = 1;
+  string artist = 2;
+  string audio_channel = 3;
+  string audio_format = 4;
+  string audio_format_dual_mono = 5;
+  string bt_codec = 6;
+  string bt_device_name = 7;
+  string bt_signal_strength = 8;
+  string demosong_playback = 9;
+  string duration = 10;
+  string function = 11;
+  string hdmi_error = 12;
+  string is_360ra = 13;
+  string jacket_url = 14;
+  string no_audio = 15;
+  string playback_state = 16;
+  string position = 17;
+  string sampling_rate = 18;
+  string service_name = 19;
+  string spotify_playlist_name = 20;
+  string title = 21;
+  string upmixer = 22;
+  string virtualizer = 23;
+  BuiltInDemo built_in_demo = 24;
+  Function function_obj = 25;
+  PlaybackCommand playback_command = 26;
+  Spotify spotify = 27;
+}
+
+message BuiltInDemo {
+  string mode = 1;
+}
+
+message Function {
+  string availability = 1;
+  string available_values = 2;
+  string unavailable_reason = 3;
+}
+
+message PlaybackCommand {
+  string availability = 1;
+  string unavailable_reason = 2;
+}
+
+message Spotify {
+  string status = 1;
+}
+
+message SoundOptimization {
+  string notify_sound_status = 1;
+  All all = 2;
+  Raee raee = 3;
+  Slm slm = 4;
+  SoundGps sound_gps = 5;
+}
+
+message Raee {
+  string is_measured = 1;
+  string measurement_sound_status = 2;
+  string measurement_status = 3;
+}
+
+message Slm {
+  string is_measured = 1;
+  string measurement_estimated_time = 2;
+  string measurement_progress = 3;
+  string measurement_result = 4;
+  string measurement_status = 5;
+}
+
+message SoundGps {
+  string in_setup = 1;
+  string is_measured = 2;
+  string measurement_sound_status = 3;
+  string measurement_status = 4;
+  string speaker_location = 5;
+}
+
+message SoundSetting {
+  string dts_dialog_control = 1;
+  AvSync av_sync = 2;
+  DtsDialogControl dts_dialog_control_obj = 3;
+  string auto_volume = 4;  // bool as string
+  string drc = 5;  // enum: "auto", "on", "off"
+  string dsee_ultimate = 6;  // bool as string
+  string dual_mono = 7;  // enum: "main", "sub", "main_sub"
+  string night_mode = 8;  // bool as string
+  string sound_effect = 9;  // enum: "Dolby Speaker Virtualizer", "Neural:X", "360SSM"
+  string sound_field = 10;  // bool as string
+  SoundField sound_field_obj = 11;
+  string voice_mode = 12;  // bool as string
+  Volume volume = 13;
+}
+
+message SoundField {
+  string availability = 1;  // bool as string
+  string unavailable_reason = 2;  // enum: "none", "unsupported_input"
+}
+
+message Volume {
+  string bass = 1;  // enum: "min", "mid", "max"
+  string rear = 2;  // int as string (-10 to 10)
+  string subwoofer = 3;  // int as string (-10 to 10)
+}
+
+message AvSync {
+  string arc = 1;
+  string current_function = 2;
+  string hdmi_0 = 3;
+}
+
+message DtsDialogControl {
+  string availability = 1;
+}
+
+message SystemSetting {
+  string auto_standby = 1;  // bool as string
+  string auto_update = 2;  // bool as string
+  string dimmer = 3;  // enum: "bright", "dark", "off"
+  string earc = 4;  // bool as string
+  string external_control = 5;  // bool as string
+  string hdmi_signal_format = 6;  // enum: "standard", "enhanced", "enhanced_4k120_8k"
+  string hdmi_standby_through = 7;  // enum: "auto", "on", "off"
+  string nw_bt_standby = 8;  // bool as string
+  string video_output_for_pip_pbp_displayed_tv = 9;  // bool as string
+}
+
+message SpeakerConnectionSetting {
+  string connection_quality = 1;  // enum: "stable_connection", "sound_quality"
+}
+
+message SpeakerSoundSetting {
+  string ssm_360_height = 1;  // enum: "high", "mid", "low" (field name: 360ssm_height)
+  PositionTv position_tv = 2;
+}
+
+message PositionTv {
+  string left_right = 1;  // enum: "left", "center", "right"
+}
+
+// Service definition
+service ControlDeviceService {
+  rpc ConfirmSignin(ConfirmSigninRequest) returns (ConfirmSigninResponse);
+  rpc ConfirmKeys(ConfirmKeysRequest) returns (ConfirmKeysResponse);
+  rpc GetSessionRandom(GetSessionRandomRequest) returns (GetSessionRandomResponse);
+  rpc GetStatesWithAuth(GetStatesWithAuthRequest) returns (GetStatesWithAuthResponse);
+  rpc StartNotifyStates(StartNotifyStatesRequest) returns (stream StartNotifyStatesResponse);
+  rpc ExecCommandWithAuth(ExecCommandWithAuthRequest) returns (ExecCommandWithAuthResponse);
+}

@@ -14,6 +14,7 @@ from custom_components.bravia_quad.const import (
     FEATURE_DRC,
     FEATURE_HDMI_CEC,
     FEATURE_INPUT,
+    FEATURE_MUTE,
     FEATURE_NIGHT_MODE,
     FEATURE_POWER,
     FEATURE_REAR_LEVEL,
@@ -80,8 +81,14 @@ NUMBER_FEATURES = {
 }
 
 SELECT_FEATURES = {
-    FEATURE_INPUT,
     FEATURE_DRC,
+}
+
+MEDIA_PLAYER_FEATURES = {
+    FEATURE_INPUT,
+    FEATURE_MUTE,
+    FEATURE_POWER,
+    FEATURE_VOLUME,
 }
 
 # Test case definitions
@@ -102,7 +109,6 @@ NUMBER_TEST_CASES = [
 ]
 
 SELECT_TEST_CASES = [
-    SelectTestCase("_input", FEATURE_INPUT, ["hdmi1", "bluetooth", "tv"]),
     SelectTestCase("_drc", FEATURE_DRC, ["on", "off", "auto"]),
 ]
 
@@ -160,7 +166,9 @@ async def test_callbacks_registered_on_setup(
     registered_features = {call_args[0][0] for call_args in register_calls}
 
     # Test all platform features are registered
-    all_expected = SWITCH_FEATURES | NUMBER_FEATURES | SELECT_FEATURES
+    all_expected = (
+        SWITCH_FEATURES | NUMBER_FEATURES | SELECT_FEATURES | MEDIA_PLAYER_FEATURES
+    )
     for feature in all_expected:
         assert feature in registered_features, f"Feature {feature} not registered"
 

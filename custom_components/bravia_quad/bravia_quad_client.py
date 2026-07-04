@@ -269,6 +269,10 @@ class BraviaQuadClient:
                 return str(value)
         return None
 
+    async def async_get_tcp_feature(self, feature: str) -> str | None:
+        """Get a TCP control-plane feature (used by gRPC hybrid seeding)."""
+        return await self._async_get_feature(feature)
+
     async def async_set_power(self, state: str) -> bool:
         """Set power state (on/off)."""
         if await self._async_set_feature(FEATURE_POWER, state):

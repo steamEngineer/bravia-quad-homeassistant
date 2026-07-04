@@ -2,6 +2,24 @@
 
 target-version = "py313"
 
+extend-exclude = [
+    "scripts/capture",
+    "scripts/frida",
+    "scripts/grpc_auth_gate.py",
+    "scripts/grpc_connect_handoff_probe.py",
+    "scripts/grpc_diff_getstates_capture.py",
+    "scripts/grpc_external_control_probe.py",
+    "scripts/grpc_notify_states_field_probe.py",
+    "scripts/grpc_playback_probe.py",
+    "scripts/grpc_snapshot_coverage.py",
+    "scripts/grpc_unmapped_enum_scan.py",
+    "scripts/reset_dev_ha_legacy.py",
+    "tests/test_analyze_getstates_log.py",
+    "tests/test_analyze_grpc_timeline.py",
+    "custom_components/bravia_quad/grpc/bravia_control_pb2.py",
+    "custom_components/bravia_quad/grpc/bravia_control_pb2_grpc.py",
+]
+
 [lint]
 select = [
     "ALL",
@@ -28,11 +46,16 @@ max-complexity = 25
 "scripts/*" = [
     "D",       # Don't require docstrings in scripts
     "FBT001",  # Allow boolean positional args in scripts
+    "FBT003",  # Allow boolean positional values in CLI argparse/help
     "PLR0915", # Allow many statements in scripts (long procedural flows)
+    "PLR2004", # Allow magic values in scripts (OAuth CLI positional args)
     "PLW2901", # Allow loop variable reassignment in scripts
     "S101",    # Allow assert statements in scripts
     "SLF001",  # Allow private member access in scripts
     "T20",     # Allow print statements in scripts
+    "E501",    # Allow long help strings in CLI scripts
+    "PLC0415", # Allow imports inside CLI main (lazy argparse)
+    "S113",    # OAuth script uses requests; timeouts set at call sites
 ]
 "tests/*" = [
     "ARG001",  # Allow unused function arguments (fixtures need to be referenced)
@@ -41,6 +64,63 @@ max-complexity = 25
     "FBT003",  # Allow boolean positional values in test assertions and mock calls
     "PLR2004", # Allow magic values in tests (common for test assertions)
     "S101",    # Allow assert statements in tests (pytest uses them)
+    "S105",    # Allow hardcoded test tokens in credential tests
     "SLF001",  # Allow private member access in tests (needed to set up internal state)
     "TC002",   # Allow runtime imports in tests (needed for entity_registry, MockConfigEntry, etc.)
+    "TC003",   # Allow runtime Path import in tests
+    "PLC0415", # Allow imports inside tests to avoid circular imports
+    "PLR0913", # Parametrize fixtures in exec command capture tests
 ]
+"custom_components/bravia_quad/__init__.py" = ["TC001"]
+# Protobuf wire-format helpers (magic bytes/tags are intentional)
+"custom_components/bravia_quad/grpc/get_states_*.py" = ["PLR2004", "PLR0911", "PLR0912", "E501"]
+"custom_components/bravia_quad/grpc/get_nonce_request.py" = ["PLR2004"]
+"custom_components/bravia_quad/grpc/exec_command_request.py" = ["PLR2004", "PLR0913"]
+"custom_components/bravia_quad/grpc_refresh.py" = ["PLR0915"]
+"custom_components/bravia_quad/grpc/get_states_auth.py" = ["PLR2004"]
+# Reverse-engineered gRPC session client
+"custom_components/bravia_quad/grpc/client.py" = [
+    "E501",
+    "TRY300",
+    "FBT001",
+    "FBT002",
+    "PLR2004",
+    "PLR0912",
+    "PLR0913",
+    "PLR0915",
+    "BLE001",
+    "S110",
+    "E722",
+    "PTH110",
+    "PTH123",
+    "ANN202",
+    "RUF002",
+    "ERA001",
+    "TID252",  # parent relative imports are correct for custom_components package layout
+]
+# Sony Seeds OAuth HTTP helpers
+"custom_components/bravia_quad/grpc/credentials.py" = [
+    "S310",
+    "S113",
+    "S105",
+    "E501",
+    "PLC0415",
+    "TRY003",
+    "EM102",
+]
+"custom_components/bravia_quad/grpc_value_normalize.py" = [
+    "PLR0911",
+    "PLR0912",
+    "C901",
+    "FBT001",
+    "E501",
+]
+"custom_components/bravia_quad/bravia_grpc_client.py" = [
+    "PLR0913",
+    "ASYNC109",
+    "PLR0911",
+    "FBT001",
+]
+"custom_components/bravia_quad/button.py" = ["D107"]
+"custom_components/bravia_quad/transport.py" = ["PLR2004"]
+"custom_components/bravia_quad/helpers.py" = ["SLF001", "PLC0415", "D102", "D107"]

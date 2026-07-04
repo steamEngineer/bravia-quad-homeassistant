@@ -22,7 +22,7 @@ def platforms() -> list[Platform]:
     return [Platform.SWITCH]
 
 
-@pytest.mark.usefixtures("mock_bravia_quad_client")
+@pytest.mark.usefixtures("mock_bravia_quad_client", "mock_bravia_http_client")
 async def test_setup_entry(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -40,7 +40,7 @@ async def test_setup_entry(
     assert mock_config_entry.entry_id in hass.data[DOMAIN]
 
 
-@pytest.mark.usefixtures("mock_bravia_quad_client")
+@pytest.mark.usefixtures("mock_bravia_quad_client", "mock_bravia_http_client")
 async def test_unload_entry(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,

@@ -9,6 +9,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
+from homeassistant.const import EntityCategory
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
@@ -56,6 +57,7 @@ async def async_setup_entry(
 class BraviaQuadFirmwareUpdate(UpdateEntity):
     """Firmware update entity backed by the HTTP management API."""
 
+    _attr_entity_category = EntityCategory.CONFIG
     _attr_has_entity_name = True
     _attr_translation_key = "firmware"
     _attr_supported_features = (
@@ -65,7 +67,7 @@ class BraviaQuadFirmwareUpdate(UpdateEntity):
     def __init__(
         self,
         http_client: BraviaHttpClient,
-        tcp_client: BraviaQuadClient,
+        tcp_client: BraviaQuadClient | None,
         entry: ConfigEntry,
     ) -> None:
         """Initialize the firmware update entity."""
@@ -85,9 +87,12 @@ class BraviaQuadFirmwareUpdate(UpdateEntity):
     async def async_added_to_hass(self) -> None:
         """Register TCP availability callback for reconnect detection."""
         await super().async_added_to_hass()
-        self._tcp_client.register_availability_callback(self._on_tcp_availability)
+        if self._tcp_client is None:
+            return
+        tcp_client = self._tcp_client
+        tcp_client.register_availability_callback(self._on_tcp_availability)
         self.async_on_remove(
-            lambda: self._tcp_client.unregister_availability_callback(
+            lambda: tcp_client.unregister_availability_callback(
                 self._on_tcp_availability
             )
         )
