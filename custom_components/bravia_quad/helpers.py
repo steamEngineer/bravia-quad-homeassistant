@@ -325,7 +325,40 @@ class BraviaQuadNotificationMixin(BraviaQuadAvailabilityMixin):
         )
 
 
-class BraviaGrpcPathMixin(Entity):
+class BraviaGrpcAvailabilityMixin(Entity):
+    """
+    Mixin that tracks gRPC session availability for HA entities.
+
+    Subclasses must define _grpc_client: BraviaGrpcClientAsync.
+    """
+
+    _grpc_client: BraviaGrpcClientAsync
+
+    @property
+    def available(self) -> bool:
+        """Entity is available when gRPC is connected."""
+        return self._grpc_client.is_connected
+
+    def _on_grpc_availability_changed(self, _available: bool) -> None:  # noqa: FBT001
+        """Handle gRPC session availability change."""
+        self.async_write_ha_state()
+
+    async def async_added_to_hass(self) -> None:
+        """Register gRPC availability callback when entity is added."""
+        await super().async_added_to_hass()
+        self._grpc_client.register_availability_callback(
+            self._on_grpc_availability_changed
+        )
+
+    async def async_will_remove_from_hass(self) -> None:
+        """Unregister gRPC availability callback when entity is removed."""
+        self._grpc_client.unregister_availability_callback(
+            self._on_grpc_availability_changed
+        )
+        await super().async_will_remove_from_hass()
+
+
+class BraviaGrpcPathMixin(BraviaGrpcAvailabilityMixin):
     """
     Mixin for entities driven by gRPC field paths.
 
@@ -335,13 +368,7 @@ class BraviaGrpcPathMixin(Entity):
     - _on_grpc_state(value): async handler
     """
 
-    _grpc_client: BraviaGrpcClientAsync
     _grpc_path: str
-
-    @property
-    def available(self) -> bool:
-        """Entity is available when gRPC is connected."""
-        return self._grpc_client.is_connected
 
     def _grpc_state_callback(self, update: Any) -> None:
         """Filter notify stream updates for this entity's path."""
