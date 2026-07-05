@@ -8,7 +8,6 @@ Reference and guides for the [Bravia Theatre Home Assistant integration](../READ
 |----------|-------------|
 | [configuration.md](configuration.md) | Setup, transport modes (TCP vs gRPC), migration |
 | [entities.md](entities.md) | Entity reference by transport |
-| [device-compatibility.md](device-compatibility.md) | Supported and untested Sony models |
 | [troubleshooting.md](troubleshooting.md) | Connection, state sync, and gRPC issues |
 | [Blueprints](../README.md#blueprints) | Source-based automation (import link in README) |
 

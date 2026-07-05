@@ -15,7 +15,6 @@ __pycache__
 docs/*
 !docs/README.md
 !docs/configuration.md
-!docs/device-compatibility.md
 !docs/development.md
 !docs/entities.md
 !docs/grpc-tcp-mapping.md

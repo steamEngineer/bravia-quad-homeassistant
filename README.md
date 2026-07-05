@@ -7,8 +7,6 @@
 
 A Home Assistant custom integration for Sony Bravia Theatre home theater systems. Choose **gRPC** (experimental, BRAVIA Connect control plane) or **TCP** (legacy IP control, no Sony sign-in) at setup.
 
-_See [device compatibility](docs/device-compatibility.md) for supported models._
-
 > **Legal and ethical note**
 >
 > This work was done for **interoperability** — making hardware I own talk to software I run — which is the purpose most explicitly protected for reverse engineering (e.g. the interoperability exemptions under 17 U.S.C. § 1201(f) in the US and Article 6 of the EU Software Directive). It was all done on **my own HT-A9M2, on my own LAN, with my own Sony account and my own credentials.** Nothing here touched anyone else's device, account, or network.
@@ -73,14 +71,65 @@ The integration discovers Bravia Theatre devices automatically. If yours is not 
 
 During setup you choose a **transport**:
 
-| Mode | Connection | Summary |
-|------|------------|---------|
-| **gRPC** (recommended, **EXPERIMENTAL**) | Port 55051 + HTTP | BRAVIA Connect plane; Sony sign-in; streaming controls and extended sound settings |
-| **TCP** (legacy) | Port 33336 + HTTP | No sign-in; full diagnostic extras (Bluetooth pairing, temperature, network sensors) |
+
+| Mode                                     | Connection        | Summary                                                                              |
+| ---------------------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
+| **gRPC** (recommended, **EXPERIMENTAL**) | Port 55051 + HTTP | BRAVIA Connect plane; Sony sign-in; streaming controls and extended sound settings   |
+| **TCP** (legacy)                         | Port 33336 + HTTP | No sign-in; full diagnostic extras (Bluetooth pairing, temperature, network sensors) |
+
 
 gRPC mode prompts for Sony sign-in (OAuth). Session keys refresh automatically when possible.
 
 Details, parity gaps, and migration: [docs/configuration.md](docs/configuration.md#transport-modes)
+
+## Device compatibility
+
+Compatibility depends on whether a device exposes the same control planes as the BRAVIA Quad: legacy TCP (port **33336**) and/or BRAVIA Connect gRPC (port **55051**). Setup chooses one transport — not both.
+
+### Models
+
+
+| Device                  | Model        | Network        | Status                      |
+| ----------------------- | ------------ | -------------- | --------------------------- |
+| BRAVIA Theatre Quad     | HT-A9M2      | WiFi/Ethernet  | gRPC ✓ · TCP ✓ (fw 001.454) |
+| BRAVIA Theatre A9       | HT-A9        | WiFi/Ethernet  | gRPC — · TCP ✓              |
+| BRAVIA Theatre Trio     | HT-A8        | WiFi/Ethernet  | gRPC * · TCP ✗              |
+| BRAVIA Theatre Bar 8    | HT-A8000     | WiFi/Ethernet  | gRPC — · TCP — (untested)   |
+| BRAVIA Theatre Bar 9    | HT-A9000     | WiFi/Ethernet  | gRPC — · TCP ✓              |
+| BRAVIA Theatre Bar 6    | HT-B600/BD60 | Bluetooth only | Incompatible                |
+| BRAVIA Theatre System 6 | HT-S60       | Bluetooth only | Incompatible                |
+| HT-AX7                  | HT-AX7       | Bluetooth only | Incompatible                |
+| HT-S2000                | HT-S2000     | Bluetooth only | Incompatible                |
+
+
+✓ = verified working · ✗ = not working · — = untested · \* = in progress ([#122](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/122) — path identified, further work required). Theatre Bar 9 TCP: [community report](https://community.home-assistant.io/t/custom-integration-sony-bravia-theatre-quad-bar-8-bar-9-control-testers-needed/972831/2). Quad gRPC/TCP detail: [transport verification](#transport-verification-ht-a9m2) below.
+
+**Feedback from owners of untested models is welcome**. For Sony's full product list, see the [Sony support article](https://www.sony.com/electronics/support/articles/00305900).
+
+### Transport verification (HT-A9M2)
+
+
+| Feature area                                                         | TCP (33336)                | gRPC (55051)                                                                                                                      |
+| -------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Power, volume, mute, input source                                    | Read/write + push          | Read/write + live notify                                                                                                          |
+| Rear level; bass level (no sub)                                      | Read/write + push          | Read/write + notify                                                                                                               |
+| Voice enhancer, night mode, sound field on/off                       | Read/write + push          | Read/write + notify                                                                                                               |
+| HDMI CEC, dual mono, BT connection quality                           | Read/write + push          | Read/write                                                                                                                        |
+| IMAX Enhanced, AV sync (HDMI / TV)                                   | Read/write + push          | Read/write                                                                                                                        |
+| DRC, auto volume                                                     | Read/write + push          | Write verified; **not readable** over gRPC on fw 001.454 — HA seeds from TCP, restore, or last write                              |
+| eARC, HDMI standby link, auto standby, auto update, external control | Read/write + push          | Write verified; **not readable** over gRPC — same seeding; entities ship **disabled by default** until confirmed on your firmware |
+| Subwoofer level (with sub)                                           | Read/write + push (number) | Read/write (gRPC-only entity)                                                                                                     |
+| Detect subwoofer (diagnostic)                                        | TCP probe                  | gRPC GetStates probe                                                                                                              |
+| Firmware update                                                      | HTTP sensor                | HTTP sensor                                                                                                                       |
+
+
+**TCP only** (no confirmed gRPC path): Bluetooth pairing button, HDMI passthrough, temperature, 360SSM sensor, network mode / DHCP / region / language diagnostics.
+
+**gRPC only** (not on legacy TCP plane): sound field **mode** select (`Dolby Speaker Virtualizer`, `Neural:X`, `360SSM`), now-playing metadata and playback attributes, play/pause/next on Spotify / Bluetooth / AirPlay, DSEE Ultimate, 360SSM height, center speaker mode, DTS Dialog Control, voice zoom on/off and level, room calibration (RAEE) sensor.
+
+On gRPC, AirPlay is **detect-only** — it appears when a client casts; it cannot be selected via command. DSEE Ultimate and 360SSM height have no TCP read fallback — gRPC write only, with HA restore or last-write cache for display. Other notify-only settings may show `unknown` until changed, restored, or seeded — see [notify-only paths](docs/sony-grpc-reference.md#notify-only-paths).
+
+Full entity mapping and parity gaps: [docs/grpc-tcp-mapping.md](docs/grpc-tcp-mapping.md)
 
 ## Blueprints
 
@@ -94,18 +143,19 @@ Automate settings (**Voice Enhancer**, **Auto Volume**, **Sound Field**, **Night
 
 ## Documentation
 
-| Topic | Document |
-|-------|----------|
-| **All docs** | [docs/README.md](docs/README.md) |
-| Setup & transport | [docs/configuration.md](docs/configuration.md) |
-| Entities | [docs/entities.md](docs/entities.md) |
-| Device compatibility | [docs/device-compatibility.md](docs/device-compatibility.md) |
-| Troubleshooting | [docs/troubleshooting.md](docs/troubleshooting.md) |
-| TCP protocol | [docs/tcp-protocol.md](docs/tcp-protocol.md) |
-| gRPC reference | [docs/sony-grpc-reference.md](docs/sony-grpc-reference.md) |
-| gRPC entity mapping | [docs/grpc-tcp-mapping.md](docs/grpc-tcp-mapping.md) |
+
+| Topic                     | Document                                                                                 |
+| ------------------------- | ---------------------------------------------------------------------------------------- |
+| **All docs**              | [docs/README.md](docs/README.md)                                                         |
+| Setup & transport         | [docs/configuration.md](docs/configuration.md)                                           |
+| Entities                  | [docs/entities.md](docs/entities.md)                                                     |
+| Troubleshooting           | [docs/troubleshooting.md](docs/troubleshooting.md)                                       |
+| TCP protocol              | [docs/tcp-protocol.md](docs/tcp-protocol.md)                                             |
+| gRPC reference            | [docs/sony-grpc-reference.md](docs/sony-grpc-reference.md)                               |
+| gRPC entity mapping       | [docs/grpc-tcp-mapping.md](docs/grpc-tcp-mapping.md)                                     |
 | Reverse-engineering story | [docs/reverse-engineering-bravia-connect.md](docs/reverse-engineering-bravia-connect.md) |
-| Development | [docs/development.md](docs/development.md) |
+| Development               | [docs/development.md](docs/development.md)                                               |
+
 
 ## Contributing
 
