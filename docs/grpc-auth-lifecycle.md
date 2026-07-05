@@ -2,6 +2,8 @@
 
 Documentation index: [docs/README.md](README.md)
 
+> **Contributions:** Corrections in auth semantics and notify-only Seeds reads reported by [@mafredri](https://github.com/mafredri) ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16), cross-check in [#136](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/136)).
+
 > **Reference only — observed behavior and current implementation**
 >
 > This document describes how Sony Seeds OAuth, cloud session keys, and device gRPC auth **appear to work** based on reverse engineering and how the integration **implements them today**. Details may be incomplete, mistaken, or superseded as we learn more about Sony’s APIs and BRAVIA Connect behavior.
@@ -36,7 +38,7 @@ flowchart TB
 
     subgraph device ["Quad :55051 (per connection)"]
         HS["Handshake\nConfirmSignin → ConfirmKeys → GetNonce → GetSessionRandom"]
-        Roll["Rolling auth_token\n32 bytes, per-RPC HMAC chain"]
+        Roll["Rolling auth_token<br/>(current HA impl)"]
     end
 
     OAuth --> AT
@@ -151,6 +153,20 @@ Missing or invalid `refresh_token`, or Sony API errors → `ConfigEntryAuthFaile
 
 **Async layer:** `BraviaGrpcClientAsync.async_exec_command()` runs the blocking exec in a thread; if it still fails, `_async_restore_session()` (disconnect, re-handshake, GetStates seed) runs once and exec is retried.
 
+### Current implementation vs minimum protocol
+
+The following describes **what the integration implements today**. [@mafredri](https://github.com/mafredri) reported simpler patterns in [#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16); simplification is tracked in [#138](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/138).
+
+| Topic | Current HA behavior | @mafredri's finding (#16) |
+|-------|--------------------|-----------------------------|
+| Per-RPC auth | Chain rolled `auth_token` from responses | Fresh `GetSessionRandom` + HMAC each RPC works |
+| Exec writes | `_ensure_preflight_exec_auth_token()` mutex + full GetStates | Direct `GetSessionRandom` → `ExecCommandWithAuth` works in his testing |
+| GetNonce | Always in handshake | May be optional for normal HMAC auth |
+
+### Notify-only reads via Seeds cloud
+
+Per [@mafredri](https://github.com/mafredri) ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)): settings not returned by local gRPC GetStates or the notify stream (DRC, DSEE, dimmer, `sound_effect`, `360ssm_height`, etc.) **are readable** via Sony Seeds `GET /devices/{device_id}/states`, using the same OAuth `access_token` already stored in `CONF_GRPC_KEYS`. BRAVIA Connect uses this path for display; HA does **not** implement cloud polling yet — see [#139](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/139).
+
 ---
 
 ## Stored credentials bundle (what’s in `CONF_GRPC_KEYS`)
@@ -190,6 +206,8 @@ Day N          If refresh_token revoked/expired → ConfigEntryAuthFailed → us
 ---
 
 ## Idle exec failure (observed ~1 h)
+
+*The following documents validated current behavior; simplification is tracked in [#138](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/138).*
 
 Reported sequence: **playing** (notify deltas active) → **HA power off** (manual standby) → **immediate power-off notify delta**, then **~60 min quiet notify** (stream may stay open, no further deltas) → **power on fails** with signed GetStates preflight `INVALID_ARGUMENT` while `_connected` remains true.
 
