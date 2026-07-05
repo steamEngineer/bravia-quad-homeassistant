@@ -147,5 +147,3 @@ Extended gRPC wire-capture tests optionally read Frida fixtures from `.cache/fri
 3. **CI** — the Forbidden paths job in Validation runs the same script on every PR and push to `main`.
 
 If the hook blocks your commit, unstage with `git reset HEAD -- <path>`. Never use `git add -f` on ignored private paths.
-
-On GitHub, enable **Secret scanning** (and push protection when available) under repository security settings as an additional platform backstop.
