@@ -17,6 +17,7 @@ Reference and guides for the [Bravia Theatre Home Assistant integration](../READ
 |----------|-------------|
 | [tcp-protocol.md](tcp-protocol.md) | Legacy TCP port 33336 JSON commands |
 | [sony-grpc-reference.md](sony-grpc-reference.md) | gRPC service, RPCs, session lifecycle |
+| [grpc-auth-lifecycle.md](grpc-auth-lifecycle.md) | OAuth, session keys, and rolling auth_token lifecycles (living reference) |
 | [grpc-tcp-mapping.md](grpc-tcp-mapping.md) | gRPC ↔ TCP entity mapping and parity gaps |
 | [reverse-engineering-bravia-connect.md](reverse-engineering-bravia-connect.md) | How BRAVIA Connect gRPC control was reverse-engineered |
 

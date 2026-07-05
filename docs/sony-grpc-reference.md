@@ -44,6 +44,10 @@ Bool paths verified for ExecCommand wire format include `power`, `mute`, `sound_
 
 Session keys expire after ~24 hours. The integration refreshes OAuth access tokens and fetches new session keys automatically when a refresh token is available. Reconfigure the integration if refresh fails. BRAVIA Connect may evict HA sessions; the reconnect loop re-seeds state from GetStates after reconnect.
 
+Exec commands run signed GetStates preflight; if rolling tokens go stale after long idle notify, the client refreshes via GetSessionRandom before retrying.
+
+For token lifetimes, refresh triggers, handshake order, and rolling `auth_token` behavior, see **[grpc-auth-lifecycle.md](grpc-auth-lifecycle.md)** (living reference — update when auth implementation changes).
+
 ## Notify-only paths
 
 Some paths (including `sound_setting.drc`) are **writable** via `ExecCommandWithAuth` but are **not** in the Connect GetStates field list mirrored by HA (`all_field_paths.txt`). Bulk GetStates, single-path GetStates, and notify deltas do not reliably return these values on current firmware.

@@ -43,6 +43,7 @@ def scan_diff(diff: str) -> bool:
     [
         ("docs/development.md", False),
         ("docs/README.md", False),
+        ("docs/grpc-auth-lifecycle.md", False),
         ("scripts/check_connection.py", False),
         ("scripts/grpc/get_session_keys.py", False),
         ("config/configuration.yaml", False),

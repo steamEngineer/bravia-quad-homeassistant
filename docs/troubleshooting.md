@@ -27,8 +27,16 @@ If you encounter connection problems:
 ### Sony sign-in or session refresh failed
 
 - Reconfigure the integration and complete Sony sign-in again
-- Session keys expire after ~24 hours; the integration refreshes automatically when a refresh token is available
+- Session keys expire after ~24 hours; the integration refreshes automatically when a refresh token is available — see [grpc-auth-lifecycle.md](grpc-auth-lifecycle.md)
 - BRAVIA Connect may evict HA sessions; the reconnect loop re-seeds state after reconnect — see [sony-grpc-reference.md](sony-grpc-reference.md#session-lifecycle)
+
+### Power on or exec fails after long standby (~1 hour)
+
+Symptoms: entity stays `off`; logs show `Exec preflight full GetStates failed` / `INVALID_ARGUMENT` while gRPC still appears connected. Often follows playing → HA power off → ~1 h with no notify deltas.
+
+Cause: rolling `session_random` / `auth_token` stale on an open notify session (cloud session keys usually still valid).
+
+Fix (integration): automatic GetSessionRandom refresh on preflight failure; session restore + retry if exec still fails. Reload should not be required. Details: [grpc-auth-lifecycle.md](grpc-auth-lifecycle.md#idle-exec-failure-observed-1-h).
 
 ### Entities show `unknown` after setup
 
