@@ -872,6 +872,31 @@ class BraviaGrpcClient:
             return False
         return True
 
+    def session_auth_snapshot(self) -> dict[str, Any]:
+        """Return rolling session auth fields for exec/preflight failure diagnostics."""
+        return {
+            "session_id": self.session_id,
+            "authenticated": self.authenticated,
+            "session_random": (
+                self.session_random.hex() if self.session_random else None
+            ),
+            "auth_token_prefix": (
+                self.auth_token[:8].hex() if self.auth_token else None
+            ),
+            "last_rpc_error": self.last_rpc_error,
+            "hmac_key_present": bool(self.hmac_key_hex),
+        }
+
+    def _warn_exec_auth_context(self, reason: str, *, command_path: str) -> None:
+        """Log session auth snapshot when exec or preflight fails."""
+        snapshot = self.session_auth_snapshot()
+        snapshot["command_path"] = command_path
+        _LOGGER.warning(
+            "gRPC exec auth failure (%s): %s",
+            reason,
+            snapshot,
+        )
+
     def _preflight_exec_auth_token(self) -> bool:
         """
         Refresh session tokens via HMAC-signed GetStates before ExecCommand.
@@ -893,6 +918,22 @@ class BraviaGrpcClient:
                 self._say(f"Exec preflight mutex #{attempt + 1} failed")
                 return False
         return True
+
+    def _ensure_preflight_exec_auth_token(self, command_path: str) -> bool:
+        """Run exec preflight; refresh session tokens and retry once on failure."""
+        if self._preflight_exec_auth_token():
+            return True
+        self._warn_exec_auth_context(
+            "preflight failed; refreshing session tokens",
+            command_path=command_path,
+        )
+        if self._refresh_session_tokens() and self._preflight_exec_auth_token():
+            return True
+        self._warn_exec_auth_context(
+            "preflight failed after GetSessionRandom refresh",
+            command_path=command_path,
+        )
+        return False
 
     def _refresh_session_tokens(self) -> bool:
         """Rotate session_random/auth_token via GetSessionRandom."""
@@ -956,7 +997,7 @@ class BraviaGrpcClient:
             self._debug(f"ExecCommand blocked (unavailable): {command_path}")
             return False
 
-        if not self._preflight_exec_auth_token():
+        if not self._ensure_preflight_exec_auth_token(command_path):
             self._say("ExecCommand preflight failed")
             return False
 
@@ -965,9 +1006,17 @@ class BraviaGrpcClient:
                 self._debug(
                     f"ExecCommand retry after INVALID_ARGUMENT for {command_path}"
                 )
-                if not (
-                    self._refresh_session_tokens() and self._preflight_exec_auth_token()
-                ):
+                if not self._refresh_session_tokens():
+                    self._warn_exec_auth_context(
+                        "GetSessionRandom refresh failed on exec retry",
+                        command_path=command_path,
+                    )
+                    break
+                if not self._preflight_exec_auth_token():
+                    self._warn_exec_auth_context(
+                        "preflight failed after GetSessionRandom on exec retry",
+                        command_path=command_path,
+                    )
                     break
             success, invalid_argument = self._send_exec_command(
                 command_path, exec_kwargs

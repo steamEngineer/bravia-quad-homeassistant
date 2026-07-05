@@ -22,6 +22,7 @@ docs/*
 !docs/sony-grpc-reference.md
 !docs/tcp-protocol.md
 !docs/troubleshooting.md
+!docs/grpc-auth-lifecycle.md
 
 scripts/grpc/session_keys.json
 *.pcap

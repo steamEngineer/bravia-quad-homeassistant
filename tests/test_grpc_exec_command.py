@@ -27,7 +27,7 @@ def test_exec_command_calls_preflight_before_send(
 ) -> None:
     with (
         patch.object(
-            grpc_client, "_preflight_exec_auth_token", return_value=True
+            grpc_client, "_ensure_preflight_exec_auth_token", return_value=True
         ) as preflight,
         patch.object(
             grpc_client, "_send_exec_command", return_value=(True, False)
@@ -44,7 +44,9 @@ def test_exec_command_fails_when_preflight_fails(
     grpc_client: BraviaGrpcClient,
 ) -> None:
     with (
-        patch.object(grpc_client, "_preflight_exec_auth_token", return_value=False),
+        patch.object(
+            grpc_client, "_ensure_preflight_exec_auth_token", return_value=False
+        ),
         patch.object(grpc_client, "_send_exec_command") as send,
     ):
         ok = grpc_client.exec_command("volume", int_value=33)
@@ -53,14 +55,41 @@ def test_exec_command_fails_when_preflight_fails(
     send.assert_not_called()
 
 
+def test_exec_command_recovers_when_initial_preflight_refresh_succeeds(
+    grpc_client: BraviaGrpcClient,
+) -> None:
+    with (
+        patch.object(
+            grpc_client,
+            "_preflight_exec_auth_token",
+            side_effect=[False, True],
+        ) as preflight,
+        patch.object(
+            grpc_client, "_refresh_session_tokens", return_value=True
+        ) as refresh,
+        patch.object(
+            grpc_client, "_send_exec_command", return_value=(True, False)
+        ) as send,
+    ):
+        ok = grpc_client.exec_command("power", bool_value=True)
+
+    assert ok is True
+    assert preflight.call_count == 2
+    refresh.assert_called_once()
+    send.assert_called_once()
+
+
 def test_exec_command_retries_on_invalid_argument(
     grpc_client: BraviaGrpcClient,
 ) -> None:
     with (
-        patch.object(grpc_client, "_preflight_exec_auth_token", return_value=True),
+        patch.object(
+            grpc_client, "_ensure_preflight_exec_auth_token", return_value=True
+        ),
         patch.object(
             grpc_client, "_refresh_session_tokens", return_value=True
         ) as refresh,
+        patch.object(grpc_client, "_preflight_exec_auth_token", return_value=True),
         patch.object(
             grpc_client,
             "_send_exec_command",
@@ -81,7 +110,9 @@ def test_exec_command_no_retry_on_other_rpc_error(
     grpc_client: BraviaGrpcClient,
 ) -> None:
     with (
-        patch.object(grpc_client, "_preflight_exec_auth_token", return_value=True),
+        patch.object(
+            grpc_client, "_ensure_preflight_exec_auth_token", return_value=True
+        ),
         patch.object(grpc_client, "_refresh_session_tokens") as refresh,
         patch.object(grpc_client, "_send_exec_command", return_value=(False, False)),
     ):

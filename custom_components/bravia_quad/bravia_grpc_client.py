@@ -8,6 +8,7 @@ import errno
 import json
 import logging
 import socket
+import time
 from typing import TYPE_CHECKING, Any
 
 from .const import DEFAULT_GRPC_PORT, RECONNECT_INITIAL_DELAY, RECONNECT_MAX_DELAY
@@ -58,6 +59,7 @@ class BraviaGrpcClientAsync:
         session_key: str | None = None,
         hmac_key: str | None = None,
         debug: bool = False,
+        session_keys_expires_at: int | None = None,
     ) -> None:
         """Initialize async gRPC client wrapper."""
         self.host = host
@@ -67,9 +69,11 @@ class BraviaGrpcClientAsync:
         self.session_key = session_key
         self.hmac_key = hmac_key
         self.debug = debug
+        self.session_keys_expires_at = session_keys_expires_at
         self._client = BraviaGrpcClient(host, port, debug=debug)
         self._connected = False
         self._transport_error = False
+        self._last_notify_at: float | None = None
         self._notify_task: asyncio.Task[None] | None = None
         self._notify_stop = asyncio.Event()
         self._state_callbacks: list[Callable[[NotifyStateUpdate], None]] = []
@@ -88,6 +92,7 @@ class BraviaGrpcClientAsync:
             key_id=keys.get("key_id"),
             session_key=keys.get("session_key"),
             hmac_key=keys.get("hmac_key"),
+            session_keys_expires_at=keys.get("session_keys_expires_at"),
             **kwargs,
         )
 
@@ -132,6 +137,26 @@ class BraviaGrpcClientAsync:
         self.key_id = keys.get("key_id")
         self.session_key = keys.get("session_key")
         self.hmac_key = keys.get("hmac_key")
+        expires_at = keys.get("session_keys_expires_at")
+        if expires_at is not None:
+            self.session_keys_expires_at = int(expires_at)
+
+    def _exec_failure_context(self, command_path: str) -> dict[str, Any]:
+        """Session auth snapshot plus HA-side idle metadata for exec failures."""
+        context = self._client.session_auth_snapshot()
+        context["command_path"] = command_path
+        context["key_id"] = self.key_id
+        context["connected"] = self._connected
+        if self.session_keys_expires_at is not None:
+            context["session_keys_expires_at"] = self.session_keys_expires_at
+            context["session_keys_expires_in_s"] = self.session_keys_expires_at - int(
+                time.time()
+            )
+        if self._last_notify_at is not None:
+            context["seconds_since_last_notify"] = round(
+                time.monotonic() - self._last_notify_at, 1
+            )
+        return context
 
     def _trace_enabled(self) -> bool:
         """Integration option or HA logger DEBUG for bravia_quad."""
@@ -145,7 +170,8 @@ class BraviaGrpcClientAsync:
         if not self._trace_enabled():
             return
         if self.debug:
-            _LOGGER.info("[gRPC debug] %s", msg, *args)
+            formatted = msg % args if args else msg
+            _LOGGER.info("[gRPC debug] %s", formatted)
         else:
             _LOGGER.debug(msg, *args)
 
@@ -442,7 +468,26 @@ class BraviaGrpcClientAsync:
         if ok:
             self._debug("ExecCommand %s -> True", command_path)
         else:
-            _LOGGER.warning("ExecCommand %s failed", command_path)
+            context = self._exec_failure_context(command_path)
+            _LOGGER.warning(
+                "ExecCommand %s failed (session may be stale): %s",
+                command_path,
+                context,
+            )
+            if await self._async_restore_session():
+                self._debug(
+                    "ExecCommand %s retrying after session restore",
+                    command_path,
+                )
+                ok = await asyncio.to_thread(_run)
+                if ok:
+                    self._debug("ExecCommand %s -> True after restore", command_path)
+                else:
+                    _LOGGER.warning(
+                        "ExecCommand %s failed after session restore: %s",
+                        command_path,
+                        self._exec_failure_context(command_path),
+                    )
         return ok
 
     async def async_exec_denormalized(
@@ -613,6 +658,7 @@ class BraviaGrpcClientAsync:
                 states = await queue.get()
                 if states is None:
                     break
+                self._last_notify_at = time.monotonic()
                 self._debug("Notify delta %s=%r", states.path, states.value)
                 for callback in self._state_callbacks:
                     try:
