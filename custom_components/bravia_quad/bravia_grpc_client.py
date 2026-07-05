@@ -30,6 +30,21 @@ _LOGGER = logging.getLogger(__name__)
 _DOMAIN_LOGGER = logging.getLogger("custom_components.bravia_quad")
 
 
+def _session_lost_reason(last_rpc_error: str | None) -> str:
+    """Human-readable reason when the notify stream drops."""
+    if not last_rpc_error:
+        return "notify stream ended (BRAVIA Connect may have taken over)"
+    lowered = last_rpc_error.lower()
+    if "too many ping" in lowered:
+        return last_rpc_error
+    if "unavailable" in lowered and not any(
+        token in lowered
+        for token in ("connection refused", "failed to connect", "settings timeout")
+    ):
+        return f"{last_rpc_error} (BRAVIA Connect may have taken over)"
+    return last_rpc_error
+
+
 class BraviaGrpcClientAsync:
     """Asyncio facade over the sync gRPC client (runs blocking calls in executor)."""
 
@@ -152,6 +167,11 @@ class BraviaGrpcClientAsync:
     def is_transport_error(self) -> bool:
         """Return True when the last connect failed because gRPC is unreachable."""
         return self._transport_error
+
+    @property
+    def last_rpc_error(self) -> str | None:
+        """Return the most recent gRPC RPC error string, if any."""
+        return self._client.last_rpc_error
 
     @staticmethod
     def _grpc_port_connect_ex(host: str, port: int) -> int | str:
@@ -500,9 +520,9 @@ class BraviaGrpcClientAsync:
                     delay,
                 )
                 _LOGGER.warning(
-                    "gRPC session lost on %s (BRAVIA Connect may have taken over); "
-                    "reconnect in %ds",
+                    "gRPC session lost on %s (%s); reconnect in %ds",
                     self.host,
+                    _session_lost_reason(self.last_rpc_error),
                     delay,
                 )
                 await self._async_wait(delay)

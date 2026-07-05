@@ -115,7 +115,14 @@ class BraviaGrpcClient:
         if err.code() != grpc.StatusCode.UNAVAILABLE:
             return
         lowered = details.lower()
-        if "connection refused" in lowered or "failed to connect" in lowered:
+        if "too many ping" in lowered:
+            return
+        if (
+            "connection refused" in lowered
+            or "failed to connect" in lowered
+            or "settings timeout" in lowered
+            or "settings frame" in lowered
+        ):
             self.last_error_is_transport = True
 
     def _trace_enabled(self) -> bool:
@@ -144,37 +151,15 @@ class BraviaGrpcClient:
         # Use insecure channel for h2c
         # Note: The dump shows user-agent: dart-grpc/2.0.0, but Python gRPC uses different user-agent
         # This shouldn't matter for functionality, but noting it for reference
-        # Keepalive settings adjusted to prevent "too_many_pings" errors from the device
-        # The device rejects pings too frequently, so we use longer intervals or disable keepalive
-        # For streaming calls, keepalive pings are not needed as the stream itself keeps the connection alive
+        # Quad rejects HTTP/2 keepalive PINGs (~3 at 30s → GOAWAY ENHANCE_YOUR_CALM).
+        # StartNotifyStates stream traffic keeps the connection alive; disable client pings.
         self.channel = grpc.insecure_channel(
             target,
             options=[
-                # Keepalive settings: use longer intervals to avoid "too_many_pings" errors
-                # Set to 30 seconds to be well above the device's threshold
-                (
-                    "grpc.keepalive_time_ms",
-                    30000,
-                ),  # Send keepalive ping every 30 seconds
-                (
-                    "grpc.keepalive_timeout_ms",
-                    10000,
-                ),  # Timeout for keepalive ping (10 seconds)
-                (
-                    "grpc.keepalive_permit_without_calls",
-                    False,
-                ),  # Don't ping when no active calls
-                # HTTP/2 ping settings: use longer intervals
-                ("grpc.http2.max_pings_without_data", 0),  # No pings without data
-                (
-                    "grpc.http2.min_time_between_pings_ms",
-                    30000,
-                ),  # Minimum 30 seconds between pings
-                (
-                    "grpc.http2.min_ping_interval_without_data_ms",
-                    30000,
-                ),  # Minimum 30 seconds for pings without data
-                # Try to match the dump's behavior more closely
+                ("grpc.keepalive_time_ms", 2147483647),  # effectively off
+                ("grpc.keepalive_timeout_ms", 20000),
+                ("grpc.keepalive_permit_without_calls", False),
+                ("grpc.http2.max_pings_without_data", 2),  # 0 = unlimited in gRPC
                 ("grpc.http2.write_buffer_size", 65536),
             ],
         )
