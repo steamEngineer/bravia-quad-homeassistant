@@ -3,19 +3,7 @@
 target-version = "py313"
 
 extend-exclude = [
-    "scripts/capture",
-    "scripts/frida",
-    "scripts/grpc_auth_gate.py",
-    "scripts/grpc_connect_handoff_probe.py",
-    "scripts/grpc_diff_getstates_capture.py",
-    "scripts/grpc_external_control_probe.py",
-    "scripts/grpc_notify_states_field_probe.py",
-    "scripts/grpc_playback_probe.py",
-    "scripts/grpc_snapshot_coverage.py",
-    "scripts/grpc_unmapped_enum_scan.py",
     "scripts/reset_dev_ha_legacy.py",
-    "tests/test_analyze_getstates_log.py",
-    "tests/test_analyze_grpc_timeline.py",
     "custom_components/bravia_quad/grpc/bravia_control_pb2.py",
     "custom_components/bravia_quad/grpc/bravia_control_pb2_grpc.py",
 ]

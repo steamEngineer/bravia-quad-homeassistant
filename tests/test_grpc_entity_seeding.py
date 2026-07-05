@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -24,6 +23,7 @@ from custom_components.bravia_quad.grpc_tcp_seed import async_seed_notify_only_f
 from custom_components.bravia_quad.grpc_value_normalize import (
     coerce_bool,
 )
+from tests.conftest import frida_fixture_dir
 
 if TYPE_CHECKING:
     from custom_components.bravia_quad.grpc.client import NotifyStateUpdate
@@ -54,9 +54,7 @@ def test_coerce_bool_none_stays_none() -> None:
 
 
 def test_frida_snapshot_none_entity_paths() -> None:
-    capture = (
-        Path(__file__).resolve().parents[1] / ".cache/frida/getstates_rx_seq51.bin"
-    )
+    capture = frida_fixture_dir() / "getstates_rx_seq51.bin"
     if not capture.is_file():
         pytest.skip("Frida capture not available")
     result = parse_get_states_response(capture.read_bytes())

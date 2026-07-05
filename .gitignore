@@ -7,13 +7,11 @@ __pycache__
 
 # misc
 .cache/
-captures/
-scripts/frida/dart_blutter_reader.js
 .coverage
 .cursor
 .vscode
 
-# Local dev / investigation (default: all docs private)
+# Local dev artifacts (default: all docs private). Canonical denylist for forbid_private_commit.sh
 docs/*
 !docs/README.md
 !docs/configuration.md

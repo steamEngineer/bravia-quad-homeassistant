@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from pathlib import Path
+import pytest
 
 from custom_components.bravia_quad.grpc.get_states_request import encode_varint
 from custom_components.bravia_quad.grpc.get_states_response import (
     parse_get_states_response,
 )
+from tests.conftest import frida_fixture_dir
 
 
 def test_parse_empty_response() -> None:
@@ -56,11 +57,9 @@ def test_parse_sound_field_int_coercion() -> None:
 
 
 def test_parse_frida_full_snapshot() -> None:
-    capture = (
-        Path(__file__).resolve().parents[1] / ".cache/frida/getstates_rx_seq51.bin"
-    )
+    capture = frida_fixture_dir() / "getstates_rx_seq51.bin"
     if not capture.is_file():
-        return
+        pytest.skip("Frida capture not available")
     result = parse_get_states_response(capture.read_bytes())
     assert len(result) >= 170
     assert result["system_setting.friendly_name"] == "Office Quads"
