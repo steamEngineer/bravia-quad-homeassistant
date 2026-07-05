@@ -5,7 +5,6 @@ from __future__ import annotations
 import binascii
 import hashlib
 import hmac as hmac_mod
-from pathlib import Path
 
 import pytest
 
@@ -21,6 +20,7 @@ from custom_components.bravia_quad.grpc.get_states_request import (
     build_small_get_states_with_auth_request,
     load_field_paths,
 )
+from tests.conftest import frida_fixture_dir
 
 HMAC_KEY = "d6e0edbb98b3442a1fb244dd05e69cb156c0b0ae68808844297f5c642368eb6a"
 SESSION_RANDOM = bytes.fromhex("7af2777ca8bdfbe7")
@@ -41,7 +41,7 @@ CAPTURE_MUTEX_AUTH = bytes.fromhex(
 CAPTURE_FULL_AUTH = bytes.fromhex(
     "35ec7b54756af2d7d283d6b3028f1bd17b535fb7b7a4fcd75ee1ae4765687964"
 )
-CAPTURE_DIR = Path(__file__).resolve().parents[1] / ".cache/frida"
+CAPTURE_DIR = frida_fixture_dir()
 
 
 def test_sign_get_states_auth_token_deterministic() -> None:

@@ -1,7 +1,6 @@
 """Tests for GetStatesWithAuth wire encoding."""
 
 import binascii
-from pathlib import Path
 
 import pytest
 
@@ -11,10 +10,9 @@ from custom_components.bravia_quad.grpc.get_states_request import (
     encode_varint,
     load_field_paths,
 )
+from tests.conftest import frida_fixture_dir
 
-CAPTURE_PATH = (
-    Path(__file__).resolve().parents[1] / ".cache/frida/getstates_tx_seq47.bin"
-)
+CAPTURE_PATH = frida_fixture_dir() / "getstates_tx_seq47.bin"
 CAPTURE_BULK_LEN = 6558
 CAPTURE_SESSION_RANDOM = bytes.fromhex("e072a043c7f7c5ef")
 CAPTURE_SESSION_ID = "1531cdf4-aad1-4a09-a17a-c6a9c46e84cf"

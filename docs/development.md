@@ -113,6 +113,7 @@ For manual TCP connection testing, see [tcp-protocol.md](tcp-protocol.md#manual-
 GitHub Actions on every pull request:
 
 - **Hassfest** — manifest and HA standards validation
+- **Forbidden paths** — blocks private/local artifacts and credential-shaped content
 - **Lint** — Ruff
 - **Tests** — pytest
 
@@ -130,3 +131,21 @@ Open a pull request against `main` and complete [`.github/PULL_REQUEST_TEMPLATE.
 4. **Issues**: Open an issue first for bugs or feature requests when appropriate
 
 Integration patterns and review guidance: [`.github/copilot-instructions.md`](../.github/copilot-instructions.md).
+
+## Private local artifacts
+
+Some paths are **local-only** and must never be committed or pushed. See [`.gitignore`](../.gitignore) for the canonical denylist; `scripts/forbid_private_commit.sh` also blocks `.cache/*` because `git check-ignore` fails on the investigation-repo symlink at `.cache/frida`.
+
+Tracked dev helpers include `scripts/check_connection.py`, `scripts/grpc/get_session_keys.py`, and `scripts/grpc/session_keys_example.json` (placeholders only — never commit `scripts/grpc/session_keys.json`).
+
+Extended gRPC wire-capture tests optionally read Frida fixtures from `.cache/frida/`; they skip when captures are absent (CI does not require them).
+
+### How protection works
+
+1. **`.gitignore`** — blocks casual `git add` of private paths.
+2. **Pre-commit / pre-push hooks** — installed by `./scripts/setup`; reject staged or pushed forbidden paths, including `git add -f` on ignored files. Credential-shaped values in `scripts/grpc/*.json` diffs are also rejected.
+3. **CI** — the Forbidden paths job in Validation runs the same script on every PR and push to `main`.
+
+If the hook blocks your commit, unstage with `git reset HEAD -- <path>`. Never use `git add -f` on ignored private paths.
+
+On GitHub, enable **Secret scanning** (and push protection when available) under repository security settings as an additional platform backstop.

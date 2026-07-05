@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -27,6 +29,16 @@ if TYPE_CHECKING:
     from collections.abc import Generator
 
     from homeassistant.core import HomeAssistant
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def frida_fixture_dir() -> Path:
+    """Gitignored Frida wire captures; override with BRAVIA_QUAD_FRIDA_FIXTURE_DIR."""
+    return Path(
+        os.environ.get("BRAVIA_QUAD_FRIDA_FIXTURE_DIR", REPO_ROOT / ".cache/frida")
+    )
 
 
 def get_entity_id_by_unique_id_suffix(

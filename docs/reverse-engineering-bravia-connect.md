@@ -51,7 +51,7 @@ flowchart TD
 ## The toolkit
 
 - **HAR / browser DevTools** — for the OAuth redirect chain (the sign-in happens in a webview).
-- **Frida on a rooted Android phone** (LineageOS 15), driven from WSL over an adb bridge — for hooking the app's crypto and gRPC calls in memory. This was the workhorse. *(The Frida/pcap capture scripts are local investigation tooling and are not committed to the repo.)*
+- **Frida on a rooted Android phone** (LineageOS 15), driven from WSL over an adb bridge — for hooking the app's crypto and gRPC calls in memory. This was the workhorse. *(The Frida/pcap capture scripts are local tooling and are not committed to this repo.)*
 - **A managed switch (Ubiquiti EdgeSwitch, "ES8") doing SPAN/RPCAP LAN capture** — for seeing traffic Frida couldn't attribute, and for answering the "does the phone talk to the Quads or something else for this data?" question.
 - **A standalone Python client** (`[grpc/client.py](../custom_components/bravia_quad/grpc/client.py)`) — the thing under construction, and also the test harness. Every hypothesis got encoded as a single question: "can the standalone client reproduce the app's bytes and get a non-error response?"
 
@@ -341,7 +341,7 @@ The gotcha that shaped the whole loop: the device gives essentially no error det
 | HMAC signing                            | `[grpc/get_states_auth.py](../custom_components/bravia_quad/grpc/get_states_auth.py)`                                                                                                        |
 | Field-path list                         | `[grpc/all_field_paths.txt](../custom_components/bravia_quad/grpc/all_field_paths.txt)`                                                                                                      |
 | Response / notify decode                | `[grpc/get_states_response.py](../custom_components/bravia_quad/grpc/get_states_response.py)`, `[grpc/notify_decode.py](../custom_components/bravia_quad/grpc/notify_decode.py)`             |
-| Frida / pcap capture harness            | Local investigation tooling — not committed                                                                                                                                                  |
+| Frida / pcap capture harness            | Local tooling — not committed                                                                                                                                                                |
 | Byte-level references                   | [sony-grpc-reference.md](sony-grpc-reference.md), [grpc-tcp-mapping.md](grpc-tcp-mapping.md)                                                                                                 |
-| Signing + notify-only analysis          | Local investigation notes — not committed                                                                                                                                                    |
+| Signing + notify-only analysis          | Local notes — not committed                                                                                                                                                                  |
 | AI method (skills, plans, entry points) | `.cursor/` — gitignored; described in [The AI workflow](#the-ai-workflow-skills-plans-and-entry-points)                                                                                      |
