@@ -733,13 +733,19 @@ class BraviaGrpcMediaPlayer(
         path, value_kind, payload = spec
         before_title = self._grpc_client.notify_state.get(_PATH_TITLE)
         ok = await self._grpc_client.async_exec_denormalized(path, value_kind, payload)
-        if ok:
-            await self._await_playback_confirm(
-                action,
-                before_title=before_title,
-                confirm_seconds=2.0,
-            )
-        return ok
+        if not ok:
+            _LOGGER.warning("Playback %s failed for %s", action, self.entity_id)
+            return False
+        if action == "play":
+            self._attr_state = MediaPlayerState.PLAYING
+        elif action == "pause":
+            self._attr_state = MediaPlayerState.PAUSED
+        await self._await_playback_confirm(
+            action,
+            before_title=before_title,
+            confirm_seconds=2.0,
+        )
+        return True
 
     async def _await_playback_confirm(
         self,
