@@ -2,6 +2,8 @@
 
 Documentation index: [docs/README.md](README.md)
 
+> **Contributions:** Corrections in Layers 4–9 reported by [@mafredri](https://github.com/mafredri) ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16), cross-check in [#136](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/136)).
+
 A field report on going from "Sony's phone app can control my Bravia Theatre Quad, so why can't Home Assistant?" to a standalone Python gRPC client that authenticates, reads live state, and writes settings — all without any public API.
 
 Target: **Sony HT-A9M2 (Bravia Theatre Quad)**, firmware `001.454`. App: **BRAVIA Connect** (`jp.co.sony.hes.home` 3.6.3, Android). This is the story; the byte-level reference lives in the sibling docs linked throughout.
@@ -35,11 +37,11 @@ It broke down into three problems stacked on top of each other — cloud auth, t
 flowchart TD
     A["Layer 1 — Cloud auth<br/>OAuth2 PKCE → Sony Seeds"] -->|session_key + hmac_key| B["Layer 2 — gRPC transport<br/>h2c on :55051"]
     B --> C["Layer 3 — Handshake<br/>ConfirmSignin → ConfirmKeys → GetNonce → GetSessionRandom"]
-    C -->|session_random + auth_token| D["Layer 5 — Rolling HMAC<br/>sign every read/write"]
+    C -->|session_random + auth_token| D["Layer 5 — Rolling HMAC<br/>(app pattern; see Layer 5)"]
     D --> E["GetStatesWithAuth — read"]
     D --> F["ExecCommandWithAuth — write"]
     D --> G["StartNotifyStates — push"]
-    E -. notify-only paths unreadable .-> H["Layer 9 — cloud/cache display?"]
+    E -. notify-only paths unreadable locally .-> H["Layer 9 — Seeds cloud read<br/>(confirmed by @mafredri)"]
 ```
 
 
@@ -171,21 +173,24 @@ One useful early discovery: `ConfirmSignin` can return `success=false` and the s
 
 
 
-## Layer 4: The proto is a lie
+## Layer 4: Our checked-in proto was wrong
 
-Here's the trap that cost the most time. There's a checked-in `bravia_control.proto`, and the obvious move is to build `GetStatesWithAuthRequest(field_list=…, auth_token=…)` and call `SerializeToString()`. **It fails with** `INVALID_ARGUMENT` **every single time.**
+Here's the trap that cost the most time. There's a checked-in [`bravia_control.proto`](../custom_components/bravia_quad/grpc/bravia_control.proto), and the obvious move is to build `GetStatesWithAuthRequest(field_list=…, auth_token=…)` and call `SerializeToString()`. **It fails with** `INVALID_ARGUMENT` **every single time.**
 
-The wire format the device actually accepts does **not** match the proto's field layout. `GetStatesWithAuth` and `ExecCommandWithAuth` had to be **hand-encoded as raw protobuf bytes** to match the app. That's why `grpc/` has `[get_states_request.py](../custom_components/bravia_quad/grpc/get_states_request.py)` and `[exec_command_request.py](../custom_components/bravia_quad/grpc/exec_command_request.py)` building byte strings directly instead of using generated message classes, and why the client's unary callables pass a raw-bytes `request_serializer`.
+The problem was **our** proto — an incorrectly reconstructed schema from an earlier pass — not Sony's device schema. Per [@mafredri](https://github.com/mafredri)'s cross-check ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), the authoritative shape from gRPC server reflection uses an outer `GetStatesWithAuthRequest { serialized_request, hmac }` wrapping an inner `GetStatesRequest { repeated names }`. The same pattern applies to `ExecCommandWithAuth`. Reflected protos are kept as local investigation reference only — not committed to this repo.
 
-The full-snapshot request is a nested envelope:
+`GetStatesWithAuth` and `ExecCommandWithAuth` still require **hand-encoded raw protobuf bytes** in our client because the checked-in proto3 stub does not match the reflected layout. That's why `grpc/` has [`get_states_request.py`](../custom_components/bravia_quad/grpc/get_states_request.py) and [`exec_command_request.py`](../custom_components/bravia_quad/grpc/exec_command_request.py) building byte strings directly instead of using generated message classes, and why the client's unary callables pass a raw-bytes `request_serializer`.
+
+The full-snapshot request on the wire is an outer envelope around the inner serialized blob:
 
 ```
-0a <varint len> <inner> 12 20 <32-byte auth_token>
-   inner = 0a <len> (repeat: 0a <len> <path>)   ← the 177 field paths
-         + 12 <len> (0a 08 <session_random> 1a <len> <session_id UUID>)
+12 20 <32-byte hmac>                    ← outer GetStatesWithAuthRequest.hmac
+0a <varint len> <inner>                 ← outer serialized_request
+   inner = 0a <len> (repeat: 0a <len> <path>)   ← GetStatesRequest.names (177 in Connect's bulk snapshot)
+         + 12 <len> (0a 08 <session_random> 1a <len> <key_id UUID>)
 ```
 
-The session embed (`session_random` + `session_id`) tripped me up repeatedly — it's a nested message *inside* field 1, not a top-level field. Get one length prefix wrong and everything after it shifts, and the device just answers `INVALID_ARGUMENT` with zero diagnostics.
+The session embed (`session_random` + `key_id`) tripped me up repeatedly — it's a nested message *inside* the inner blob, not a top-level field on the flat proto3 message we checked in. Get one length prefix wrong and everything after it shifts, and the device just answers `INVALID_ARGUMENT` with zero diagnostics.
 
 ---
 
@@ -193,7 +198,9 @@ The session embed (`session_random` + `session_id`) tripped me up repeatedly —
 
 ## Layer 5: The rolling HMAC — the hard part
 
-Every `GetStatesWithAuth` and `ExecCommandWithAuth` carries a trailing 32-byte `auth_token`. The `GetSessionRandom` token works *once*; after that the device expects a fresh signature computed from the request contents. So the whole game came down to: **what exactly gets HMAC'd, and with which key?**
+### What we learned (still valid)
+
+Every `GetStatesWithAuth` and `ExecCommandWithAuth` carries a 32-byte HMAC signature. The `GetSessionRandom` token works *once*; after that the device expects a fresh signature computed from the request contents. So the whole game came down to: **what exactly gets HMAC'd, and with which key?**
 
 First instinct: hook OpenSSL's native `HMAC()` and read the arguments. I wrote a native-`HMAC()` Frida hook for exactly that *(local tooling, not committed)*. **It captured zero HMAC ops for GetStates.** The app's crypto for this path never touches native `libcrypto` — it lives in the Dart runtime, because BRAVIA Connect is a Flutter app.
 
@@ -202,13 +209,22 @@ The fix was a **blutter-based Dart hook** (run via the local Frida harness in it
 - Full GetStates: `data_len=6521`
 - Mutex GetStates (`client_control.mutex.any`): `data_len=78`
 
-Correlating those lengths against the request bytes gave the rule, now encoded in `[get_states_auth.py](../custom_components/bravia_quad/grpc/get_states_auth.py)`:
+Correlating those lengths against the request bytes gave the rule, now encoded in [`get_states_auth.py`](../custom_components/bravia_quad/grpc/get_states_auth.py):
 
-> `hmacApplyMac` **signs the *inner* request body only** — the field-list block plus the session embed. **No outer** `0a` **tag/length, no** `12 20` **auth field.** Then `auth_token = HMAC-SHA256(hmac_key, that_preimage)`.
+> `hmacApplyMac` **signs the *inner* request body only** — the field-list block plus the session embed. **No outer** `0a` **tag/length, no** `12 20` **auth field.** Then `hmac = HMAC-SHA256(hmac_key, that_preimage)`.
 
-`ExecCommand` uses the same rule over its own (smaller, ~68-byte) command body. The gotcha for exec: a `GetSessionRandom` token alone isn't accepted. The app runs a full-snapshot GetStates *and* a `client_control.mutex.any` probe first, and it's the token that rolls through *those* that signs the exec. That mutex-preflight dance is `_preflight_exec_auth_token()` / `get_states_app_sequence()`.
+`ExecCommand` uses the same rule over its own (smaller, ~68-byte) command body.
 
-The cold-start RPC order, mirrored exactly:
+Proof it worked: the standalone client's full GetStates request is **byte-identical to the Frida-captured full-snapshot frame** (6558 B), and the live matrix probe reports `hmac_signed_full`, `signed_preflight`, and `app_sequence` all OK. *(Full signing breakdown lives in local investigation notes, not committed.)*
+
+### What @mafredri corrected
+
+Per [@mafredri](https://github.com/mafredri)'s cross-check ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)):
+
+- **Rolling token chain** — chaining `auth_token` values from each response is a **BRAVIA Connect app optimization**, not a protocol requirement. He reports that calling `GetSessionRandom` before every RPC (then signing with `hmac_key`) works reliably on iOS.
+- **Exec preflight** — the mutex + full GetStates dance before exec is **what HA implements today** (mirroring Android app captures), not proven required. He reports direct `GetSessionRandom` → `ExecCommandWithAuth` works in his testing. Simplification is tracked in [#138](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/138).
+
+*Cold-start sequence mirrored from Android app captures — HA's current client follows this; simpler patterns may suffice ([#138](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/138)).*
 
 ```mermaid
 sequenceDiagram
@@ -227,19 +243,17 @@ sequenceDiagram
     D-->>C: 08 01 (ok)
 ```
 
-
-
-Proof it worked: the standalone client's full GetStates request is **byte-identical to the Frida-captured full-snapshot frame** (6558 B), and the live matrix probe reports `hmac_signed_full`, `signed_preflight`, and `app_sequence` all OK. *(Full signing breakdown lives in local investigation notes, not committed.)*
+The gotcha that shaped HA's current exec path: a `GetSessionRandom` token alone isn't always accepted for writes after idle notify. The app runs a full-snapshot GetStates *and* a `client_control.mutex.any` probe first, and it's the token that rolls through *those* that signs the exec. That mutex-preflight dance is `_preflight_exec_auth_token()` / `get_states_app_sequence()` in today's client.
 
 ---
 
 
 
-## Layer 6: The right 177 paths
+## Layer 6: The Connect app's 177-path snapshot
 
-`GetStates` sends the device a *list* of the field paths it wants back. My first list (171 paths, reverse-engineered from an older encoder) → `INVALID_ARGUMENT`. Diffing my request against the Frida capture byte-by-byte *(with a local hex-export analyzer, not committed)* revealed **six missing paths**, including `notification.standby_power_status`. Adding them brought the request to **177 paths / 6558 B** — byte-perfect against the app. The canonical list is checked in as `[grpc/all_field_paths.txt](../custom_components/bravia_quad/grpc/all_field_paths.txt)`. `client_control.mutex.any` is deliberately *not* in that list; it's a separate 114 B probe.
+`GetStates` sends the device a *list* of the field paths it wants back. My first list (171 paths, reverse-engineered from an older encoder) → `INVALID_ARGUMENT`. Diffing my request against the Frida capture byte-by-byte *(with a local hex-export analyzer, not committed)* revealed **six missing paths**, including `notification.standby_power_status`. Adding them brought the request to **177 paths / 6558 B** — byte-perfect against Connect's bulk GetStates on fw `001.454`. The canonical list is checked in as [`grpc/all_field_paths.txt`](../custom_components/bravia_quad/grpc/all_field_paths.txt). `client_control.mutex.any` is deliberately *not* in that list; it's a separate 114 B probe.
 
-The lesson: the device validates the request as a whole. "Close enough" is a hard failure, with no hint about *what* was wrong.
+Per [@mafredri](https://github.com/mafredri)'s cross-check ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), the device accepts **any valid path names individually or in flexible batches** — the 177-path snapshot is what Connect sends, not a hard device requirement. Many of our early `INVALID_ARGUMENT` failures were simultaneous encoding and signing bugs, not path-count mandates.
 
 ---
 
@@ -255,23 +269,25 @@ The `GetStates` response is yet another bespoke nested layout — top-level fiel
 
 With those fixed, a snapshot decodes cleanly: `volume=34`, `power=true`, `sound_setting.volume.rear=-3`, `friendly_name="Office Quads"`, `fw_update.version.main="001.454"`, and so on.
 
----
-
-
-
-## Layer 8: The notify stream is mislabeled
-
-`StartNotifyStates` is a server-streaming RPC that pushes state changes. Except the deltas don't arrive in the `states` field the proto implies — **they arrive in** `session_random`**.** The proto field name is a red herring. `[notify_decode.py](../custom_components/bravia_quad/grpc/notify_decode.py)` pulls the nested `(path, value)` out of that blob, using the same "empty bytes = false" and varint-vs-string disambiguation the snapshot parser needed.
-
-That's also why the client's notify loop reads `resp.session_random` and runs it through `decode_notify_delta`, not `resp.states`.
+Per the reflected schema ([@mafredri](https://github.com/mafredri), [#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), responses arrive as `GetStatesResponseWithHmac { serialized_response, hmac }` inside the outer `GetStatesWithAuthResponse` wrapper.
 
 ---
 
 
 
-## Layer 9: The notify-only mystery (still partly open)
+## Layer 8: Notify stream field naming
 
-The strangest finding of all. Some settings — Dynamic Range Compressor (`sound_setting.drc`), 360SSM height, eARC — **accept** `ExecCommand` **writes** and BRAVIA Connect visibly reflects the change, yet **cannot be read back over gRPC at all**: they're absent from the 177-path GetStates list, single-path GetStates returns `UNKNOWN`, and they never show up as a notify delta.
+`StartNotifyStates` is a server-streaming RPC that pushes state changes. Per [@mafredri](https://github.com/mafredri)'s cross-check ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)) and the reflected schema, the stream delivers `NotifyStatesWithAuth` → `NotifyStatesWithHmac { serialized_states, hmac }` — not the flat `states` field our outdated stub implies, and not a field named `session_random`.
+
+Our generated stub and [`notify_decode.py`](../custom_components/bravia_quad/grpc/notify_decode.py) still read a misnamed accessor (`resp.session_random`) and decode the nested `(path, value)` pairs from that blob. The schema field is `serialized_states`. A code-side rename is tracked in [#138](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/138).
+
+---
+
+
+
+## Layer 9: The notify-only mystery (resolved — Seeds cloud read path)
+
+Some settings — Dynamic Range Compressor (`sound_setting.drc`), 360SSM height, eARC — **accept** `ExecCommand` **writes** and BRAVIA Connect visibly reflects the change, yet **cannot be read back over local gRPC**: they're absent from the 177-path GetStates list, single-path GetStates returns `UNKNOWN`, and they never show up on the notify stream.
 
 ```mermaid
 flowchart LR
@@ -279,20 +295,19 @@ flowchart LR
     Q -. not in 177-path list .-> G["bulk GetStates: absent"]
     Q -. single-path .-> S["GetStates: UNKNOWN"]
     Q -. stream .-> N["Notify: no delta"]
-    Q ==>|outbound HTTPS| Cloud["CloudFront / AWS"]
-    Cloud ==> App["BRAVIA Connect shows DRC<br/>(cloud/cache-backed?)"]
+    Q ==>|outbound HTTPS| Cloud["Sony Seeds cloud"]
+    Cloud --> SeedsAPI["GET /devices/id/states"]
+    SeedsAPI ==> App["BRAVIA Connect shows DRC"]
+    SeedsAPI -. HA does not poll yet .-> HA["HA: TCP seed / restore / last write"]
 ```
 
 
 
-I chased this hard, because it breaks the "read-modify-write" assumption HA entities rely on. The investigation *(local notes, not committed)* ran a hypothesis matrix:
+**@mafredri confirmed** ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)): socket tracing showed the gRPC connection idle while Connect's UI updated after setting changes; all read traffic went to Sony Seeds (`GET /devices/{device_id}/states`), which returns DRC, DSEE, dimmer, `sound_effect`, `360ssm_height`, and other "mystery" settings. He verified this with direct API calls.
 
-- **Does the phone even talk to the Quad after HA writes DRC?** ES8 LAN capture said **yes** — the phone opens a real `:55051` gRPC session ~11s after HA's write (Connect cold-open).
-- **Does that session read DRC back?** Frida-decoded the phone's own GetStates and notify traffic during that window — **no DRC in the request list, none in the responses, none in the notify deltas.**
-- **Is it a TCP side-channel?** The legacy TCP plane *can* read `audio.drc`, but the phone wasn't seen using it on cold-open.
-- **Conclusion (H5, "likely"):** the Quad makes outbound HTTPS to CloudFront/AWS while Connect is open. The app's DRC *display* is most plausibly **cloud/cache-backed**, not a live LAN read.
+Our earlier investigation *(local notes, not committed)* had hypothesized cloud/cache-backed display (H5, "likely") from ES8/Frida captures — that conclusion is **superseded** by @mafredri's direct Seeds API proof.
 
-So HA's design settled on: **write** notify-only paths via `ExecCommand`; **seed** their displayed value from the legacy TCP plane, HA state-restore, or the last successful write; and explicitly **do not** treat "BRAVIA Connect shows X" as proof of a readable gRPC path. It's documented for users as an expected parity gap.
+So HA's design today: **write** notify-only paths via `ExecCommand`; **read** via TCP seed ([`grpc_tcp_seed.py`](../custom_components/bravia_quad/grpc_tcp_seed.py)), HA state-restore, or the last successful write. Whether HA should poll Seeds for these values is tracked in [#139](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/139).
 
 ---
 
@@ -323,7 +338,8 @@ The gotcha that shaped the whole loop: the device gives essentially no error det
 ## What's still open
 
 - **Replaying old captured bytes fails** once session tokens differ — expected, since auth is session-bound. Every run has to re-sign.
-- **DRC and its peers remain write-only** over gRPC on fw `001.454`. A definitive answer needs a correlated Frida-during-ES8-capture run with the phone on USB.
+- **Client auth simplification** — test @mafredri's simpler `GetSessionRandom`-per-RPC and direct-exec patterns ([#138](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/138)).
+- **Seeds cloud read integration** — whether HA should poll `GET /devices/{device_id}/states` for notify-only settings ([#139](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/139)).
 - **Rear-level scale** (`-3` over gRPC) versus the TCP step semantics isn't fully reconciled yet.
 
 ---

@@ -59,7 +59,7 @@ AirPlay is **detect-only** in HA: `airplay2` is omitted from the selectable sour
 
 `playback_control.playback_command.availability` is subscribed for future gating.
 
-**Notify-only / gRPC-unreadable app settings:** Paths in `NOTIFY_ONLY_GRPC_PATHS` (DRC, 360SSM height, eARC, auto standby, etc.) accept ExecCommand writes but are **not readable** over gRPC on fw 001.454 — single-path and bulk GetStates return `UNKNOWN`, `StartNotifyStatesResponse.states` is always empty, and `session_random` deltas never include these paths. Initial entity state comes from TCP seed, HA restore, or the last Exec write cache. See [sony-grpc-reference.md](sony-grpc-reference.md#notify-only-paths).
+**Notify-only / gRPC-unreadable app settings:** Paths in `NOTIFY_ONLY_GRPC_PATHS` (DRC, 360SSM height, eARC, auto standby, etc.) accept ExecCommand writes but are **not readable** over local gRPC on fw 001.454 — single-path and bulk GetStates return `UNKNOWN`, and the notify stream never includes these paths. [@mafredri](https://github.com/mafredri) confirmed ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)) that BRAVIA Connect reads them via Seeds `GET /devices/{device_id}/states`; HA does not poll Seeds yet ([#139](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/139)). Initial entity state comes from TCP seed, HA restore, or the last Exec write cache. See [sony-grpc-reference.md](sony-grpc-reference.md#notify-only-paths).
 
 ## GetStates snapshot vs entity seeding
 
