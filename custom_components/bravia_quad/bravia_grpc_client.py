@@ -79,6 +79,7 @@ class BraviaGrpcClientAsync:
         self._state_callbacks: list[Callable[[NotifyStateUpdate], None]] = []
         self._reconnect_callback: ReconnectCallback | None = None
         self._refresh_keys_callback: RefreshKeysCallback | None = None
+        self._availability_callbacks: set[Callable[[bool], None]] = set()
         self.volume_step_interval: int = 0
 
     @classmethod
@@ -130,6 +131,31 @@ class BraviaGrpcClientAsync:
     def set_refresh_keys_callback(self, callback: RefreshKeysCallback) -> None:
         """Run when authentication fails to refresh Sony Seeds session keys."""
         self._refresh_keys_callback = callback
+
+    def register_availability_callback(self, callback: Callable[[bool], None]) -> None:
+        """Register a callback for gRPC session availability changes."""
+        self._availability_callbacks.add(callback)
+
+    def unregister_availability_callback(
+        self, callback: Callable[[bool], None]
+    ) -> None:
+        """Unregister a gRPC session availability callback."""
+        self._availability_callbacks.discard(callback)
+
+    def _notify_availability(self, *, available: bool) -> None:
+        """Notify entities when the gRPC session connects or drops."""
+        for callback in tuple(self._availability_callbacks):
+            try:
+                callback(available)
+            except Exception:
+                _LOGGER.exception("Error in gRPC availability callback")
+
+    def _set_connected(self, *, connected: bool) -> None:
+        """Update connection flag and notify entities when availability changes."""
+        if self._connected == connected:
+            return
+        self._connected = connected
+        self._notify_availability(available=connected)
 
     def update_keys(self, keys: dict[str, Any]) -> None:
         """Replace Sony Seeds session key fields after OAuth refresh."""
@@ -214,7 +240,7 @@ class BraviaGrpcClientAsync:
     async def async_connect(self) -> bool:
         """Connect and authenticate with Sony Seeds session keys."""
         self._transport_error = False
-        self._connected = False
+        self._set_connected(connected=False)
 
         grpc_port_status = await asyncio.to_thread(
             self._grpc_port_connect_ex, self.host, self.port
@@ -237,8 +263,8 @@ class BraviaGrpcClientAsync:
             key_id=self.key_id,
             device_id=self.device_id,
         )
-        self._connected = ok
         if ok:
+            self._set_connected(connected=True)
             self._debug("Authenticated with %s:%s", self.host, self.port)
         elif self._client.last_error_is_transport:
             self._transport_error = True
@@ -264,7 +290,7 @@ class BraviaGrpcClientAsync:
             self._notify_task = None
         else:
             await asyncio.to_thread(self._client.disconnect)
-        self._connected = False
+        self._set_connected(connected=False)
 
     async def async_get_states(self) -> Any | None:
         """Fetch full device state snapshot."""
@@ -557,7 +583,7 @@ class BraviaGrpcClientAsync:
                 if self._notify_stop.is_set():
                     break
 
-                self._connected = False
+                self._set_connected(connected=False)
                 await asyncio.to_thread(self._client.disconnect)
                 self._debug(
                     "Notify stream ended on %s; reconnect scheduled in %ds",

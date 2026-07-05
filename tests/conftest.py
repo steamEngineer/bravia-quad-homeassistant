@@ -467,6 +467,8 @@ def grpc_client() -> MagicMock:
     client.async_exec_command = AsyncMock(return_value=True)
     client.add_state_callback = MagicMock()
     client.remove_state_callback = MagicMock()
+    client.register_availability_callback = MagicMock()
+    client.unregister_availability_callback = MagicMock()
     return client
 
 
