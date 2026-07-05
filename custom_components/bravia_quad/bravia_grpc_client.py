@@ -419,7 +419,10 @@ class BraviaGrpcClientAsync:
             bool_value,
         )
         ok = await asyncio.to_thread(_run)
-        self._debug("ExecCommand %s -> %s", command_path, ok)
+        if ok:
+            self._debug("ExecCommand %s -> True", command_path)
+        else:
+            _LOGGER.warning("ExecCommand %s failed", command_path)
         return ok
 
     async def async_exec_denormalized(

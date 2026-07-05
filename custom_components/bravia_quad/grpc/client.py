@@ -889,71 +889,24 @@ class BraviaGrpcClient:
 
     def _preflight_exec_auth_token(self) -> bool:
         """
-        Obtain a rolling auth_token via GetStatesWithAuth (app mutex chain).
+        Refresh session tokens via HMAC-signed GetStates before ExecCommand.
 
-        BRAVIA Connect typically runs full snapshot GetStates, then
-        ``client_control.mutex.any``, before ExecCommand. The response
-        auth_token signs the exec body (GetSessionRandom token alone is not
-        enough on fw 001.454).
+        Mirrors ``get_states_app_sequence()`` (full signed snapshot + mutex×2)
+        without the brief notify window — required on fw 001.454 when notify
+        kept metadata fresh but exec signing values went stale.
         """
         if not self.session_id or not self.session_random or not self.auth_token:
             return False
 
-        method = (
-            "/jp.co.sony.hes.ssh.controldevice.v1.ControlDeviceService/"
-            "GetStatesWithAuth"
-        )
-        unary_callable = self.channel.unary_unary(
-            method,
-            request_serializer=lambda payload: (
-                payload if isinstance(payload, bytes) else payload.SerializeToString()
-            ),
-            response_deserializer=lambda payload: payload,
-        )
-        auth = self.auth_token
-
-        def _try_get_states(label: str, request_bytes: bytes) -> bool:
-            try:
-                response = unary_callable.future(request_bytes).result()
-            except grpc.RpcError as e:
-                self._say(
-                    f"Exec preflight GetStates ({label}) error: "
-                    f"{e.code()} - {e.details()}"
-                )
-                return False
-            next_token = extract_auth_token_from_states_response(response)
-            if not next_token:
-                self._say(
-                    f"Exec preflight GetStates ({label}) response missing auth_token"
-                )
-                return False
-            nonlocal auth
-            auth = next_token
-            return True
-
-        try:
-            field_paths = load_field_paths()
-        except ValueError:
-            field_paths = None
-
-        if field_paths:
-            full_request = build_get_states_with_auth_request(
-                field_paths,
-                session_random=self.session_random,
-                session_id=self.session_id,
-                auth_token=auth,
-            )
-            _try_get_states("full", full_request)
-
-        small_request = build_small_get_states_with_auth_request(
-            "client_control.mutex.any",
-            session_random=self.session_random,
-            session_id=self.session_id,
-            auth_token=auth,
-        )
-        if not _try_get_states("mutex", small_request):
+        signed = bool(self.hmac_key_hex)
+        if self.get_states_dict(use_signed_auth=signed) is None:
+            self._say("Exec preflight full GetStates failed")
             return False
-        self.auth_token = auth
+
+        for attempt in range(2):
+            if not self.acquire_client_mutex(use_signed_auth=signed):
+                self._say(f"Exec preflight mutex #{attempt + 1} failed")
+                return False
         return True
 
     def _refresh_session_tokens(self) -> bool:
@@ -973,7 +926,7 @@ class BraviaGrpcClient:
             self.session_id = session_resp.session_id
         return True
 
-    def exec_command(
+    def exec_command(  # noqa: PLR0911
         self,
         command_path: str,
         value: Any = None,
@@ -1015,11 +968,39 @@ class BraviaGrpcClient:
             return False
 
         if grpc_exec_unavailable_reason(self._notify_state, command_path):
-            self._debug("ExecCommand blocked (unavailable): %s", command_path)
+            self._debug(f"ExecCommand blocked (unavailable): {command_path}")
             return False
 
-        if not self._sign_exec_auth_token(command_path, **exec_kwargs):
+        if not self._preflight_exec_auth_token():
+            self._say("ExecCommand preflight failed")
             return False
+
+        for attempt in range(2):
+            if attempt == 1:
+                self._debug(
+                    f"ExecCommand retry after INVALID_ARGUMENT for {command_path}"
+                )
+                if not (
+                    self._refresh_session_tokens() and self._preflight_exec_auth_token()
+                ):
+                    break
+            success, invalid_argument = self._send_exec_command(
+                command_path, exec_kwargs
+            )
+            if success:
+                return True
+            if not invalid_argument:
+                return False
+        return False
+
+    def _send_exec_command(
+        self,
+        command_path: str,
+        exec_kwargs: dict[str, int | bool | str],
+    ) -> tuple[bool, bool]:
+        """Send ExecCommandWithAuth; return (success, invalid_argument_rpc)."""
+        if not self._sign_exec_auth_token(command_path, **exec_kwargs):
+            return False, False
 
         try:
             manual_request_bytes = build_exec_command_with_auth_request(
@@ -1059,11 +1040,11 @@ class BraviaGrpcClient:
                 and command_path != "playback_control.playback_command"
             ):
                 self._cache_exec_value(command_path, exec_kwargs)
-            return success
+            return success, False
 
         except grpc.RpcError as e:
             self._say(f"ExecCommand error: {e.code()} - {e.details()}")
-            return False
+            return False, e.code() == grpc.StatusCode.INVALID_ARGUMENT
 
     def _cache_exec_value(
         self, command_path: str, exec_kwargs: dict[str, int | bool | str]
