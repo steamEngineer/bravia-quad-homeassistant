@@ -307,7 +307,7 @@ flowchart LR
 
 Our earlier investigation *(local notes, not committed)* had hypothesized cloud/cache-backed display (H5, "likely") from ES8/Frida captures — that conclusion is **superseded** by @mafredri's direct Seeds API proof.
 
-So HA's design today: **write** notify-only paths via `ExecCommand`; **read** via TCP seed ([`grpc_tcp_seed.py`](../custom_components/bravia_quad/grpc_tcp_seed.py)), HA state-restore, or the last successful write. Whether HA should poll Seeds for these values is tracked in [#139](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/139).
+So HA's design: **write** notify-only paths via `ExecCommand`; **read** via Sony Seeds cloud when `grpc_seeds_poll` is enabled ([`grpc_seeds_seed.py`](../custom_components/bravia_quad/grpc_seeds_seed.py)), otherwise HA state-restore or the last successful write. TCP seed applies only when Seeds is disabled (legacy hybrid on TCP-capable models). See [seeds-cloud-states.md](seeds-cloud-states.md).
 
 ---
 
@@ -339,7 +339,7 @@ The gotcha that shaped the whole loop: the device gives essentially no error det
 
 - **Replaying old captured bytes fails** once session tokens differ — expected, since auth is session-bound. Every run has to re-sign.
 - **Client auth simplification** — test @mafredri's simpler `GetSessionRandom`-per-RPC and direct-exec patterns ([#138](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/138)).
-- **Seeds cloud read integration** — whether HA should poll `GET /devices/{device_id}/states` for notify-only settings ([#139](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/139)).
+- **Seeds cloud read integration** — opt-in via `grpc_seeds_poll`; see [seeds-cloud-states.md](seeds-cloud-states.md) ([#139](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/139)).
 - **Rear-level scale** (`-3` over gRPC) versus the TCP step semantics isn't fully reconciled yet.
 
 ---

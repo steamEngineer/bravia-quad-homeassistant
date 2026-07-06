@@ -19,10 +19,13 @@ from .grpc_mapping import (
     entity_critical_grpc_paths,
     missing_entity_paths,
 )
+from .grpc_seeds_seed import SEEDS_SEED_PATHS, async_seed_from_seeds
 from .grpc_tcp_seed import async_seed_notify_only_from_tcp
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Awaitable, Callable
+
+    from homeassistant.core import HomeAssistant
 
     ReconnectCallback = Callable[[], Awaitable[None]]
     RefreshKeysCallback = Callable[[], Awaitable[bool]]
@@ -60,6 +63,9 @@ class BraviaGrpcClientAsync:
         hmac_key: str | None = None,
         debug: bool = False,
         session_keys_expires_at: int | None = None,
+        seeds_poll: bool = False,
+        credentials: dict[str, Any] | None = None,
+        hass: HomeAssistant | None = None,
     ) -> None:
         """Initialize async gRPC client wrapper."""
         self.host = host
@@ -70,6 +76,9 @@ class BraviaGrpcClientAsync:
         self.hmac_key = hmac_key
         self.debug = debug
         self.session_keys_expires_at = session_keys_expires_at
+        self.seeds_poll = seeds_poll
+        self._credentials = dict(credentials or {})
+        self._hass = hass
         self._client = BraviaGrpcClient(host, port, debug=debug)
         self._connected = False
         self._transport_error = False
@@ -132,6 +141,12 @@ class BraviaGrpcClientAsync:
         """Run when authentication fails to refresh Sony Seeds session keys."""
         self._refresh_keys_callback = callback
 
+    async def async_refresh_credentials(self) -> bool:
+        """Refresh OAuth access token and gRPC session keys via the HA callback."""
+        if self._refresh_keys_callback is None:
+            return False
+        return await self._refresh_keys_callback()
+
     def register_availability_callback(self, callback: Callable[[bool], None]) -> None:
         """Register a callback for gRPC session availability changes."""
         self._availability_callbacks.add(callback)
@@ -163,6 +178,8 @@ class BraviaGrpcClientAsync:
         self.key_id = keys.get("key_id")
         self.session_key = keys.get("session_key")
         self.hmac_key = keys.get("hmac_key")
+        if keys.get("access_token"):
+            self._credentials.update(keys)
         expires_at = keys.get("session_keys_expires_at")
         if expires_at is not None:
             self.session_keys_expires_at = int(expires_at)
@@ -360,18 +377,34 @@ class BraviaGrpcClientAsync:
                 self._client.update_notify_cache(result)
                 bulk_resolved += 1
 
-        notify_only_resolved = await async_seed_notify_only_from_tcp(self.host, self)
+        notify_only_resolved = 0
+        if (
+            self.seeds_poll
+            and self._hass is not None
+            and self._credentials.get("access_token")
+        ):
+            notify_only_resolved = await async_seed_from_seeds(
+                self._hass,
+                self._credentials,
+                self,
+            )
+        else:
+            notify_only_resolved = await async_seed_notify_only_from_tcp(
+                self.host, self
+            )
         still_missing = len(missing_entity_paths(self._client.notify_state))
         if bulk_resolved or notify_only_resolved:
             total = len(entity_critical_grpc_paths())
             resolved = total - still_missing
+            seed_source = "seeds-seed" if self.seeds_poll else "tcp-seed"
             _LOGGER.info(
                 "gRPC entity path backfill on %s: %d/%d resolved "
-                "(bulk single-path +%d, tcp-seed +%d, %d still missing)",
+                "(bulk single-path +%d, %s +%d, %d still missing)",
                 self.host,
                 resolved,
                 total,
                 bulk_resolved,
+                seed_source,
                 notify_only_resolved,
                 still_missing,
             )
@@ -493,6 +526,17 @@ class BraviaGrpcClientAsync:
         ok = await asyncio.to_thread(_run)
         if ok:
             self._debug("ExecCommand %s -> True", command_path)
+            if (
+                self.seeds_poll
+                and self._hass is not None
+                and command_path in SEEDS_SEED_PATHS
+            ):
+                await async_seed_from_seeds(
+                    self._hass,
+                    self._credentials,
+                    self,
+                    paths=frozenset({command_path}),
+                )
         else:
             context = self._exec_failure_context(command_path)
             _LOGGER.warning(

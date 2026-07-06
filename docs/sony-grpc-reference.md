@@ -81,7 +81,7 @@ Some paths (including `sound_setting.drc`) are **writable** via `ExecCommandWith
 |-----------|--------|
 | **Write (local gRPC)** | ExecCommand — unchanged |
 | **Read (local gRPC)** | Unavailable for many paths (bulk/single GetStates, notify) |
-| **Read (Seeds cloud)** | @mafredri confirmed via `GET /devices/{device_id}/states` ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)) — HA research [#139](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/139) |
-| **Read (HA today)** | TCP seed ([`grpc_tcp_seed.py`](../custom_components/bravia_quad/grpc_tcp_seed.py)), HA state restore, last successful write |
+| **Read (Seeds cloud)** | @mafredri confirmed via `GET /devices/{device_id}/states` ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)); HA opt-in via `grpc_seeds_poll` — [seeds-cloud-states.md](seeds-cloud-states.md) |
+| **Read (HA today, Seeds off)** | HA state restore, last successful write; TCP seed only when Seeds disabled on TCP-capable models |
 
 DSEE Ultimate and 360SSM height have no confirmed TCP read feature on tested firmware; wiring is deferred until a stable read path is confirmed.

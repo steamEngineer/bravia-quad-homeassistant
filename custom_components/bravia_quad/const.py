@@ -17,6 +17,7 @@ CONF_GRPC_KEYS = "grpc_keys"
 CONF_GRPC_OAUTH_REDIRECT = "grpc_oauth_redirect"
 CONF_GRPC_DEVICE_ID = "grpc_device_id"
 CONF_GRPC_DEBUG = "grpc_debug"
+CONF_GRPC_SEEDS_POLL = "grpc_seeds_poll"
 
 TRANSPORT_TCP = "tcp"
 TRANSPORT_GRPC = "grpc"

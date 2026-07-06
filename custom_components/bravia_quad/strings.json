@@ -67,10 +67,11 @@
   "options": {
     "step": {
       "init": {
-        "title": "gRPC debug logging",
-        "description": "Enable verbose logging for gRPC notify and ExecCommand traffic. Useful when diagnosing BRAVIA Connect session issues.",
+        "title": "gRPC options",
+        "description": "gRPC transport settings. Seeds cloud reads use the same Sony API as BRAVIA Connect (@mafredri) for settings not readable over local gRPC — required on models where TCP is blocked (e.g. HT-A8).",
         "data": {
-          "grpc_debug": "Verbose gRPC debug logging"
+          "grpc_debug": "Verbose gRPC debug logging",
+          "grpc_seeds_poll": "Read notify-only settings from Sony Seeds cloud"
         }
       }
     }
