@@ -11,6 +11,7 @@ import threading
 import time
 import uuid
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 import grpc
@@ -64,10 +65,24 @@ class NotifyStateUpdate:
     value: Any
 
 
+class AuthMode(StrEnum):
+    """Device gRPC auth strategy (@mafredri #16 / #138)."""
+
+    APP_MIRROR = "app_mirror"
+    FRESH_EXEC_ONLY = "fresh_exec_only"
+
+
 class BraviaGrpcClient:
     """Client for communicating with Bravia devices via gRPC over h2c."""
 
-    def __init__(self, host: str, port: int = 55051, debug: bool = False) -> None:
+    def __init__(
+        self,
+        host: str,
+        port: int = 55051,
+        debug: bool = False,
+        *,
+        auth_mode: AuthMode | str = AuthMode.FRESH_EXEC_ONLY,
+    ) -> None:
         """
         Initialize the Bravia gRPC client.
 
@@ -75,6 +90,7 @@ class BraviaGrpcClient:
             host: IP address or hostname of the Bravia device
             port: Port number (default: 55051)
             debug: Enable debug output (default: False)
+            auth_mode: Exec/GetStates auth strategy (default: fresh GetSessionRandom per exec)
 
         """
         self.host = host
@@ -90,6 +106,7 @@ class BraviaGrpcClient:
         self.hmac_key_hex: str | None = None
         self.authenticated = False
         self.debug = debug
+        self.auth_mode = AuthMode(auth_mode)
         self._notify_state: dict[str, Any] = {}
         self._notify_stream: Any | None = None
         self.last_rpc_error: str | None = None
@@ -997,27 +1014,46 @@ class BraviaGrpcClient:
             self._debug(f"ExecCommand blocked (unavailable): {command_path}")
             return False
 
-        if not self._ensure_preflight_exec_auth_token(command_path):
-            self._say("ExecCommand preflight failed")
+        if self.auth_mode == AuthMode.APP_MIRROR:
+            if not self._ensure_preflight_exec_auth_token(command_path):
+                self._say("ExecCommand preflight failed")
+                return False
+        elif not self._refresh_session_tokens():
+            self._warn_exec_auth_context(
+                "GetSessionRandom failed before exec",
+                command_path=command_path,
+            )
             return False
 
         for attempt in range(2):
             if attempt == 1:
-                self._debug(
-                    f"ExecCommand retry after INVALID_ARGUMENT for {command_path}"
-                )
-                if not self._refresh_session_tokens():
-                    self._warn_exec_auth_context(
-                        "GetSessionRandom refresh failed on exec retry",
-                        command_path=command_path,
+                if self.auth_mode == AuthMode.APP_MIRROR:
+                    self._debug(
+                        f"ExecCommand retry after INVALID_ARGUMENT for {command_path}"
                     )
-                    break
-                if not self._preflight_exec_auth_token():
-                    self._warn_exec_auth_context(
-                        "preflight failed after GetSessionRandom on exec retry",
-                        command_path=command_path,
+                    if not self._refresh_session_tokens():
+                        self._warn_exec_auth_context(
+                            "GetSessionRandom refresh failed on exec retry",
+                            command_path=command_path,
+                        )
+                        break
+                    if not self._preflight_exec_auth_token():
+                        self._warn_exec_auth_context(
+                            "preflight failed after GetSessionRandom on exec retry",
+                            command_path=command_path,
+                        )
+                        break
+                else:
+                    self._debug(
+                        f"ExecCommand preflight fallback after INVALID_ARGUMENT "
+                        f"for {command_path}"
                     )
-                    break
+                    if not self._ensure_preflight_exec_auth_token(command_path):
+                        self._warn_exec_auth_context(
+                            "preflight fallback failed after direct exec",
+                            command_path=command_path,
+                        )
+                        break
             success, invalid_argument = self._send_exec_command(
                 command_path, exec_kwargs
             )

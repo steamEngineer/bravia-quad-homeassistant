@@ -147,21 +147,32 @@ Missing or invalid `refresh_token`, or Sony API errors → `ConfigEntryAuthFaile
 
 **Lifetime:** Bound to the **TCP/gRPC connection**, not a clock. When the notify stream drops and the client reconnects, the whole handshake runs again from step 1, still using the same cloud `hmac_key`/`key_id` until those expire (~24 h).
 
-**Exec commands** require a preflight sequence (full signed GetStates + mutex probes) so the rolled token is valid before writes. See `get_states_app_sequence()` and `_preflight_exec_auth_token()`.
+**Exec commands** use fresh `GetSessionRandom` before each write by default (`AuthMode.FRESH_EXEC_ONLY`), then HMAC-sign the exec body. The legacy app-mirror preflight (full signed GetStates + mutex probes) runs only as a **fallback** on the first `INVALID_ARGUMENT` from exec — not on every command. See `_refresh_session_tokens()`, `_ensure_preflight_exec_auth_token()`, and `exec_command()`.
 
-**Exec entry point:** `exec_command()` calls `_ensure_preflight_exec_auth_token()` (not bare `_preflight_exec_auth_token()`). On preflight failure it runs `GetSessionRandom` once and retries preflight before giving up.
+**Exec entry point:** `exec_command()` calls `_refresh_session_tokens()` on the happy path. On exec `INVALID_ARGUMENT`, it falls back to `_ensure_preflight_exec_auth_token()` once (which may run `GetSessionRandom` → retry preflight). `AuthMode.APP_MIRROR` retains the old unconditional preflight gate for probes and rollback.
 
 **Async layer:** `BraviaGrpcClientAsync.async_exec_command()` runs the blocking exec in a thread; if it still fails, `_async_restore_session()` (disconnect, re-handshake, GetStates seed) runs once and exec is retried.
 
-### Current implementation vs minimum protocol
+### Default auth mode (since #138)
 
-The following describes **what the integration implements today**. [@mafredri](https://github.com/mafredri) reported simpler patterns in [#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16); simplification is tracked in [#138](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/138).
+Validated on live HT-A9M2 (2026-07-05): [@mafredri](https://github.com/mafredri)'s simpler exec pattern ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)) works when paired with preflight as retry-only fallback:
 
-| Topic | Current HA behavior | @mafredri's finding (#16) |
-|-------|--------------------|-----------------------------|
-| Per-RPC auth | Chain rolled `auth_token` from responses | Fresh `GetSessionRandom` + HMAC each RPC works |
-| Exec writes | `_ensure_preflight_exec_auth_token()` mutex + full GetStates | Direct `GetSessionRandom` → `ExecCommandWithAuth` works in his testing |
-| GetNonce | Always in handshake | May be optional for normal HMAC auth |
+| Step | Default (`FRESH_EXEC_ONLY`) | Fallback on `INVALID_ARGUMENT` |
+|------|----------------------------|--------------------------------|
+| Before exec | `GetSessionRandom` → HMAC-sign exec | Full signed GetStates + mutex preflight (`_ensure_preflight_exec_auth_token`) |
+| After exec fail | — | Retry exec once with rolled token from preflight |
+
+`AuthMode` values: `fresh_exec_only` (default), `app_mirror` (legacy unconditional preflight).
+
+### Historical app-mirror behavior
+
+The following table contrasts the **previous** default (pre-#138) with [@mafredri](https://github.com/mafredri)'s findings ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)). The integration now uses the simpler exec path by default; see **Default auth mode** above.
+
+| Topic | Previous HA default (pre-#138) | Current default (#138) | @mafredri's finding (#16) |
+|-------|-------------------------------|------------------------|---------------------------|
+| Per-RPC auth | Chain rolled `auth_token` from responses | Rolling for reads; fresh `GetSessionRandom` before exec | Fresh `GetSessionRandom` + HMAC each RPC works |
+| Exec writes | Unconditional `_ensure_preflight_exec_auth_token()` | `_refresh_session_tokens()` before exec; preflight on `INVALID_ARGUMENT` only | Direct `GetSessionRandom` → `ExecCommandWithAuth` works |
+| GetNonce | Always in handshake | Unchanged | May be optional for normal HMAC auth |
 
 ### Notify-only reads via Seeds cloud
 
@@ -207,7 +218,7 @@ Day N          If refresh_token revoked/expired → ConfigEntryAuthFailed → us
 
 ## Idle exec failure (observed ~1 h)
 
-*The following documents validated current behavior; simplification is tracked in [#138](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/138).*
+*Validated on live HT-A9M2; #138 keeps preflight as retry-only fallback so Tier 2 recovery semantics are preserved.*
 
 Reported sequence: **playing** (notify deltas active) → **HA power off** (manual standby) → **immediate power-off notify delta**, then **~60 min quiet notify** (stream may stay open, no further deltas) → **power on fails** with signed GetStates preflight `INVALID_ARGUMENT` while `_connected` remains true.
 
@@ -223,8 +234,8 @@ Follow-up fix: `_ensure_preflight_exec_auth_token()` — on preflight fail, `Get
 
 ### Recovery (current implementation)
 
-1. **Initial preflight failure** → `GetSessionRandom` → retry signed GetStates + mutex preflight (`_ensure_preflight_exec_auth_token`)
-2. **Exec send `INVALID_ARGUMENT`** → forced `GetSessionRandom` → preflight → retry send
+1. **Happy path (#138):** `GetSessionRandom` → HMAC-sign exec → send
+2. **Exec `INVALID_ARGUMENT`:** `_ensure_preflight_exec_auth_token()` (GetSessionRandom on preflight fail) → retry exec
 3. **Still failing** → `BraviaGrpcClientAsync._async_restore_session()` (disconnect, re-auth, re-seed) → one exec retry
 
 Exec failures log a session auth snapshot (tokens, `session_keys_expires_at`, `seconds_since_last_notify`) at WARNING.
@@ -266,6 +277,6 @@ When changing auth behavior, update this document if any of the following change
 - [ ] `SESSION_KEYS_REFRESH_BUFFER` or proactive refresh conditions
 - [ ] Device handshake RPC order or signing rules
 - [ ] Reconnect / refresh callback behavior in `grpc_refresh.py` or `bravia_grpc_client.py`
-- [ ] Exec preflight recovery (`_ensure_preflight_exec_auth_token`, GetSessionRandom on preflight fail)
+- [ ] Exec auth mode / preflight fallback (`AuthMode`, `_refresh_session_tokens` before exec, `_ensure_preflight_exec_auth_token`)
 - [ ] Idle exec failure symptoms or validation notes when repro conditions change
 - [ ] Observed Sony API lifetimes (`expires_in` values) that differ from ~24 h / ~30–60 min

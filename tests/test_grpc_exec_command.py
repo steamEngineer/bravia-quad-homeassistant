@@ -7,12 +7,24 @@ from unittest.mock import MagicMock, patch
 import grpc
 import pytest
 
-from custom_components.bravia_quad.grpc.client import BraviaGrpcClient
+from custom_components.bravia_quad.grpc.client import AuthMode, BraviaGrpcClient
 
 
 @pytest.fixture
 def grpc_client() -> BraviaGrpcClient:
-    client = BraviaGrpcClient("127.0.0.1")
+    client = BraviaGrpcClient("127.0.0.1", auth_mode=AuthMode.APP_MIRROR)
+    client.authenticated = True
+    client.session_id = "session-abc"
+    client.session_random = b"\x01" * 8
+    client.auth_token = b"\x02" * 32
+    client.hmac_key_hex = "ab" * 32
+    client.channel = MagicMock()
+    return client
+
+
+@pytest.fixture
+def grpc_client_fresh() -> BraviaGrpcClient:
+    client = BraviaGrpcClient("127.0.0.1", auth_mode=AuthMode.FRESH_EXEC_ONLY)
     client.authenticated = True
     client.session_id = "session-abc"
     client.session_random = b"\x01" * 8
@@ -38,6 +50,73 @@ def test_exec_command_calls_preflight_before_send(
     assert ok is True
     preflight.assert_called_once()
     send.assert_called_once_with("volume", {"int_value": 33})
+
+
+def test_fresh_exec_calls_get_session_random_not_preflight(
+    grpc_client_fresh: BraviaGrpcClient,
+) -> None:
+    with (
+        patch.object(
+            grpc_client_fresh, "_refresh_session_tokens", return_value=True
+        ) as refresh,
+        patch.object(
+            grpc_client_fresh, "_ensure_preflight_exec_auth_token"
+        ) as preflight,
+        patch.object(
+            grpc_client_fresh, "_send_exec_command", return_value=(True, False)
+        ) as send,
+    ):
+        ok = grpc_client_fresh.exec_command("volume", int_value=33)
+
+    assert ok is True
+    refresh.assert_called_once()
+    preflight.assert_not_called()
+    send.assert_called_once()
+
+
+def test_fresh_exec_preflight_fallback_on_invalid_argument(
+    grpc_client_fresh: BraviaGrpcClient,
+) -> None:
+    with (
+        patch.object(grpc_client_fresh, "_refresh_session_tokens", return_value=True),
+        patch.object(
+            grpc_client_fresh,
+            "_ensure_preflight_exec_auth_token",
+            return_value=True,
+        ) as preflight,
+        patch.object(
+            grpc_client_fresh,
+            "_send_exec_command",
+            side_effect=[(False, True), (True, False)],
+        ) as send,
+    ):
+        ok = grpc_client_fresh.exec_command("power", bool_value=True)
+
+    assert ok is True
+    assert send.call_count == 2
+    preflight.assert_called_once()
+
+
+def test_fresh_exec_no_third_send_on_double_invalid_argument(
+    grpc_client_fresh: BraviaGrpcClient,
+) -> None:
+    with (
+        patch.object(grpc_client_fresh, "_refresh_session_tokens", return_value=True),
+        patch.object(
+            grpc_client_fresh,
+            "_ensure_preflight_exec_auth_token",
+            return_value=True,
+        ),
+        patch.object(
+            grpc_client_fresh,
+            "_send_exec_command",
+            return_value=(False, True),
+        ) as send,
+    ):
+        ok = grpc_client_fresh.exec_command("power", bool_value=True)
+
+    assert ok is False
+    assert send.call_count == 2
 
 
 def test_exec_command_fails_when_preflight_fails(
