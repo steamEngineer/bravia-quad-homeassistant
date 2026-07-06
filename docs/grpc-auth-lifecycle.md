@@ -147,9 +147,9 @@ Missing or invalid `refresh_token`, or Sony API errors → `ConfigEntryAuthFaile
 
 **Lifetime:** Bound to the **TCP/gRPC connection**, not a clock. When the notify stream drops and the client reconnects, the whole handshake runs again from step 1, still using the same cloud `hmac_key`/`key_id` until those expire (~24 h).
 
-**Exec commands** use fresh `GetSessionRandom` before each write by default (`AuthMode.FRESH_EXEC_ONLY`), then HMAC-sign the exec body. The legacy app-mirror preflight (full signed GetStates + mutex probes) runs only as a **fallback** on the first `INVALID_ARGUMENT` from exec — not on every command. See `_prepare_fresh_exec_auth()`, `_ensure_preflight_exec_auth_token()`, and `exec_command()`.
+**Exec commands** use fresh `GetSessionRandom` before each write by default (`AuthMode.FRESH_EXEC_ONLY`), then HMAC-sign the exec body. The legacy app-mirror preflight (full signed GetStates + mutex probes) runs only as a **fallback** on the first `INVALID_ARGUMENT` from exec — not on every command. See `_refresh_session_tokens()`, `_ensure_preflight_exec_auth_token()`, and `exec_command()`.
 
-**Exec entry point:** `exec_command()` calls `_prepare_fresh_exec_auth()` on the happy path. On exec `INVALID_ARGUMENT`, it falls back to `_ensure_preflight_exec_auth_token()` once (which may run `GetSessionRandom` → retry preflight). `AuthMode.APP_MIRROR` retains the old unconditional preflight gate for probes and rollback.
+**Exec entry point:** `exec_command()` calls `_refresh_session_tokens()` on the happy path. On exec `INVALID_ARGUMENT`, it falls back to `_ensure_preflight_exec_auth_token()` once (which may run `GetSessionRandom` → retry preflight). `AuthMode.APP_MIRROR` retains the old unconditional preflight gate for probes and rollback.
 
 **Async layer:** `BraviaGrpcClientAsync.async_exec_command()` runs the blocking exec in a thread; if it still fails, `_async_restore_session()` (disconnect, re-handshake, GetStates seed) runs once and exec is retried.
 
@@ -162,7 +162,7 @@ Validated on live HT-A9M2 (2026-07-05): [@mafredri](https://github.com/mafredri)
 | Before exec | `GetSessionRandom` → HMAC-sign exec | Full signed GetStates + mutex preflight (`_ensure_preflight_exec_auth_token`) |
 | After exec fail | — | Retry exec once with rolled token from preflight |
 
-`AuthMode` values: `fresh_exec_only` (default), `fresh_per_rpc` (also refreshes before signed GetStates), `app_mirror` (legacy unconditional preflight).
+`AuthMode` values: `fresh_exec_only` (default), `app_mirror` (legacy unconditional preflight).
 
 ### Historical app-mirror behavior
 
@@ -171,7 +171,7 @@ The following table contrasts the **previous** default (pre-#138) with [@mafredr
 | Topic | Previous HA default (pre-#138) | Current default (#138) | @mafredri's finding (#16) |
 |-------|-------------------------------|------------------------|---------------------------|
 | Per-RPC auth | Chain rolled `auth_token` from responses | Rolling for reads; fresh `GetSessionRandom` before exec | Fresh `GetSessionRandom` + HMAC each RPC works |
-| Exec writes | Unconditional `_ensure_preflight_exec_auth_token()` | `_prepare_fresh_exec_auth()`; preflight on `INVALID_ARGUMENT` only | Direct `GetSessionRandom` → `ExecCommandWithAuth` works |
+| Exec writes | Unconditional `_ensure_preflight_exec_auth_token()` | `_refresh_session_tokens()` before exec; preflight on `INVALID_ARGUMENT` only | Direct `GetSessionRandom` → `ExecCommandWithAuth` works |
 | GetNonce | Always in handshake | Unchanged | May be optional for normal HMAC auth |
 
 ### Notify-only reads via Seeds cloud
@@ -277,6 +277,6 @@ When changing auth behavior, update this document if any of the following change
 - [ ] `SESSION_KEYS_REFRESH_BUFFER` or proactive refresh conditions
 - [ ] Device handshake RPC order or signing rules
 - [ ] Reconnect / refresh callback behavior in `grpc_refresh.py` or `bravia_grpc_client.py`
-- [ ] Exec auth mode / preflight fallback (`AuthMode`, `_prepare_fresh_exec_auth`, `_ensure_preflight_exec_auth_token`)
+- [ ] Exec auth mode / preflight fallback (`AuthMode`, `_refresh_session_tokens` before exec, `_ensure_preflight_exec_auth_token`)
 - [ ] Idle exec failure symptoms or validation notes when repro conditions change
 - [ ] Observed Sony API lifetimes (`expires_in` values) that differ from ~24 h / ~30–60 min

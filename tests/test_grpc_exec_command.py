@@ -57,8 +57,8 @@ def test_fresh_exec_calls_get_session_random_not_preflight(
 ) -> None:
     with (
         patch.object(
-            grpc_client_fresh, "_prepare_fresh_exec_auth", return_value=True
-        ) as fresh,
+            grpc_client_fresh, "_refresh_session_tokens", return_value=True
+        ) as refresh,
         patch.object(
             grpc_client_fresh, "_ensure_preflight_exec_auth_token"
         ) as preflight,
@@ -69,7 +69,7 @@ def test_fresh_exec_calls_get_session_random_not_preflight(
         ok = grpc_client_fresh.exec_command("volume", int_value=33)
 
     assert ok is True
-    fresh.assert_called_once()
+    refresh.assert_called_once()
     preflight.assert_not_called()
     send.assert_called_once()
 
@@ -78,7 +78,7 @@ def test_fresh_exec_preflight_fallback_on_invalid_argument(
     grpc_client_fresh: BraviaGrpcClient,
 ) -> None:
     with (
-        patch.object(grpc_client_fresh, "_prepare_fresh_exec_auth", return_value=True),
+        patch.object(grpc_client_fresh, "_refresh_session_tokens", return_value=True),
         patch.object(
             grpc_client_fresh,
             "_ensure_preflight_exec_auth_token",
@@ -95,6 +95,28 @@ def test_fresh_exec_preflight_fallback_on_invalid_argument(
     assert ok is True
     assert send.call_count == 2
     preflight.assert_called_once()
+
+
+def test_fresh_exec_no_third_send_on_double_invalid_argument(
+    grpc_client_fresh: BraviaGrpcClient,
+) -> None:
+    with (
+        patch.object(grpc_client_fresh, "_refresh_session_tokens", return_value=True),
+        patch.object(
+            grpc_client_fresh,
+            "_ensure_preflight_exec_auth_token",
+            return_value=True,
+        ),
+        patch.object(
+            grpc_client_fresh,
+            "_send_exec_command",
+            return_value=(False, True),
+        ) as send,
+    ):
+        ok = grpc_client_fresh.exec_command("power", bool_value=True)
+
+    assert ok is False
+    assert send.call_count == 2
 
 
 def test_exec_command_fails_when_preflight_fails(

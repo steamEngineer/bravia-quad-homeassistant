@@ -70,7 +70,6 @@ class AuthMode(StrEnum):
 
     APP_MIRROR = "app_mirror"
     FRESH_EXEC_ONLY = "fresh_exec_only"
-    FRESH_PER_RPC = "fresh_per_rpc"
 
 
 class BraviaGrpcClient:
@@ -585,12 +584,6 @@ class BraviaGrpcClient:
         paths = field_paths or load_field_paths()
         token = auth_token if auth_token is not None else self.auth_token
         if use_signed_auth and self.hmac_key_hex:
-            if (
-                self.auth_mode == AuthMode.FRESH_PER_RPC
-                and not self._refresh_session_tokens()
-            ):
-                self._say("GetStates GetSessionRandom refresh failed")
-                return None
             inner_parts = b"".join(
                 b"\x0a" + self._encode_varint(len(p.encode())) + p.encode()
                 for p in paths
@@ -976,16 +969,6 @@ class BraviaGrpcClient:
             self.session_id = session_resp.session_id
         return True
 
-    def _prepare_fresh_exec_auth(self, command_path: str) -> bool:
-        """GetSessionRandom before exec (@mafredri #16); sign happens in _send_exec_command."""
-        if not self._refresh_session_tokens():
-            self._warn_exec_auth_context(
-                "GetSessionRandom failed before exec",
-                command_path=command_path,
-            )
-            return False
-        return True
-
     def exec_command(  # noqa: PLR0911
         self,
         command_path: str,
@@ -1035,12 +1018,14 @@ class BraviaGrpcClient:
             if not self._ensure_preflight_exec_auth_token(command_path):
                 self._say("ExecCommand preflight failed")
                 return False
-        elif not self._prepare_fresh_exec_auth(command_path):
-            self._say("ExecCommand GetSessionRandom failed")
+        elif not self._refresh_session_tokens():
+            self._warn_exec_auth_context(
+                "GetSessionRandom failed before exec",
+                command_path=command_path,
+            )
             return False
 
-        used_preflight_fallback = False
-        for attempt in range(3):
+        for attempt in range(2):
             if attempt == 1:
                 if self.auth_mode == AuthMode.APP_MIRROR:
                     self._debug(
@@ -1058,7 +1043,7 @@ class BraviaGrpcClient:
                             command_path=command_path,
                         )
                         break
-                elif not used_preflight_fallback:
+                else:
                     self._debug(
                         f"ExecCommand preflight fallback after INVALID_ARGUMENT "
                         f"for {command_path}"
@@ -1069,9 +1054,6 @@ class BraviaGrpcClient:
                             command_path=command_path,
                         )
                         break
-                    used_preflight_fallback = True
-                else:
-                    break
             success, invalid_argument = self._send_exec_command(
                 command_path, exec_kwargs
             )
