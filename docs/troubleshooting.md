@@ -40,7 +40,7 @@ Fix (integration): automatic GetSessionRandom refresh on preflight failure; sess
 
 ### Entities show `unknown` after setup
 
-Some gRPC paths (including DRC and Auto Volume) are **writable** but **not readable** over local gRPC on current firmware. [@mafredri](https://github.com/mafredri) confirmed ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)) that BRAVIA Connect reads these via Sony Seeds cloud API; HA uses TCP seed, HA restore, or the last write until [#139](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/139). This is expected — see [sony-grpc-reference.md](sony-grpc-reference.md#notify-only-paths) and [grpc-tcp-mapping.md](grpc-tcp-mapping.md#getstates-snapshot-vs-entity-seeding).
+Some gRPC paths (including DRC and Auto Volume) are **writable** but **not readable** over local gRPC on current firmware. [@mafredri](https://github.com/mafredri) confirmed ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)) that BRAVIA Connect reads these via Sony Seeds cloud API. Enable **Seeds cloud reads** in gRPC integration options (`grpc_seeds_poll`) — see [seeds-cloud-states.md](seeds-cloud-states.md). Without Seeds, HA uses restore or the last write (TCP seed only when Seeds is off on TCP-capable models).
 
 ### Wrong entity set or missing features
 

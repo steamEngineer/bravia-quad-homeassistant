@@ -238,6 +238,15 @@ def get_devices(access_token: str) -> dict[str, Any]:
     return _sync_get_json(f"{IOT_BASE_URL}/devices", headers)
 
 
+def get_device_states(device_id: str, access_token: str) -> dict[str, Any]:
+    """Fetch device state snapshot from Sony Seeds IoT API (sync)."""
+    headers = {
+        **_IOT_HEADERS_BASE,
+        "authorization": f"Bearer {access_token}",
+    }
+    return _sync_get_json(f"{IOT_BASE_URL}/devices/{device_id}/states", headers)
+
+
 def get_session_keys(device_id: str, access_token: str) -> dict[str, Any]:
     """Fetch gRPC session keys for a device (sync)."""
     url = f"{IOT_BASE_URL}/devices/{device_id}/session_keys"
@@ -406,6 +415,24 @@ async def async_get_devices(
             response.raise_for_status()
         except ClientResponseError as exc:
             msg = f"Sony Seeds devices request failed: HTTP {exc.status}"
+            raise GrpcCredentialsRefreshError(msg) from exc
+        return await response.json()
+
+
+async def async_get_device_states(
+    session: ClientSession, device_id: str, access_token: str
+) -> dict[str, Any]:
+    """Fetch device state snapshot from Sony Seeds IoT API (async)."""
+    headers = {
+        **_IOT_HEADERS_BASE,
+        "authorization": f"Bearer {access_token}",
+    }
+    url = f"{IOT_BASE_URL}/devices/{device_id}/states"
+    async with session.get(url, headers=headers) as response:
+        try:
+            response.raise_for_status()
+        except ClientResponseError as exc:
+            msg = f"Sony Seeds device states request failed: HTTP {exc.status}"
             raise GrpcCredentialsRefreshError(msg) from exc
         return await response.json()
 

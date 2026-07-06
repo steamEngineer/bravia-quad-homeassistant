@@ -176,7 +176,7 @@ The following table contrasts the **previous** default (pre-#138) with [@mafredr
 
 ### Notify-only reads via Seeds cloud
 
-Per [@mafredri](https://github.com/mafredri) ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)): settings not returned by local gRPC GetStates or the notify stream (DRC, DSEE, dimmer, `sound_effect`, `360ssm_height`, etc.) **are readable** via Sony Seeds `GET /devices/{device_id}/states`, using the same OAuth `access_token` already stored in `CONF_GRPC_KEYS`. BRAVIA Connect uses this path for display; HA does **not** implement cloud polling yet — see [#139](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/139).
+Per [@mafredri](https://github.com/mafredri) ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)): settings not returned by local gRPC GetStates or the notify stream (DRC, DSEE, dimmer, `sound_effect`, `360ssm_height`, etc.) **are readable** via Sony Seeds `GET /devices/{device_id}/states`, using the same OAuth `access_token` already stored in `CONF_GRPC_KEYS`. BRAVIA Connect uses this path for display. HA can enable this via the **Seeds cloud reads** integration option (`grpc_seeds_poll`) — see [seeds-cloud-states.md](seeds-cloud-states.md) ([#139](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/139)).
 
 ---
 

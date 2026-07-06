@@ -11,7 +11,7 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .bravia_grpc_client import BraviaGrpcClientAsync
-from .const import CONF_GRPC_DEBUG, CONF_GRPC_KEYS, DEFAULT_NAME
+from .const import CONF_GRPC_DEBUG, CONF_GRPC_KEYS, CONF_GRPC_SEEDS_POLL, DEFAULT_NAME
 from .external_control import async_ensure_external_control_enabled
 from .grpc.credentials import (
     GrpcCredentialsError,
@@ -144,8 +144,14 @@ async def async_setup_grpc_client(
 
     try:
         grpc_debug = bool(entry.options.get(CONF_GRPC_DEBUG, False))
+        seeds_poll = bool(entry.options.get(CONF_GRPC_SEEDS_POLL, False))
         grpc_client = BraviaGrpcClientAsync.from_keys_json(
-            entry.data["host"], keys_json, debug=grpc_debug
+            entry.data["host"],
+            keys_json,
+            debug=grpc_debug,
+            seeds_poll=seeds_poll,
+            credentials=credentials,
+            hass=hass,
         )
         if grpc_debug:
             _LOGGER.info("gRPC debug logging enabled for %s", entry.data["host"])

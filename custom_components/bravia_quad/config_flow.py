@@ -32,6 +32,7 @@ from .const import (
     CONF_GRPC_DEVICE_ID,
     CONF_GRPC_KEYS,
     CONF_GRPC_OAUTH_REDIRECT,
+    CONF_GRPC_SEEDS_POLL,
     CONF_HAS_SUBWOOFER,
     CONF_MANUFACTURER,
     CONF_MODEL,
@@ -94,6 +95,7 @@ STEP_REAUTH_SCHEMA = vol.Schema(
 OPTIONS_SCHEMA_GRPC = vol.Schema(
     {
         vol.Optional(CONF_GRPC_DEBUG, default=False): bool,
+        vol.Optional(CONF_GRPC_SEEDS_POLL, default=False): bool,
     }
 )
 
@@ -597,6 +599,7 @@ class BraviaQuadOptionsFlowHandler(OptionsFlow):
                 OPTIONS_SCHEMA_GRPC,
                 {
                     CONF_GRPC_DEBUG: options.get(CONF_GRPC_DEBUG, False),
+                    CONF_GRPC_SEEDS_POLL: options.get(CONF_GRPC_SEEDS_POLL, False),
                 },
             ),
         )
