@@ -173,13 +173,13 @@ One useful early discovery: `ConfirmSignin` can return `success=false` and the s
 
 
 
-## Layer 4: Our checked-in proto was wrong
+## Layer 4: Our early proto reconstruction was wrong
 
-Here's the trap that cost the most time. There's a checked-in [`bravia_control.proto`](../custom_components/bravia_quad/grpc/bravia_control.proto), and the obvious move is to build `GetStatesWithAuthRequest(field_list=…, auth_token=…)` and call `SerializeToString()`. **It fails with** `INVALID_ARGUMENT` **every single time.**
+Here's the trap that cost the most time. We initially checked in a monolithic `bravia_control.proto` and the obvious move was to build `GetStatesWithAuthRequest(field_list=…, auth_token=…)` and call `SerializeToString()`. **It fails with** `INVALID_ARGUMENT` **every single time.**
 
-The problem was **our** proto — an incorrectly reconstructed schema from an earlier pass — not Sony's device schema. Per [@mafredri](https://github.com/mafredri)'s cross-check ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), the authoritative shape from gRPC server reflection uses an outer `GetStatesWithAuthRequest { serialized_request, hmac }` wrapping an inner `GetStatesRequest { repeated names }`. The same pattern applies to `ExecCommandWithAuth`. Reflected protos are kept as local investigation reference only — not committed to this repo.
+The problem was **our** proto — an incorrectly reconstructed schema from an early pass — not Sony's device schema. Per [@mafredri](https://github.com/mafredri)'s cross-check ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), the authoritative shape from gRPC server reflection uses an outer `GetStatesWithAuthRequest { serialized_request, hmac }` wrapping an inner `GetStatesRequest { repeated names }`. The same pattern applies to `ExecCommandWithAuth`. Reflected protos are kept in the investigation repo only — not committed here. The monolithic `.proto` has since been removed; this repo keeps generated [`bravia_control_pb2*.py`](../custom_components/bravia_quad/grpc/) stubs for handshake/notify only.
 
-`GetStatesWithAuth` and `ExecCommandWithAuth` still require **hand-encoded raw protobuf bytes** in our client because the checked-in proto3 stub does not match the reflected layout. That's why `grpc/` has [`get_states_request.py`](../custom_components/bravia_quad/grpc/get_states_request.py) and [`exec_command_request.py`](../custom_components/bravia_quad/grpc/exec_command_request.py) building byte strings directly instead of using generated message classes, and why the client's unary callables pass a raw-bytes `request_serializer`.
+`GetStatesWithAuth` and `ExecCommandWithAuth` still require **hand-encoded raw protobuf bytes** in our client because the generated proto3 stubs do not match the reflected layout. That's why `grpc/` has [`get_states_request.py`](../custom_components/bravia_quad/grpc/get_states_request.py) and [`exec_command_request.py`](../custom_components/bravia_quad/grpc/exec_command_request.py) building byte strings directly instead of using generated message classes, and why the client's unary callables pass a raw-bytes `request_serializer`.
 
 The full-snapshot request on the wire is an outer envelope around the inner serialized blob:
 
