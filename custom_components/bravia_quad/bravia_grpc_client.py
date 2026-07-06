@@ -141,6 +141,12 @@ class BraviaGrpcClientAsync:
         """Run when authentication fails to refresh Sony Seeds session keys."""
         self._refresh_keys_callback = callback
 
+    async def async_refresh_credentials(self) -> bool:
+        """Refresh OAuth access token and gRPC session keys via the HA callback."""
+        if self._refresh_keys_callback is None:
+            return False
+        return await self._refresh_keys_callback()
+
     def register_availability_callback(self, callback: Callable[[bool], None]) -> None:
         """Register a callback for gRPC session availability changes."""
         self._availability_callbacks.add(callback)

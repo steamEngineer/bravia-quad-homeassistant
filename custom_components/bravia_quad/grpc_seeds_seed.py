@@ -39,6 +39,44 @@ def parse_seeds_device_states(raw: dict[str, Any]) -> dict[str, Any]:
     return parsed
 
 
+async def _fetch_device_states(
+    session: Any,
+    device_id: str,
+    access_token: str,
+    credentials: dict[str, Any],
+    grpc_client: BraviaGrpcClientAsync,
+) -> dict[str, Any] | None:
+    """GET /states; refresh OAuth once on 401."""
+    try:
+        return await async_get_device_states(session, device_id, access_token)
+    except GrpcCredentialsRefreshError as err:
+        if "401" not in str(err) or not await grpc_client.async_refresh_credentials():
+            _LOGGER.debug(
+                "Seeds state seed skipped for %s: %s",
+                grpc_client.host,
+                err,
+            )
+            return None
+        refreshed_token = credentials.get("access_token")
+        if not refreshed_token:
+            _LOGGER.debug(
+                "Seeds state seed skipped for %s: no access_token after refresh",
+                grpc_client.host,
+            )
+            return None
+        try:
+            return await async_get_device_states(
+                session, device_id, str(refreshed_token)
+            )
+        except (GrpcCredentialsRefreshError, OSError) as retry_err:
+            _LOGGER.debug(
+                "Seeds state seed skipped for %s after refresh: %s",
+                grpc_client.host,
+                retry_err,
+            )
+            return None
+
+
 async def async_seed_from_seeds(
     hass: Any,
     credentials: dict[str, Any],
@@ -59,20 +97,17 @@ async def async_seed_from_seeds(
 
     session = async_get_clientsession(hass)
     try:
-        raw = await async_get_device_states(session, device_id, access_token)
-    except GrpcCredentialsRefreshError as err:
-        _LOGGER.debug(
-            "Seeds state seed skipped for %s: %s",
-            grpc_client.host,
-            err,
+        raw = await _fetch_device_states(
+            session, device_id, access_token, credentials, grpc_client
         )
-        return 0
     except OSError as err:
         _LOGGER.debug(
             "Seeds state seed skipped for %s: %s",
             grpc_client.host,
             err,
         )
+        return 0
+    if raw is None:
         return 0
 
     flat = parse_seeds_device_states(raw)

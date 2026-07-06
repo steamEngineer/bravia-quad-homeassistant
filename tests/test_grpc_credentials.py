@@ -26,8 +26,21 @@ def test_keys_need_refresh_within_buffer() -> None:
 
 
 def test_keys_need_refresh_still_valid() -> None:
-    credentials = {"session_keys_expires_at": int(time.time()) + 7200}
+    now = int(time.time())
+    credentials = {
+        "session_keys_expires_at": now + 7200,
+        "access_token_expires_at": now + 7200,
+    }
     assert keys_need_refresh(credentials) is False
+
+
+def test_keys_need_refresh_expired_access_token() -> None:
+    now = int(time.time())
+    credentials = {
+        "session_keys_expires_at": now + 86400,
+        "access_token_expires_at": now - 60,
+    }
+    assert keys_need_refresh(credentials) is True
 
 
 def test_keys_need_refresh_without_expiry() -> None:

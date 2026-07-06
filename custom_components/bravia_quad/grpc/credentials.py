@@ -188,11 +188,13 @@ def keys_need_refresh(
     *,
     buffer_seconds: int = SESSION_KEYS_REFRESH_BUFFER,
 ) -> bool:
-    """Return True when session keys are missing or near expiry."""
-    expires_at = credentials.get("session_keys_expires_at")
-    if expires_at is None:
-        return False
-    return int(time.time()) >= int(expires_at) - buffer_seconds
+    """Return True when session keys or OAuth access token are missing or near expiry."""
+    now = int(time.time())
+    session_expires = credentials.get("session_keys_expires_at")
+    if session_expires is not None and now >= int(session_expires) - buffer_seconds:
+        return True
+    access_expires = credentials.get("access_token_expires_at")
+    return access_expires is not None and now >= int(access_expires) - buffer_seconds
 
 
 def _sync_post_form(url: str, payload: dict[str, str], headers: dict[str, str]) -> dict:
