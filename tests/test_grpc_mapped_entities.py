@@ -133,6 +133,17 @@ def test_voice_zoom_none_reason_is_available() -> None:
     )
 
 
+def test_playback_command_false_availability_none_reason_is_available() -> None:
+    notify_state = {
+        "playback_control.playback_command.availability": False,
+        "playback_control.playback_command.unavailable_reason": "none",
+    }
+    assert (
+        grpc_exec_unavailable_reason(notify_state, "playback_control.playback_command")
+        is None
+    )
+
+
 def _entity_suffixes(entities: list, grpc_entry: MagicMock) -> set[str]:
     prefix = f"{DOMAIN}_{grpc_entry.unique_id}_"
     return {e._attr_unique_id.removeprefix(prefix) for e in entities}
