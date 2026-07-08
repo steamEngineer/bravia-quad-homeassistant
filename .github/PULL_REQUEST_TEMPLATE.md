@@ -27,6 +27,7 @@ changelog. Label names match .github/labels.yml descriptions.
 
 ## Checklist
 
+- [ ] The code change is tested and works locally.
 - [ ] `uv run pytest` passes, and tests have been added/updated under `tests/` where applicable.
 - [ ] `./scripts/lint` passes (Ruff + ty; or `pre-commit run --all-files` if hooks are installed).
 - [ ] User-facing strings updated in `strings.json` and `translations/en.json` when applicable.
