@@ -138,11 +138,11 @@
           "off": "Off"
         }
       },
-      "dimmer": {
-        "name": "Display dimmer",
+      "display_brightness": {
+        "name": "Display Brightness",
         "state": {
           "dark": "Dark",
-          "normal": "Normal",
+          "off": "Off",
           "bright": "Bright"
         }
       },

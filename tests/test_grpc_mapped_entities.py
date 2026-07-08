@@ -96,11 +96,17 @@ def test_dimmer_mapping_options_and_exec() -> None:
     mapping = mapping_for_grpc_path("system_setting.dimmer")
     assert mapping is not None
     assert mapping.ha_platform == "select"
-    assert ha_options_for_mapping(mapping) == ["dark", "normal", "bright"]
+    spec = entity_spec_for_mapping(mapping)
+    assert spec.translation_key == "display_brightness"
+    assert spec.unique_id_suffix == "display_brightness"
+    assert ha_options_for_mapping(mapping) == ["bright", "dark", "off"]
     kind, payload = denormalize_for_exec(mapping, "dark")
     assert kind == "string_value"
     assert payload == "dark"
     assert normalize_grpc_value(mapping, payload) == "dark"
+    kind, payload = denormalize_for_exec(mapping, "off")
+    assert kind == "string_value"
+    assert payload == "off"
 
 
 def test_auto_volume_bool_exec() -> None:

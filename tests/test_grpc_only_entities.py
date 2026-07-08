@@ -155,7 +155,7 @@ async def test_dimmer_restores_on_added_to_hass(
     spec = entity_spec_for_path(GRPC_PATH_DIMMER)
     assert spec is not None
     entity = BraviaGrpcMappedSelect(grpc_client, grpc_entry, spec)
-    entity.entity_id = f"select.{DOMAIN}_serial123_dimmer"
+    entity.entity_id = f"select.{DOMAIN}_serial123_display_brightness"
     entity.hass = hass
     entity.async_write_ha_state = MagicMock()
     grpc_client.merge_notify_cache = MagicMock()

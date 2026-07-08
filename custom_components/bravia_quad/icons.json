@@ -44,7 +44,7 @@
       "drc": {
         "default": "mdi:tune-vertical"
       },
-      "dimmer": {
+      "display_brightness": {
         "default": "mdi:brightness-6"
       },
       "imax_mode": {
