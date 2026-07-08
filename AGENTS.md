@@ -15,7 +15,7 @@
 
 - `./scripts/setup` — dependencies and pre-commit hooks
 - `uv run pytest` — test suite (parallel via pytest-xdist; use `-n0` for serial debugging)
-- `uv run ty custom_components tests` — type checking
+- `uv run ty check custom_components/bravia_quad` — type checking
 - `./scripts/lint` — Ruff lint and format
 - `./scripts/develop` — local Home Assistant (http://localhost:8123)
 
