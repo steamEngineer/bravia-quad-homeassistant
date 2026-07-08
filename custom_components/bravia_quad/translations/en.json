@@ -170,7 +170,7 @@
         }
       },
       "hdmi_standby_link": {
-        "name": "HDMI standby link",
+        "name": "HDMI standby through",
         "state": {
           "auto": "Auto",
           "on": "On",
