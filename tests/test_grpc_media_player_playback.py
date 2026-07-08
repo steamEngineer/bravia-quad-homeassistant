@@ -20,6 +20,7 @@ from custom_components.bravia_quad.grpc_media_player import (
     _PATH_AUDIO_FORMAT,
     _PATH_AVAILABLE_VALUES,
     _PATH_COMMAND_AVAILABILITY,
+    _PATH_COMMAND_UNAVAILABLE,
     _PATH_DURATION,
     _PATH_FUNCTION_UNAVAILABLE,
     _PATH_INPUT,
@@ -430,6 +431,56 @@ def test_supported_features_bool_command_availability_false(
     grpc_client.notify_state[_PATH_COMMAND_AVAILABILITY] = False
     entity = BraviaGrpcMediaPlayer(grpc_client, entry)
 
+    assert entity.supported_features == _BASE_SUPPORTED_FEATURES
+
+
+def test_supported_features_include_transport_when_availability_false_reason_none(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.notify_state.update(
+        {
+            _PATH_COMMAND_AVAILABILITY: False,
+            _PATH_COMMAND_UNAVAILABLE: "none",
+        }
+    )
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity.supported_features == (
+        _BASE_SUPPORTED_FEATURES | _transport_features()
+    )
+
+
+def test_bluetooth_keeps_transport_when_availability_false_reason_none(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.notify_state.update(
+        {
+            _PATH_INPUT: "bluetooth",
+            _PATH_COMMAND_AVAILABILITY: False,
+            _PATH_COMMAND_UNAVAILABLE: "none",
+        }
+    )
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity._attr_source == "bluetooth"
+    assert entity.supported_features == (
+        _BASE_SUPPORTED_FEATURES | _transport_features()
+    )
+
+
+def test_airplay2_hides_transport_when_availability_false_reason_none(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.notify_state.update(
+        {
+            _PATH_INPUT: "airplay",
+            _PATH_COMMAND_AVAILABILITY: False,
+            _PATH_COMMAND_UNAVAILABLE: "none",
+        }
+    )
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity._attr_source == "airplay2"
     assert entity.supported_features == _BASE_SUPPORTED_FEATURES
 
 

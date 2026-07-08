@@ -263,7 +263,11 @@ def grpc_exec_unavailable_reason(
         return str(reason)
     availability = notify_state.get(f"{base}.availability")
     if availability is False:
-        return reason if reason is not None else "unavailable"
+        if reason is None:
+            return "unavailable"
+        if str(reason).lower() in ("", "none"):
+            return None
+        return str(reason)
     return None
 
 

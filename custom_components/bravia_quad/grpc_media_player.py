@@ -408,8 +408,16 @@ class BraviaGrpcMediaPlayer(
         ):
             return False
         availability = self._grpc_client.notify_state.get(_PATH_COMMAND_AVAILABILITY)
-        if availability is None:
-            # AirPlay publishes explicit availability; Spotify often leaves it null.
+        unavailable_reason = _coerce_str(
+            self._grpc_client.notify_state.get(_PATH_COMMAND_UNAVAILABLE)
+        )
+        if availability is None or (
+            _coerce_availability_flag(availability) is False
+            and unavailable_reason is not None
+            and unavailable_reason.lower() == "none"
+        ):
+            # AirPlay publishes explicit availability; Spotify often leaves it null
+            # or sends availability=False with unavailable_reason='none'.
             return self._attr_source != "airplay2"
         return _availability_allows_action(availability, action)
 
