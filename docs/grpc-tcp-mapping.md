@@ -93,7 +93,7 @@ NOTIFY-only paths may remain `unknown` until Seeds/TCP seed succeeds, the device
 | Subwoofer level (with sub) | — | `sound_setting.volume.subwoofer` | number (-10…10) |
 | Dual mono | `audio.dualmono` | `sound_setting.dual_mono` | select |
 | BT connection quality | `bluetooth.connectionquality` | `bluetooth_setting.connection_quality` | select |
-| HDMI standby link | `hdmi.standbylink` | `system_setting.hdmi_standby_through` | select |
+| HDMI standby through | `hdmi.standbylink` | `system_setting.hdmi_standby_through` | select |
 | HDMI CEC power-off sync | — | `system_setting.cec_power_off_sync` | select |
 | IP address | `network.ipaddress` | `system_setting.ipv4_address` | sensor |
 
@@ -114,4 +114,4 @@ Features with no confirmed gRPC path or known semantic mismatch:
 | Network mode / DHCP / region / language | Not in field list |
 | Bluetooth pairing button | TCP-only |
 
-Unverified app-setting paths (`verified=False` in mapping) ship **disabled by default**: auto standby, auto update, external control, HDMI standby link, eARC.
+Unverified app-setting paths (`verified=False` in mapping) ship **disabled by default**: auto standby, auto update, external control, HDMI standby through, eARC.
