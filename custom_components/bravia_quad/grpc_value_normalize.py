@@ -15,6 +15,7 @@ from .const import (
     AUTO_UPDATE_ON,
     BASS_LEVEL_OPTIONS,
     BT_CONNECTION_QUALITY_OPTIONS,
+    CEC_POWER_OFF_SYNC_OPTIONS,
     CENTER_SPEAKER_MODE_OPTIONS,
     DRC_OPTIONS,
     DUAL_MONO_OPTIONS,
@@ -173,6 +174,9 @@ def normalize_grpc_value(mapping: GrpcTcpMapping, raw_value: Any) -> Any | None:
     if grpc_path == "speaker_sound_setting.center_speaker_mode":
         text = str(raw_value)
         return text or None
+
+    if grpc_path == "system_setting.cec_power_off_sync":
+        return str(raw_value)
 
     if grpc_path == "sound_optimization.raee.is_measured":
         return format_raee_value(raw_value)
@@ -356,6 +360,8 @@ def ha_options_for_mapping(mapping: GrpcTcpMapping) -> list[str] | None:
         return list(INPUT_OPTIONS)
     if mapping.grpc_path == "system_setting.hdmi_standby_through":
         return list(HDMI_STANDBY_LINK_OPTIONS)
+    if mapping.grpc_path == "system_setting.cec_power_off_sync":
+        return list(CEC_POWER_OFF_SYNC_OPTIONS)
     if tcp_feature == FEATURE_AUDIO_RETURN_CHANNEL:
         return list(AUDIO_RETURN_CHANNEL_OPTIONS)
     if mapping.grpc_path == "speaker_sound_setting.360ssm_height":

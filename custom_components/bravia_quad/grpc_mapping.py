@@ -321,6 +321,12 @@ GRPC_TCP_MAPPINGS: tuple[GrpcTcpMapping, ...] = (
         verified=False,
     ),
     GrpcTcpMapping(
+        "system_setting.cec_power_off_sync",
+        None,
+        "select",
+        writable=True,
+    ),
+    GrpcTcpMapping(
         "sound_setting.auto_volume",
         FEATURE_AAV,
         "switch",

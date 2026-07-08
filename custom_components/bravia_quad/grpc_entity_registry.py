@@ -71,6 +71,10 @@ _BY_TCP_FEATURE: dict[str, tuple[str, str]] = {
 }
 
 _BY_GRPC_PATH: dict[str, tuple[str, str]] = {
+    "system_setting.cec_power_off_sync": (
+        "cec_power_off_sync",
+        "cec_power_off_sync",
+    ),
     "sound_setting.dsee_ultimate": ("dsee_ultimate", "dsee_ultimate"),
     "sound_setting.dts_dialog_control": ("dts_dialog_control", "dts_dialog_control"),
     "speaker_sound_setting.360ssm_height": ("ssm_360_height", "ssm_360_height"),
