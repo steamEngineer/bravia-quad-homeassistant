@@ -450,6 +450,40 @@ def test_supported_features_include_transport_when_availability_false_reason_non
     )
 
 
+def test_bluetooth_keeps_transport_when_availability_false_reason_none(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.notify_state.update(
+        {
+            _PATH_INPUT: "bluetooth",
+            _PATH_COMMAND_AVAILABILITY: False,
+            _PATH_COMMAND_UNAVAILABLE: "none",
+        }
+    )
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity._attr_source == "bluetooth"
+    assert entity.supported_features == (
+        _BASE_SUPPORTED_FEATURES | _transport_features()
+    )
+
+
+def test_airplay2_hides_transport_when_availability_false_reason_none(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.notify_state.update(
+        {
+            _PATH_INPUT: "airplay",
+            _PATH_COMMAND_AVAILABILITY: False,
+            _PATH_COMMAND_UNAVAILABLE: "none",
+        }
+    )
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity._attr_source == "airplay2"
+    assert entity.supported_features == _BASE_SUPPORTED_FEATURES
+
+
 @pytest.mark.asyncio
 async def test_async_media_play_exec(grpc_client: MagicMock, entry: MagicMock) -> None:
     entity = BraviaGrpcMediaPlayer(grpc_client, entry)
