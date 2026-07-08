@@ -134,6 +134,8 @@ def normalize_input_source(value: Any) -> str | None:
         return None
     if text == "airplay":
         return "airplay2"
+    if text == "hdmi":
+        return "hdmi1"
     return text
 
 
@@ -141,6 +143,8 @@ def denormalize_input_source(ha_value: str) -> str:
     """Map HA/TCP source ids to gRPC playback_control.function values."""
     if ha_value == "airplay2":
         return "airplay"
+    if ha_value == "hdmi1":
+        return "hdmi"
     return ha_value
 
 

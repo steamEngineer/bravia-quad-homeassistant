@@ -264,3 +264,49 @@ def test_send_exec_command_invalid_argument_flag(
 
     assert success is False
     assert invalid is True
+
+
+def test_send_exec_command_source_switch_confirmed_by_notify(
+    grpc_client: BraviaGrpcClient,
+) -> None:
+    grpc_client._notify_state["playback_control.function"] = "hdmi"
+    with (
+        patch.object(grpc_client, "_sign_exec_auth_token", return_value=True),
+        patch(
+            "custom_components.bravia_quad.grpc.client.build_exec_command_with_auth_request",
+            return_value=b"exec-req",
+        ),
+    ):
+        unary = MagicMock()
+        unary.future.return_value.result.return_value = b""
+        grpc_client.channel.unary_unary.return_value = unary
+        success, invalid = grpc_client._send_exec_command(
+            "playback_control.function",
+            {"string_value": "hdmi"},
+        )
+
+    assert success is True
+    assert invalid is False
+
+
+def test_send_exec_command_empty_body_without_notify_still_fails(
+    grpc_client: BraviaGrpcClient,
+) -> None:
+    grpc_client._notify_state["playback_control.function"] = "tv"
+    with (
+        patch.object(grpc_client, "_sign_exec_auth_token", return_value=True),
+        patch(
+            "custom_components.bravia_quad.grpc.client.build_exec_command_with_auth_request",
+            return_value=b"exec-req",
+        ),
+    ):
+        unary = MagicMock()
+        unary.future.return_value.result.return_value = b""
+        grpc_client.channel.unary_unary.return_value = unary
+        success, invalid = grpc_client._send_exec_command(
+            "playback_control.function",
+            {"string_value": "hdmi"},
+        )
+
+    assert success is False
+    assert invalid is False
