@@ -25,10 +25,14 @@ def test_normalize_input_source_airplay() -> None:
     mapping = mapping_for_grpc_path("playback_control.function")
     assert mapping is not None
     assert normalize_grpc_value(mapping, "airplay") == "airplay2"
+    assert normalize_grpc_value(mapping, "hdmi") == "hdmi1"
     assert normalize_grpc_value(mapping, "spotify") == "spotify"
     kind, payload = denormalize_for_exec(mapping, "airplay2")
     assert kind == "string_value"
     assert payload == "airplay"
+    kind, payload = denormalize_for_exec(mapping, "hdmi1")
+    assert kind == "string_value"
+    assert payload == "hdmi"
 
 
 def test_normalize_power_bool() -> None:
