@@ -89,7 +89,6 @@ scripts/                        # Dev and optional gRPC CLI tools
 
 ```bash
 ./scripts/lint   # Ruff + ty (custom_components/bravia_quad)
-uv run ty check custom_components/bravia_quad   # type checking only
 ```
 
 ## Testing
