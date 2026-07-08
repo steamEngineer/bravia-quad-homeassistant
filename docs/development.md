@@ -88,8 +88,7 @@ scripts/                        # Dev and optional gRPC CLI tools
 [Ruff](https://docs.astral.sh/ruff/) for linting and formatting (Home Assistant standards). Python 3.14.2+.
 
 ```bash
-./scripts/lint
-uv run ty custom_components tests   # type checking
+./scripts/lint   # Ruff + ty (custom_components/bravia_quad)
 ```
 
 ## Testing
@@ -114,7 +113,7 @@ GitHub Actions on every pull request:
 
 - **Hassfest** — manifest and HA standards validation
 - **Forbidden paths** — blocks private/local artifacts and credential-shaped content
-- **Lint** — Ruff
+- **Lint** — Ruff and Ty (`custom_components/bravia_quad`)
 - **Tests** — pytest
 
 Release workflow validates version format, updates `pyproject.toml` and `manifest.json`, tags, and publishes GitHub releases.
