@@ -63,6 +63,31 @@ def test_drc_denormalize_round_trip() -> None:
     assert normalize_grpc_value(mapping, payload) == "auto"
 
 
+def test_cec_power_off_sync_mapping_and_options() -> None:
+    from custom_components.bravia_quad.grpc_value_normalize import (
+        ha_options_for_mapping,
+    )
+
+    mapping = mapping_for_grpc_path("system_setting.cec_power_off_sync")
+    assert mapping is not None
+    assert mapping.ha_platform == "select"
+    assert mapping.verified is True
+    assert ha_options_for_mapping(mapping) == ["auto", "on", "off"]
+    kind, payload = denormalize_for_exec(mapping, "auto")
+    assert kind == "string_value"
+    assert payload == "auto"
+    assert normalize_grpc_value(mapping, payload) == "auto"
+
+
+def test_cec_power_off_sync_in_mapped_select_entities(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    select_paths = {
+        e._grpc_path for e in mapped_select_entities(grpc_client, grpc_entry)
+    }
+    assert "system_setting.cec_power_off_sync" in select_paths
+
+
 def test_auto_volume_bool_exec() -> None:
     mapping = mapping_for_grpc_path("sound_setting.auto_volume")
     assert mapping is not None

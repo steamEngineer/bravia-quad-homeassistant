@@ -187,6 +187,9 @@ BT_CONNECTION_QUALITY_OPTIONS: list[str] = ["prioritysound", "priorityconnection
 # HDMI Standby Link options (API values used as translation keys)
 HDMI_STANDBY_LINK_OPTIONS: list[str] = ["auto", "on", "off"]
 
+# CEC power-off sync options (API values used as translation keys)
+CEC_POWER_OFF_SYNC_OPTIONS: list[str] = ["auto", "on", "off"]
+
 # Audio Return Channel options (API values used as translation keys)
 AUDIO_RETURN_CHANNEL_OPTIONS: list[str] = ["off", "arc", "earc"]
 

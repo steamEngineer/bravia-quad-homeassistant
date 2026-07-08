@@ -94,6 +94,7 @@ NOTIFY-only paths may remain `unknown` until Seeds/TCP seed succeeds, the device
 | Dual mono | `audio.dualmono` | `sound_setting.dual_mono` | select |
 | BT connection quality | `bluetooth.connectionquality` | `bluetooth_setting.connection_quality` | select |
 | HDMI standby link | `hdmi.standbylink` | `system_setting.hdmi_standby_through` | select |
+| CEC power-off sync | — | `system_setting.cec_power_off_sync` | select |
 | IP address | `network.ipaddress` | `system_setting.ipv4_address` | sensor |
 
 **Not aliased:** `sound_setting.dts_dialog_control` (DTS Dialog Control) is a separate gRPC-only switch from DRC.

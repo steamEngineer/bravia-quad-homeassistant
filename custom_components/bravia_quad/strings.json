@@ -160,6 +160,14 @@
           "off": "Off"
         }
       },
+      "cec_power_off_sync": {
+        "name": "CEC power-off sync",
+        "state": {
+          "auto": "Auto",
+          "on": "On",
+          "off": "Off"
+        }
+      },
       "audio_return_channel": {
         "name": "Audio Return Channel",
         "state": {

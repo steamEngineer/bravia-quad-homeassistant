@@ -59,6 +59,9 @@
       "hdmi_standby_link": {
         "default": "mdi:link-variant"
       },
+      "cec_power_off_sync": {
+        "default": "mdi:television-off"
+      },
       "audio_return_channel": {
         "default": "mdi:audio-video"
       }
