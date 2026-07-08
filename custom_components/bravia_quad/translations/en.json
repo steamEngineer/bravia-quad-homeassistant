@@ -138,6 +138,14 @@
           "off": "Off"
         }
       },
+      "dimmer": {
+        "name": "Display dimmer",
+        "state": {
+          "dark": "Dark",
+          "normal": "Normal",
+          "bright": "Bright"
+        }
+      },
       "imax_mode": {
         "name": "IMAX Enhanced",
         "state": {

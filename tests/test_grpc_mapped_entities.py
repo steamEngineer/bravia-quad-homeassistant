@@ -88,6 +88,21 @@ def test_cec_power_off_sync_in_mapped_select_entities(
     assert "system_setting.cec_power_off_sync" in select_paths
 
 
+def test_dimmer_mapping_options_and_exec() -> None:
+    from custom_components.bravia_quad.grpc_value_normalize import (
+        ha_options_for_mapping,
+    )
+
+    mapping = mapping_for_grpc_path("system_setting.dimmer")
+    assert mapping is not None
+    assert mapping.ha_platform == "select"
+    assert ha_options_for_mapping(mapping) == ["dark", "normal", "bright"]
+    kind, payload = denormalize_for_exec(mapping, "dark")
+    assert kind == "string_value"
+    assert payload == "dark"
+    assert normalize_grpc_value(mapping, payload) == "dark"
+
+
 def test_auto_volume_bool_exec() -> None:
     mapping = mapping_for_grpc_path("sound_setting.auto_volume")
     assert mapping is not None

@@ -190,6 +190,9 @@ HDMI_STANDBY_LINK_OPTIONS: list[str] = ["auto", "on", "off"]
 # CEC power-off sync options (API values used as translation keys)
 CEC_POWER_OFF_SYNC_OPTIONS: list[str] = ["auto", "on", "off"]
 
+# Display dimmer options (API values used as translation keys)
+DIMMER_OPTIONS: list[str] = ["dark", "normal", "bright"]
+
 # Audio Return Channel options (API values used as translation keys)
 AUDIO_RETURN_CHANNEL_OPTIONS: list[str] = ["off", "arc", "earc"]
 

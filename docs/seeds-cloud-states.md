@@ -47,9 +47,9 @@ Seeds values are stored in the gRPC notify cache **as returned** (gRPC-native ty
 
 | gRPC path | Seeds present (probe) | HA entity | Notes |
 |-----------|----------------------|-----------|-------|
-| All 9 `NOTIFY_ONLY_GRPC_PATHS` | Yes | switch/select | Primary gRPC-mode read path |
+| All `NOTIFY_ONLY_GRPC_PATHS` (incl. dimmer) | Yes | switch/select | Primary gRPC-mode read path |
 | `sound_setting.sound_effect` | Yes | select | Not in notify-only list; unreadable via GetStates |
-| `system_setting.dimmer` | Yes | — | No HA entity yet; captured for future use |
+| `system_setting.dimmer` | Yes | select | Notify-only; Seeds seed when `grpc_seeds_poll` enabled |
 
 Enum strings match gRPC exec values (`"auto"`, `"mid"`, `"Neural:X"`, etc.). Booleans are JSON `true`/`false` (e.g. DSEE, eARC enabled).
 

@@ -114,6 +114,7 @@ def test_grpc_path_needs_ha_restore() -> None:
 
     assert grpc_path_needs_ha_restore("sound_setting.drc") is True
     assert grpc_path_needs_ha_restore("sound_setting.dsee_ultimate") is True
+    assert grpc_path_needs_ha_restore("system_setting.dimmer") is True
     assert grpc_path_needs_ha_restore("sound_setting.dts_dialog_control") is True
     assert (
         grpc_path_needs_ha_restore("speaker_sound_setting.center_speaker_mode") is True

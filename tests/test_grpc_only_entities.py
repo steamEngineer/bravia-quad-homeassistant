@@ -24,6 +24,7 @@ from custom_components.bravia_quad.helpers import (
 )
 
 GRPC_PATH_DSEE = "sound_setting.dsee_ultimate"
+GRPC_PATH_DIMMER = "system_setting.dimmer"
 GRPC_PATH_DTS_DIALOG = "sound_setting.dts_dialog_control"
 GRPC_PATH_SSM360_HEIGHT = "speaker_sound_setting.360ssm_height"
 
@@ -40,6 +41,7 @@ def test_mapped_grpc_switch_and_select_factories_include_former_handcrafted(
     assert GRPC_PATH_DSEE in switch_paths
     assert GRPC_PATH_DTS_DIALOG in switch_paths
     assert GRPC_PATH_SSM360_HEIGHT in select_paths
+    assert GRPC_PATH_DIMMER in select_paths
     assert "speaker_sound_setting.center_speaker_mode" in select_paths
 
 
@@ -144,6 +146,31 @@ async def test_ssm_height_restores_on_added_to_hass(
     grpc_client.merge_notify_cache.assert_called_once_with(
         {GRPC_PATH_SSM360_HEIGHT: "high"}
     )
+
+
+@pytest.mark.asyncio
+async def test_dimmer_restores_on_added_to_hass(
+    hass: HomeAssistant, grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    spec = entity_spec_for_path(GRPC_PATH_DIMMER)
+    assert spec is not None
+    entity = BraviaGrpcMappedSelect(grpc_client, grpc_entry, spec)
+    entity.entity_id = f"select.{DOMAIN}_serial123_dimmer"
+    entity.hass = hass
+    entity.async_write_ha_state = MagicMock()
+    grpc_client.merge_notify_cache = MagicMock()
+    grpc_client.notify_state = {}
+
+    async_get(hass).last_states[entity.entity_id] = StoredState(
+        State(entity.entity_id, "dark"),
+        None,
+        datetime.now(tz=UTC),
+    )
+
+    await entity.async_added_to_hass()
+
+    assert entity._attr_current_option == "dark"
+    grpc_client.merge_notify_cache.assert_called_once_with({GRPC_PATH_DIMMER: "dark"})
 
 
 @pytest.mark.asyncio

@@ -124,5 +124,6 @@ async def test_backfill_uses_tcp_when_seeds_disabled() -> None:
 
 def test_seeds_seed_paths_cover_notify_only_and_sound_effect() -> None:
     assert "sound_setting.drc" in SEEDS_SEED_PATHS
+    assert "system_setting.dimmer" in SEEDS_SEED_PATHS
     assert "sound_setting.sound_effect" in SEEDS_SEED_PATHS
-    assert len(SEEDS_SEED_PATHS) == 10
+    assert len(SEEDS_SEED_PATHS) == 11
