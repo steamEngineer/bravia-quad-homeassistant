@@ -91,6 +91,7 @@ _PLAYBACK_EXEC: dict[str, tuple[str, str, str]] = {
     "play": (_PATH_PLAYBACK_COMMAND, "string_value", "play"),
     "pause": (_PATH_PLAYBACK_COMMAND, "string_value", "pause"),
     "next_track": (_PATH_PLAYBACK_COMMAND, "string_value", "next"),
+    "previous_track": (_PATH_PLAYBACK_COMMAND, "string_value", "prev"),
 }
 
 _NOW_PLAYING_PATHS: frozenset[str] = frozenset(
@@ -198,6 +199,7 @@ _TRANSPORT_FEATURE_BY_ACTION: dict[str, MediaPlayerEntityFeature] = {
     "play": MediaPlayerEntityFeature.PLAY,
     "pause": MediaPlayerEntityFeature.PAUSE,
     "next_track": MediaPlayerEntityFeature.NEXT_TRACK,
+    "previous_track": MediaPlayerEntityFeature.PREVIOUS_TRACK,
 }
 
 _CORE_PATHS: frozenset[str] = frozenset(
@@ -219,7 +221,7 @@ _PLAYBACK_BACKFILL_PATHS: tuple[str, ...] = (
 
 _ACTION_DEVICE_TOKENS: dict[str, str] = {
     "next_track": "next",
-    "previous_track": "previous",
+    "previous_track": "prev",
 }
 
 _POSITION_WRITE_INTERVAL = 5.0
@@ -765,7 +767,7 @@ class BraviaGrpcMediaPlayer(
         """Refresh HA state after transport exec once notify confirms (or timeout)."""
         deadline = time.monotonic() + confirm_seconds
         while time.monotonic() < deadline:
-            if action == "next_track":
+            if action in ("next_track", "previous_track"):
                 if self._grpc_client.notify_state.get(_PATH_TITLE) != before_title:
                     break
             elif action == "pause":
@@ -799,6 +801,10 @@ class BraviaGrpcMediaPlayer(
     async def async_media_next_track(self) -> None:
         """Skip to the next track."""
         await self._async_exec_playback("next_track")
+
+    async def async_media_previous_track(self) -> None:
+        """Skip to the previous track."""
+        await self._async_exec_playback("previous_track")
 
     async def async_select_sound_mode(self, sound_mode: str) -> None:
         """Select sound field mode."""

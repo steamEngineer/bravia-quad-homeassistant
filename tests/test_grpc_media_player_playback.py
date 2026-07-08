@@ -371,12 +371,13 @@ def test_supported_features_exclude_transport_when_power_off(
 def test_supported_features_respect_command_availability(
     grpc_client: MagicMock, entry: MagicMock
 ) -> None:
-    grpc_client.notify_state[_PATH_COMMAND_AVAILABILITY] = "play pause next"
+    grpc_client.notify_state[_PATH_COMMAND_AVAILABILITY] = "play pause next prev"
     entity = BraviaGrpcMediaPlayer(grpc_client, entry)
 
     assert entity.supported_features & MediaPlayerEntityFeature.PLAY
     assert entity.supported_features & MediaPlayerEntityFeature.PAUSE
     assert entity.supported_features & MediaPlayerEntityFeature.NEXT_TRACK
+    assert entity.supported_features & MediaPlayerEntityFeature.PREVIOUS_TRACK
 
 
 def test_supported_features_string_availability_maps_next_track(
@@ -386,6 +387,15 @@ def test_supported_features_string_availability_maps_next_track(
     entity = BraviaGrpcMediaPlayer(grpc_client, entry)
 
     assert entity.supported_features & MediaPlayerEntityFeature.NEXT_TRACK
+
+
+def test_supported_features_string_availability_maps_previous_track(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.notify_state[_PATH_COMMAND_AVAILABILITY] = "play pause next prev"
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity.supported_features & MediaPlayerEntityFeature.PREVIOUS_TRACK
 
 
 def test_supported_features_int_availability_true(
@@ -523,6 +533,21 @@ async def test_async_media_next_track_exec(
         "playback_control.playback_command",
         "string_value",
         "next",
+    )
+
+
+@pytest.mark.asyncio
+async def test_async_media_previous_track_exec(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    await entity.async_media_previous_track()
+
+    grpc_client.async_exec_denormalized.assert_awaited_once_with(
+        "playback_control.playback_command",
+        "string_value",
+        "prev",
     )
 
 
