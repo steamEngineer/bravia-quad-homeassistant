@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.switch import SwitchEntity
 from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 
 from .const import (
     AAV_OFF,
@@ -75,6 +76,16 @@ async def async_setup_entry(
     if data.transport == TRANSPORT_GRPC:
         if data.grpc_client is None:
             return
+        # Legacy select → gRPC switch; TCP transport keeps tri-state select.
+        registry = er.async_get(hass)
+        arc_unique_id = f"{DOMAIN}_{entry.unique_id}_audio_return_channel"
+        for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
+            if (
+                entity_entry.entity_id.startswith("select.")
+                and entity_entry.unique_id == arc_unique_id
+            ):
+                registry.async_remove(entity_entry.entity_id)
+                break
         async_add_entities(
             mapped_switch_entities(data.grpc_client, entry),
             update_before_add=True,
