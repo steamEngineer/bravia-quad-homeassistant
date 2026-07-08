@@ -297,6 +297,9 @@
       },
       "dts_dialog_control": {
         "name": "DTS Dialog Control"
+      },
+      "audio_return_channel": {
+        "name": "ARC (TV)"
       }
     },
     "sensor": {

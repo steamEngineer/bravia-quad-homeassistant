@@ -102,6 +102,9 @@
       },
       "external_control": {
         "default": "mdi:remote"
+      },
+      "audio_return_channel": {
+        "default": "mdi:audio-video"
       }
     },
     "sensor": {
