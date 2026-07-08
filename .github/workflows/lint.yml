@@ -74,7 +74,7 @@ jobs:
         if: >-
           github.event_name == 'push' ||
           needs.changes.outputs.code == 'true'
-        run: uv python install 3.14.2
+        run: uv python install 3.14.6
 
       - name: Lint
         if: >-
@@ -122,7 +122,7 @@ jobs:
         if: >-
           github.event_name == 'push' ||
           needs.changes.outputs.code == 'true'
-        run: uv python install 3.14.2
+        run: uv python install 3.14.6
 
       - name: Install dependencies
         if: >-
