@@ -27,6 +27,7 @@ GRPC_PATH_DSEE = "sound_setting.dsee_ultimate"
 GRPC_PATH_DIMMER = "system_setting.dimmer"
 GRPC_PATH_DTS_DIALOG = "sound_setting.dts_dialog_control"
 GRPC_PATH_SSM360_HEIGHT = "speaker_sound_setting.360ssm_height"
+GRPC_PATH_EARC = "system_setting.earc"
 
 
 def test_mapped_grpc_switch_and_select_factories_include_former_handcrafted(
@@ -40,9 +41,11 @@ def test_mapped_grpc_switch_and_select_factories_include_former_handcrafted(
     }
     assert GRPC_PATH_DSEE in switch_paths
     assert GRPC_PATH_DTS_DIALOG in switch_paths
+    assert GRPC_PATH_EARC in switch_paths
     assert GRPC_PATH_SSM360_HEIGHT in select_paths
     assert GRPC_PATH_DIMMER in select_paths
     assert "speaker_sound_setting.center_speaker_mode" in select_paths
+    assert GRPC_PATH_EARC not in select_paths
 
 
 @pytest.mark.asyncio
@@ -68,6 +71,31 @@ async def test_restore_notify_only_switch_seeds_cache(
     assert restored is True
     assert entity._attr_is_on is True
     grpc_client.merge_notify_cache.assert_called_once_with({GRPC_PATH_DSEE: True})
+
+
+@pytest.mark.asyncio
+async def test_restore_notify_only_earc_switch_seeds_cache(
+    hass: HomeAssistant, grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    spec = entity_spec_for_path(GRPC_PATH_EARC)
+    assert spec is not None
+    entity = BraviaGrpcMappedSwitch(grpc_client, grpc_entry, spec)
+    entity.entity_id = f"switch.{DOMAIN}_serial123_audio_return_channel"
+    entity.hass = hass
+    entity._attr_is_on = None
+    grpc_client.merge_notify_cache = MagicMock()
+
+    async_get(hass).last_states[entity.entity_id] = StoredState(
+        State(entity.entity_id, "on"),
+        None,
+        datetime.now(tz=UTC),
+    )
+
+    restored = await restore_notify_only_switch(entity, grpc_client, GRPC_PATH_EARC)
+
+    assert restored is True
+    assert entity._attr_is_on is True
+    grpc_client.merge_notify_cache.assert_called_once_with({GRPC_PATH_EARC: True})
 
 
 @pytest.mark.asyncio

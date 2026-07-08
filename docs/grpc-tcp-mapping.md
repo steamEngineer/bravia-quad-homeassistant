@@ -108,11 +108,12 @@ Features with no confirmed gRPC path or known semantic mismatch:
 
 | TCP feature | Reason |
 |-------------|--------|
-| `hdmi.audioreturnchannel` | Proto `system_setting.earc` is bool; tri-state select unverified |
 | `hdmi.passthrough` | No confirmed path (`hdmi_signal_format` candidate) |
 | `audio.360ssm` | Not in field list (distinct from 360SSM height) |
 | `system.temperature` | Not in field list |
 | Network mode / DHCP / region / language | Not in field list |
 | Bluetooth pairing button | TCP-only |
 
-Unverified app-setting paths (`verified=False` in mapping) ship **disabled by default**: auto standby, auto update, external control, HDMI standby through, eARC.
+Unverified app-setting paths (`verified=False` in mapping) ship **disabled by default**: auto standby, auto update, external control, HDMI standby through.
+
+**eARC / audio return (`system_setting.earc`):** gRPC mode exposes a **switch** (on/off). ExecCommand uses **bool** (`true` = audio return on, `false` = off). Seeds and TCP seed map `arc`/`earc` → on, `off` → off. **TCP mode** keeps the tri-state select (`off` / `arc` / `earc`). ARC vs eARC is negotiated with the TV (TCP may report `arc` while Seeds is `true`). Live-validated on fw 001.454.

@@ -155,11 +155,15 @@ def test_bt_quality_value_map() -> None:
     assert payload == "stable_connection"
 
 
-def test_earc_bool_normalizes_to_select_option() -> None:
+def test_earc_normalizes_to_bool_for_grpc_switch() -> None:
     mapping = mapping_for_grpc_path("system_setting.earc")
     assert mapping is not None
-    assert normalize_grpc_value(mapping, True) == "earc"
-    assert normalize_grpc_value(mapping, False) == "off"
+    assert mapping.ha_platform == "switch"
+    assert normalize_grpc_value(mapping, True) is True
+    assert normalize_grpc_value(mapping, False) is False
+    assert normalize_grpc_value(mapping, "arc") is True
+    assert normalize_grpc_value(mapping, "earc") is True
+    assert normalize_grpc_value(mapping, "off") is False
 
 
 def test_volume_denormalize_uses_int_value() -> None:
@@ -203,5 +207,12 @@ def test_tcp_seed_denormalize_aav_bool() -> None:
 def test_tcp_seed_denormalize_earc() -> None:
     mapping = mapping_for_grpc_path("system_setting.earc")
     assert mapping is not None
-    _, value = denormalize_for_exec(mapping, "earc")
-    assert value == "earc"
+    kind_earc, value_earc = denormalize_for_exec(mapping, "earc")
+    kind_arc, value_arc = denormalize_for_exec(mapping, "arc")
+    kind_off, value_off = denormalize_for_exec(mapping, "off")
+    assert kind_earc == "bool_value"
+    assert value_earc is True
+    assert kind_arc == "bool_value"
+    assert value_arc is True
+    assert kind_off == "bool_value"
+    assert value_off is False

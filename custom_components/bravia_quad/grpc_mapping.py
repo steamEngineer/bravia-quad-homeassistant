@@ -307,11 +307,11 @@ GRPC_TCP_MAPPINGS: tuple[GrpcTcpMapping, ...] = (
     GrpcTcpMapping(
         "system_setting.earc",
         FEATURE_AUDIO_RETURN_CHANNEL,
-        "select",
+        "switch",
         writable=True,
         app_setting_id="system_setting.earc",
-        verified=False,
-        notes="Proto bool; tri-state parity unverified — live spike required",
+        verified=True,
+        notes="Exec bool on/off; Seeds bool; TCP arc/earc both → true",
     ),
     GrpcTcpMapping(
         "system_setting.hdmi_standby_through",

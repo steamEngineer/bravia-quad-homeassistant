@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Any, Literal
 from .const import (
     AAV_OFF,
     AAV_ON,
-    AUDIO_RETURN_CHANNEL_OPTIONS,
     AUTO_STANDBY_OFF,
     AUTO_STANDBY_ON,
     AUTO_UPDATE_OFF,
@@ -233,20 +232,16 @@ def normalize_grpc_value(mapping: GrpcTcpMapping, raw_value: Any) -> Any | None:
             return "on" if raw_value else "off"
         return str(raw_value)
 
-    if (
-        grpc_path == "system_setting.earc"
-        or tcp_feature == FEATURE_AUDIO_RETURN_CHANNEL
-    ):
+    if grpc_path == "system_setting.earc":
         if isinstance(raw_value, bool):
-            return "earc" if raw_value else "off"
+            return raw_value
         text = str(raw_value).lower()
-        if text in ("true", "1", "earc"):
-            return "earc"
         if text in ("false", "0", "off"):
-            return "off"
-        if text == "arc":
-            return "arc"
-        return str(raw_value)
+            return False
+        if text in ("true", "1", "on", "arc", "earc"):
+            return True
+        coerced = coerce_bool(raw_value)
+        return coerced if coerced is not None else raw_value
 
     if tcp_feature == FEATURE_BT_CONNECTION_QUALITY:
         text = str(raw_value).lower()
@@ -344,6 +339,20 @@ def denormalize_for_exec(
             SOUND_EFFECT_HA_TO_DEVICE.get(str(ha_value), str(ha_value)),
         )
 
+    if (
+        grpc_path == "system_setting.earc"
+        or tcp_feature == FEATURE_AUDIO_RETURN_CHANNEL
+    ):
+        text = str(ha_value).lower()
+        if text in ("off", "false", "0"):
+            return ("bool_value", False)
+        if text in ("arc", "earc", "on", "true", "1"):
+            return ("bool_value", True)
+        coerced = coerce_bool(ha_value)
+        if coerced is not None:
+            return ("bool_value", coerced)
+        return ("bool_value", bool(ha_value))
+
     if mapping.ha_platform == "number":
         return ("int_value", int(ha_value))
 
@@ -370,8 +379,6 @@ def ha_options_for_mapping(mapping: GrpcTcpMapping) -> list[str] | None:
         return list(HDMI_STANDBY_LINK_OPTIONS)
     if mapping.grpc_path == "system_setting.cec_power_off_sync":
         return list(CEC_POWER_OFF_SYNC_OPTIONS)
-    if tcp_feature == FEATURE_AUDIO_RETURN_CHANNEL:
-        return list(AUDIO_RETURN_CHANNEL_OPTIONS)
     if mapping.grpc_path == "speaker_sound_setting.360ssm_height":
         return list(SSM360_HEIGHT_OPTIONS)
     if mapping.grpc_path == "speaker_sound_setting.center_speaker_mode":
