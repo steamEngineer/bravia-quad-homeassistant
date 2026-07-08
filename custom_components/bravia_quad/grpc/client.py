@@ -1063,20 +1063,6 @@ class BraviaGrpcClient:
                 return False
         return False
 
-    def _exec_confirmed_by_notify(
-        self,
-        command_path: str,
-        exec_kwargs: dict[str, int | bool | str],
-    ) -> bool:
-        """Source switches may return empty RPC bodies; notify confirms them."""
-        if command_path != "playback_control.function":
-            return False
-        expected = exec_kwargs.get("string_value")
-        if not isinstance(expected, str) or not expected:
-            return False
-        actual = self._notify_state.get(command_path)
-        return isinstance(actual, str) and actual == expected
-
     def _send_exec_command(
         self,
         command_path: str,
@@ -1117,12 +1103,6 @@ class BraviaGrpcClient:
                 resp = ExecCommandWithAuthResponse()
                 resp.ParseFromString(response)
                 success = resp.success
-            if (
-                not success
-                and not response
-                and self._exec_confirmed_by_notify(command_path, exec_kwargs)
-            ):
-                success = True
             unavailable = grpc_exec_unavailable_reason(self._notify_state, command_path)
             if (
                 success
