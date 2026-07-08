@@ -9,7 +9,31 @@
     "automerge": true
   },
   "commitMessagePrefix": "⬆️",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "uv python install pins in GitHub Actions workflows",
+      "managerFilePatterns": ["/^\\.github\\/workflows\\/.*\\.ya?ml$/"],
+      "matchStrings": [
+        "run: uv python install (?<currentValue>\\d+\\.\\d+\\.\\d+)"
+      ],
+      "datasourceTemplate": "python-version",
+      "depNameTemplate": "python",
+      "versioningTemplate": "python"
+    }
+  ],
   "packageRules": [
+    {
+      "description": "Group .python-version and CI uv python install pins in one PR",
+      "matchDepNames": ["python"],
+      "groupName": "python"
+    },
+    {
+      "description": "Keep pyproject requires-python at the HA minimum; bump manually",
+      "matchManagers": ["pep621"],
+      "matchDepNames": ["python"],
+      "enabled": false
+    },
     {
       "matchManagers": ["pep621"],
       "addLabels": ["python"]
