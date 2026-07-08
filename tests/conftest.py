@@ -42,12 +42,21 @@ def frida_fixture_dir() -> Path:
 
 
 def get_entity_id_by_unique_id_suffix(
-    entity_registry: er.EntityRegistry, suffix: str
+    entity_registry: er.EntityRegistry,
+    suffix: str,
+    *,
+    platform: str | None = None,
 ) -> str | None:
     """Get entity_id from the registry by unique_id suffix."""
     for entry in entity_registry.entities.values():
-        if entry.unique_id and entry.unique_id.endswith(suffix):
-            return entry.entity_id
+        if not entry.unique_id or not entry.unique_id.endswith(suffix):
+            continue
+        if platform is not None and entry.domain != platform:
+            continue
+        # `_volume` also matches `_advanced_auto_volume` via endswith.
+        if suffix == "_volume" and entry.unique_id.endswith("_advanced_auto_volume"):
+            continue
+        return entry.entity_id
     return None
 
 
@@ -356,6 +365,20 @@ def platforms() -> list[Platform]:
     ]
 
 
+async def _await_entity_states(
+    hass: HomeAssistant, entity_ids: list[str], *, attempts: int = 50
+) -> None:
+    """Wait for enabled entities to appear in the state machine after reload."""
+    for entity_id in entity_ids:
+        for _ in range(attempts):
+            if hass.states.get(entity_id) is not None:
+                break
+            await hass.async_block_till_done()
+        else:
+            msg = f"Entity state not available after reload: {entity_id}"
+            raise AssertionError(msg)
+
+
 async def _setup_integration_with_suffixes_enabled(
     hass: HomeAssistant,
     mock_config_entry: MockConfigEntry,
@@ -385,6 +408,7 @@ async def _setup_integration_with_suffixes_enabled(
         with patch("custom_components.bravia_quad.PLATFORMS", platforms):
             await hass.config_entries.async_reload(mock_config_entry.entry_id)
             await hass.async_block_till_done()
+        await _await_entity_states(hass, entities_to_enable)
 
     return mock_config_entry
 
@@ -453,6 +477,7 @@ async def init_integration_all(
         with patch("custom_components.bravia_quad.PLATFORMS", platforms):
             await hass.config_entries.async_reload(mock_config_entry.entry_id)
             await hass.async_block_till_done()
+        await _await_entity_states(hass, entities_to_enable)
 
     return mock_config_entry
 
