@@ -34,6 +34,6 @@ The table below lists the core entities shared with or superseded by gRPC mode. 
 gRPC mode exposes ~40 mapped entities via [grpc-tcp-mapping.md](grpc-tcp-mapping.md), including:
 
 - **Media player** — power, volume, mute, source, sound field mode (`sound_setting.sound_effect`), now-playing metadata, and play/pause/next/previous on streaming inputs
-- **gRPC-only controls** — CEC power-off sync, DSEE Ultimate, 360SSM height, center speaker, DTS Dialog Control, subwoofer level (with sub), dual mono, and more
+- **gRPC-only controls** — HDMI CEC power-off sync, DSEE Ultimate, 360SSM height, center speaker, DTS Dialog Control, subwoofer level (with sub), dual mono, and more
 
 Input source and sound field mode are on the media player only (no standalone select entities). Some settings may show `unknown` until changed or restored — see [sony-grpc-reference.md](sony-grpc-reference.md#notify-only-paths).

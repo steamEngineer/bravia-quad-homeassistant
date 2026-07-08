@@ -178,7 +178,7 @@
         }
       },
       "cec_power_off_sync": {
-        "name": "CEC power-off sync",
+        "name": "HDMI CEC power-off sync",
         "state": {
           "auto": "Auto",
           "on": "On",
