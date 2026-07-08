@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.components.number import NumberMode
@@ -21,6 +21,7 @@ from custom_components.bravia_quad.grpc_entity_registry import (
     entity_spec_for_path,
 )
 from custom_components.bravia_quad.grpc_mapped_entities import (
+    BraviaGrpcBassLevelSelect,
     BraviaGrpcMappedSelect,
     BraviaGrpcMappedSwitch,
     mapped_number_entities,
@@ -219,6 +220,32 @@ def test_bass_select_shows_min_mid_max_not_int(
     entities = mapped_select_entities(grpc_client, grpc_entry)
     bass = next(e for e in entities if e._attr_unique_id.endswith("_bass_level_select"))
     assert bass._attr_current_option == expected
+    assert bass._attr_options == ["min", "mid", "max"]
+
+
+async def test_bass_select_sync_after_exec_keeps_enum_labels(
+    hass: HomeAssistant,
+    grpc_client: MagicMock,
+    grpc_entry: MagicMock,
+) -> None:
+    """Post-exec sync must keep min/mid/max labels, not TCP ints 0/1/2."""
+    grpc_client.notify_state = {"sound_setting.volume.bass": "max"}
+
+    async def _exec(path: str, kind: str, payload: str) -> bool:
+        grpc_client.notify_state["sound_setting.volume.bass"] = payload
+        return True
+
+    grpc_client.async_exec_denormalized = AsyncMock(side_effect=_exec)
+    mapping = mapping_for_grpc_path("sound_setting.volume.bass")
+    assert mapping is not None
+    spec = entity_spec_for_mapping(mapping)
+    bass = BraviaGrpcBassLevelSelect(grpc_client, grpc_entry, spec)
+    bass.hass = hass
+    bass.async_write_ha_state = MagicMock()
+
+    await bass.async_select_option("min")
+
+    assert bass._attr_current_option == "min"
     assert bass._attr_options == ["min", "mid", "max"]
 
 

@@ -421,6 +421,16 @@ class BraviaGrpcBassLevelSelect(BraviaGrpcMappedSelect):
         self._attr_current_option = option
         self.async_write_ha_state()
 
+    def _sync_select_from_notify(self) -> None:
+        option = _coerce_bass_option(
+            normalize_grpc_value(
+                self._spec.mapping,
+                self._grpc_client.notify_state.get(self._grpc_path),
+            )
+        )
+        if option is not None:
+            self._attr_current_option = option
+
 
 def _number_range(mapping: GrpcTcpMapping) -> tuple[float, float]:  # noqa: PLR0911
     if mapping.grpc_path == "sound_setting.volume.subwoofer":
