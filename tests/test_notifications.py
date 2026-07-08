@@ -241,20 +241,6 @@ async def test_switch_notification_updates_state(
 # --- Number Notification State Update Tests ---
 
 
-def _get_entity_id_by_unique_id_suffix_and_platform(
-    entity_registry: er.EntityRegistry, suffix: str, platform: str
-) -> str | None:
-    """Get entity_id from the registry by unique_id suffix and platform."""
-    for entry in entity_registry.entities.values():
-        if (
-            entry.unique_id
-            and entry.unique_id.endswith(suffix)
-            and entry.entity_id.startswith(f"{platform}.")
-        ):
-            return entry.entity_id
-    return None
-
-
 @pytest.mark.parametrize(
     "test_case",
     NUMBER_TEST_CASES,
@@ -268,8 +254,8 @@ async def test_number_notification_updates_state(
     test_case: NumberTestCase,
 ) -> None:
     """Test that number notifications update entity state."""
-    entity_id = _get_entity_id_by_unique_id_suffix_and_platform(
-        entity_registry, test_case.entity_suffix, "number"
+    entity_id = get_entity_id_by_unique_id_suffix(
+        entity_registry, test_case.entity_suffix, platform="number"
     )
     assert entity_id is not None, f"Entity {test_case.entity_suffix} not found"
 
