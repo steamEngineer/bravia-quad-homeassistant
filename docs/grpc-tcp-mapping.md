@@ -49,7 +49,8 @@ Verified on HT-A9M2 (fw 001.454). Spotify and AirPlay share the same command map
 | `media_player.media_play` | `playback_control.playback_command` | `string_value=play` | Confirmed |
 | `media_player.media_pause` | `playback_control.playback_command` | `string_value=pause` | Confirmed |
 | `media_player.media_next_track` | `playback_control.playback_command` | `string_value=next` | Confirmed |
-| — | `playback_control.playback_command` | `string_value=previous` | Exec failed in testing |
+| `media_player.media_previous_track` | `playback_control.playback_command` | `string_value=prev` | Confirmed (AirPlay live probe 2026-07-07) |
+| — | `playback_control.playback_command` | `string_value=previous` | Exec failed (wrong token) |
 | — | `playback_control.playback_command` | `string_value=stop` | Not implemented in HA |
 | — | `playback_control.position` | `int_value=<seconds>` | Seek not supported |
 
