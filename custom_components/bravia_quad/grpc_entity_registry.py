@@ -75,6 +75,7 @@ _BY_GRPC_PATH: dict[str, tuple[str, str]] = {
         "cec_power_off_sync",
         "cec_power_off_sync",
     ),
+    "system_setting.dimmer": ("display_brightness", "display_brightness"),
     "sound_setting.dsee_ultimate": ("dsee_ultimate", "dsee_ultimate"),
     "sound_setting.dts_dialog_control": ("dts_dialog_control", "dts_dialog_control"),
     "speaker_sound_setting.360ssm_height": ("ssm_360_height", "ssm_360_height"),

@@ -17,6 +17,7 @@ from .const import (
     BT_CONNECTION_QUALITY_OPTIONS,
     CEC_POWER_OFF_SYNC_OPTIONS,
     CENTER_SPEAKER_MODE_OPTIONS,
+    DIMMER_OPTIONS,
     DRC_OPTIONS,
     DUAL_MONO_OPTIONS,
     EXTERNAL_CONTROL_OFF,
@@ -179,7 +180,10 @@ def normalize_grpc_value(mapping: GrpcTcpMapping, raw_value: Any) -> Any | None:
         text = str(raw_value)
         return text or None
 
-    if grpc_path == "system_setting.cec_power_off_sync":
+    if grpc_path in (
+        "system_setting.cec_power_off_sync",
+        "system_setting.dimmer",
+    ):
         return str(raw_value)
 
     if grpc_path == "sound_optimization.raee.is_measured":
@@ -374,4 +378,6 @@ def ha_options_for_mapping(mapping: GrpcTcpMapping) -> list[str] | None:
         return list(CENTER_SPEAKER_MODE_OPTIONS)
     if mapping.grpc_path == "sound_setting.sound_effect":
         return list(SOUND_EFFECT_OPTIONS)
+    if mapping.grpc_path == "system_setting.dimmer":
+        return list(DIMMER_OPTIONS)
     return None

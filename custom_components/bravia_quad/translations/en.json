@@ -138,6 +138,14 @@
           "off": "Off"
         }
       },
+      "display_brightness": {
+        "name": "Display Brightness",
+        "state": {
+          "dark": "Dark",
+          "off": "Off",
+          "bright": "Bright"
+        }
+      },
       "imax_mode": {
         "name": "IMAX Enhanced",
         "state": {

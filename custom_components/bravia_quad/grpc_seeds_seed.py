@@ -19,7 +19,7 @@ _SOUND_EFFECT_PATH = "sound_setting.sound_effect"
 
 # Paths filled from Seeds when unset in notify cache (see docs/seeds-cloud-states.md).
 SEEDS_SEED_PATHS: frozenset[str] = frozenset(NOTIFY_ONLY_GRPC_PATHS) | {
-    _SOUND_EFFECT_PATH
+    _SOUND_EFFECT_PATH,
 }
 
 

@@ -67,6 +67,7 @@ NOTIFY_ONLY_GRPC_PATHS: tuple[str, ...] = (
     "system_setting.auto_standby",
     "system_setting.auto_update",
     "system_setting.external_control",
+    "system_setting.dimmer",
 )
 
 NOTIFY_ONLY_GRPC_PATHS_SET: frozenset[str] = frozenset(NOTIFY_ONLY_GRPC_PATHS)
@@ -346,6 +347,12 @@ GRPC_TCP_MAPPINGS: tuple[GrpcTcpMapping, ...] = (
         "switch",
         writable=True,
         notes="DTS Dialog Control; separate from DRC",
+    ),
+    GrpcTcpMapping(
+        "system_setting.dimmer",
+        None,
+        "select",
+        writable=True,
     ),
 )
 

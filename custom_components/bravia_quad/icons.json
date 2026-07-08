@@ -44,6 +44,9 @@
       "drc": {
         "default": "mdi:tune-vertical"
       },
+      "display_brightness": {
+        "default": "mdi:brightness-6"
+      },
       "imax_mode": {
         "default": "mdi:filmstrip"
       },

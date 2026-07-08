@@ -88,6 +88,7 @@ NOTIFY-only paths may remain `unknown` until Seeds/TCP seed succeeds, the device
 | HA entity | TCP feature | gRPC path | Platform |
 |-----------|-------------|-----------|----------|
 | Dynamic Range Compressor | `audio.drangecomp` | `sound_setting.drc` | select |
+| Display Brightness | — | `system_setting.dimmer` | select (`bright`, `dark`, `off`) |
 | Auto Volume | `audio.aav` | `sound_setting.auto_volume` | switch |
 | Bass level (no sub) | `main.bassstep` | `sound_setting.volume.bass` | select (min/mid/max) |
 | Subwoofer level (with sub) | — | `sound_setting.volume.subwoofer` | number (-10…10) |
