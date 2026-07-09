@@ -383,7 +383,7 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
             else:
                 if self._reauth_entry is not None:
-                    return self._complete_grpc_reauth()
+                    return await self._async_complete_grpc_reauth()
                 return await self.async_step_user_confirm()
 
         return self.async_show_form(
@@ -422,7 +422,7 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "unknown"
             else:
                 if self._reauth_entry is not None:
-                    return self._complete_grpc_reauth()
+                    return await self._async_complete_grpc_reauth()
                 return await self.async_step_user_confirm()
 
         return self.async_show_form(
@@ -435,16 +435,36 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    def _complete_grpc_reauth(self) -> ConfigFlowResult:
+    async def _async_complete_grpc_reauth(self) -> ConfigFlowResult:
         """Apply gRPC reauth updates after successful OAuth."""
         reauth_entry = self._reauth_entry
         if reauth_entry is None or self._host is None or self._setup_info is None:
             msg = "Reauth state missing after gRPC OAuth"
             raise HomeAssistantError(msg)
 
+        unique_id = self._setup_info.get(CONF_SERIAL) or self._setup_info.get(CONF_MAC)
+        if unique_id is not None:
+            await self.async_set_unique_id(unique_id)
+            # Enforce device match only when the entry already uses a stable ID.
+            stable = {
+                reauth_entry.data.get(CONF_SERIAL),
+                reauth_entry.data.get(CONF_MAC),
+            }
+            if reauth_entry.unique_id in stable:
+                self._abort_if_unique_id_mismatch(reason="wrong_account")
+
         data_updates: dict[str, Any] = {CONF_HOST: self._host}
         if keys := self._setup_info.get(CONF_GRPC_KEYS):
             data_updates[CONF_GRPC_KEYS] = keys
+        for key in (
+            CONF_SERIAL,
+            CONF_MAC,
+            CONF_MODEL,
+            CONF_MODEL_ID,
+            CONF_MANUFACTURER,
+        ):
+            if value := self._setup_info.get(key):
+                data_updates[key] = value
         return self.async_update_reload_and_abort(
             reauth_entry,
             data_updates=data_updates,
@@ -458,9 +478,16 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
             if self._host is None or self._setup_info is None:
                 return await self.async_step_user()
 
-            unique_id = self._setup_info.get(CONF_SERIAL, self._host)
+            unique_id = self._setup_info.get(CONF_SERIAL) or self._setup_info.get(
+                CONF_MAC
+            )
+            if unique_id is None:
+                # Last resort before create — prefer aborting duplicate hosts
+                self._async_abort_entries_match({CONF_HOST: self._host})
+                unique_id = self._host
             await self.async_set_unique_id(unique_id)
             self._abort_if_unique_id_configured()
+            self._async_abort_entries_match({CONF_HOST: self._host})
 
             entry_data = {CONF_HOST: self._host, **self._setup_info}
             title = self._setup_info.get(CONF_NAME, DEFAULT_NAME)

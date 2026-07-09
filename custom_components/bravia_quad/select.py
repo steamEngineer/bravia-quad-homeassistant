@@ -33,10 +33,13 @@ from .const import (
     IMAX_MODE_OPTIONS,
     TRANSPORT_GRPC,
 )
+from .entity import (
+    BraviaQuadNotificationMixin,
+    entity_unique_id,
+    get_device_info,
+)
 from .grpc_mapped_entities import mapped_select_entities
 from .helpers import (
-    BraviaQuadNotificationMixin,
-    get_device_info,
     raise_set_rejected,
     verify_feature_value,
 )
@@ -46,7 +49,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-    from . import BraviaQuadData
+    from . import BraviaQuadConfigEntry
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -57,11 +60,11 @@ PARALLEL_UPDATES = 1
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BraviaQuadConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Quad select entities from a config entry."""
-    data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+    data = entry.runtime_data
 
     if data.transport == TRANSPORT_GRPC:
         if data.grpc_client is None:
@@ -78,7 +81,7 @@ async def async_setup_entry(
 
     # Remove legacy switch entity after IMAX mode became a select
     registry = er.async_get(hass)
-    imax_unique_id = f"{DOMAIN}_{entry.unique_id}_imax_mode"
+    imax_unique_id = entity_unique_id(entry, "imax_mode")
     for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
         if (
             entity_entry.entity_id.startswith("switch.")
@@ -125,7 +128,7 @@ class BraviaQuadBassLevelSelect(BraviaQuadNotificationMixin, SelectEntity):
         self._client = client
         self._entry = entry
         self._reloading = False
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_bass_level_select"
+        self._attr_unique_id = entity_unique_id(entry, "bass_level_select")
         self._attr_options = list(BASS_LEVEL_OPTIONS.keys())
         current_bass_value = client.bass_level
         self._attr_current_option = BASS_LEVEL_VALUES_TO_OPTIONS.get(
@@ -216,7 +219,7 @@ class BraviaQuadDynamicRangeCompressorSelect(BraviaQuadNotificationMixin, Select
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the Dynamic Range Compressor select entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_drc"
+        self._attr_unique_id = entity_unique_id(entry, "drc")
         self._attr_options = DRC_OPTIONS
         # Initialize current option from client's current DRC state
         current_drc_value = client.drc
@@ -270,7 +273,7 @@ class BraviaQuadHdmiPassthroughSelect(BraviaQuadNotificationMixin, SelectEntity)
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the HDMI passthrough select."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_hdmi_passthrough"
+        self._attr_unique_id = entity_unique_id(entry, "hdmi_passthrough")
         self._attr_options = HDMI_PASSTHROUGH_OPTIONS
         current = None
         self._attr_current_option = (
@@ -327,7 +330,7 @@ class BraviaQuadImaxModeSelect(BraviaQuadNotificationMixin, SelectEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the IMAX mode select."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_imax_mode"
+        self._attr_unique_id = entity_unique_id(entry, "imax_mode")
         self._attr_options = list(IMAX_MODE_OPTIONS)
         current = client.imax_mode
         self._attr_current_option = current if current in IMAX_MODE_OPTIONS else "auto"
@@ -403,7 +406,7 @@ class BraviaQuadDualMonoSelect(BraviaQuadNotificationMixin, SelectEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the dual mono select."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_dual_mono"
+        self._attr_unique_id = entity_unique_id(entry, "dual_mono")
         self._attr_options = DUAL_MONO_OPTIONS
         current = None
         self._attr_current_option = current if current in DUAL_MONO_OPTIONS else "main"
@@ -457,7 +460,7 @@ class BraviaQuadBtConnectionQualitySelect(BraviaQuadNotificationMixin, SelectEnt
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the Bluetooth connection quality select."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_bt_connection_quality"
+        self._attr_unique_id = entity_unique_id(entry, "bt_connection_quality")
         self._attr_options = BT_CONNECTION_QUALITY_OPTIONS
         current = None
         self._attr_current_option = (
@@ -513,7 +516,7 @@ class BraviaQuadHdmiStandbyLinkSelect(BraviaQuadNotificationMixin, SelectEntity)
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the HDMI standby link select."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_hdmi_standby_link"
+        self._attr_unique_id = entity_unique_id(entry, "hdmi_standby_link")
         self._attr_options = HDMI_STANDBY_LINK_OPTIONS
         current = None
         self._attr_current_option = (
@@ -569,7 +572,7 @@ class BraviaQuadAudioReturnChannelSelect(BraviaQuadNotificationMixin, SelectEnti
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the audio return channel select."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_audio_return_channel"
+        self._attr_unique_id = entity_unique_id(entry, "audio_return_channel")
         self._attr_options = AUDIO_RETURN_CHANNEL_OPTIONS
         current = None
         self._attr_current_option = (

@@ -2,19 +2,14 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import time
-from typing import TYPE_CHECKING, Any, Protocol, cast
+from typing import TYPE_CHECKING, Any, cast
 
-from homeassistant.components.number import NumberMode, RestoreNumber
-from homeassistant.const import CONF_HOST, CONF_MAC, EntityCategory
+from homeassistant.const import CONF_HOST, CONF_MAC
 from homeassistant.core import State
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
-from homeassistant.helpers.device_registry import DeviceInfo
-from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.restore_state import (
     StoredState,
 )
@@ -23,16 +18,16 @@ from homeassistant.helpers.restore_state import (
 )
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, MAX_VOLUME_STEP_INTERVAL
+from .const import DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.components.select import SelectEntity
     from homeassistant.components.switch import SwitchEntity
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
+    from homeassistant.helpers.entity import Entity
 
     from .bravia_grpc_client import BraviaGrpcClientAsync
-    from .bravia_quad_client import BraviaQuadClient
     from .grpc_mapping import GrpcTcpMapping
 
 _LOGGER = logging.getLogger(__name__)
@@ -125,16 +120,18 @@ def migrate_legacy_identifiers(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """
     Migrate legacy device and entity identifiers to the current unique_id.
 
-    Handles entry_id-based, IP-based, and MAC-based legacy formats.
+    Handles entry_id-based, IP-based, and MAC-based legacy formats, then
+    strips the historical ``{DOMAIN}_`` entity unique_id prefix.
     """
-    legacy_keys = _legacy_keys(entry)
-    if not legacy_keys:
+    if entry.unique_id is None:
         return
 
-    target_key = require_unique_id(entry)
+    legacy_keys = _legacy_keys(entry)
+    target_key = entry.unique_id
     for legacy_key in legacy_keys:
         _migrate_device(hass, legacy_key, target_key)
         _migrate_entities(hass, entry.entry_id, legacy_key, target_key)
+    _migrate_domain_prefixed_entities(hass, entry.entry_id, target_key)
 
 
 def _migrate_device(hass: HomeAssistant, legacy_key: str, target_key: str) -> None:
@@ -176,22 +173,31 @@ def _migrate_entities(
 ) -> None:
     """Migrate entity unique_ids from legacy_key prefix to target_key prefix."""
     entity_registry = er.async_get(hass)
-    old_prefix = f"{DOMAIN}_{legacy_key}_"
-    new_prefix = f"{DOMAIN}_{target_key}_"
+    # Historical formats: DOMAIN_legacy_suffix and (post-strip) legacy_suffix
+    old_prefixes = (f"{DOMAIN}_{legacy_key}_", f"{legacy_key}_")
+    new_prefix = f"{target_key}_"
     migrated_count = 0
 
     # Get all entities for this config entry
     entities = er.async_entries_for_config_entry(entity_registry, config_entry_id)
 
     for entity_entry in entities:
-        if not entity_entry.unique_id or not entity_entry.unique_id.startswith(
-            old_prefix
-        ):
+        if not entity_entry.unique_id:
+            continue
+
+        matched_prefix: str | None = None
+        for old_prefix in old_prefixes:
+            if entity_entry.unique_id.startswith(old_prefix):
+                matched_prefix = old_prefix
+                break
+        if matched_prefix is None:
             continue
 
         # Build new unique_id by replacing the prefix
-        suffix = entity_entry.unique_id[len(old_prefix) :]
+        suffix = entity_entry.unique_id[len(matched_prefix) :]
         new_unique_id = f"{new_prefix}{suffix}"
+        if entity_entry.unique_id == new_unique_id:
+            continue
 
         # Check if an entity with the new unique_id already exists
         existing = entity_registry.async_get_entity_id(
@@ -226,14 +232,46 @@ def _migrate_entities(
         )
 
 
-def get_device_info(entry: ConfigEntry) -> DeviceInfo:
-    """
-    Return device info to link an entity to its device.
+def _migrate_domain_prefixed_entities(
+    hass: HomeAssistant, config_entry_id: str, target_key: str
+) -> None:
+    """Strip historical ``{DOMAIN}_{target_key}_`` entity unique_id prefix."""
+    entity_registry = er.async_get(hass)
+    old_prefix = f"{DOMAIN}_{target_key}_"
+    new_prefix = f"{target_key}_"
+    migrated_count = 0
 
-    Returns only identifiers so HA matches the entity to the device
-    without overwriting the manufacturer/model set during setup.
-    """
-    return DeviceInfo(identifiers={(DOMAIN, require_unique_id(entry))})
+    entities = er.async_entries_for_config_entry(entity_registry, config_entry_id)
+    for entity_entry in entities:
+        if not entity_entry.unique_id or not entity_entry.unique_id.startswith(
+            old_prefix
+        ):
+            continue
+
+        suffix = entity_entry.unique_id[len(old_prefix) :]
+        new_unique_id = f"{new_prefix}{suffix}"
+        existing = entity_registry.async_get_entity_id(
+            entity_entry.domain,
+            entity_entry.platform,
+            new_unique_id,
+        )
+        if existing:
+            _LOGGER.debug(
+                "Removing duplicate domain-prefixed entity %s",
+                entity_entry.entity_id,
+            )
+            entity_registry.async_remove(entity_entry.entity_id)
+        else:
+            entity_registry.async_update_entity(
+                entity_entry.entity_id, new_unique_id=new_unique_id
+            )
+        migrated_count += 1
+
+    if migrated_count > 0:
+        _LOGGER.info(
+            "Migrated %d entities off domain-prefixed unique_id format",
+            migrated_count,
+        )
 
 
 def remove_legacy_group_subdevices(
@@ -254,144 +292,11 @@ def remove_legacy_input_select(
     """Remove standalone selects superseded by the media player."""
     uid = require_unique_id(entry)
     for suffix in ("input", "sound_effect"):
-        unique_id = f"{DOMAIN}_{uid}_{suffix}"
-        if entity_id := entity_registry.async_get_entity_id(
-            "select", DOMAIN, unique_id
-        ):
-            entity_registry.async_remove(entity_id)
-
-
-class BraviaQuadAvailabilityMixin(Entity):
-    """
-    Mixin that tracks connection availability for Bravia Quad entities.
-
-    Subclasses must define:
-    - _client: BraviaQuadClient instance
-
-    Provides an `available` property that reflects the TCP connection state
-    and automatically updates HA when the connection drops or recovers.
-    """
-
-    _client: BraviaQuadClient
-
-    @property
-    def available(self) -> bool:
-        """Return True if entity is available."""
-        return self._client.is_connected
-
-    def _on_availability_changed(self, _available: bool) -> None:  # noqa: FBT001
-        """Handle connection availability change."""
-        self.async_write_ha_state()
-
-    async def async_added_to_hass(self) -> None:
-        """Register availability callback when entity is added."""
-        await super().async_added_to_hass()
-        self._client.register_availability_callback(self._on_availability_changed)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Unregister availability callback when entity is removed."""
-        self._client.unregister_availability_callback(self._on_availability_changed)
-        await super().async_will_remove_from_hass()
-
-
-class BraviaQuadNotificationMixin(BraviaQuadAvailabilityMixin):
-    """
-    Mixin for entities that subscribe to Bravia Quad notifications.
-
-    Subclasses must define:
-    - _client: BraviaQuadClient instance
-    - _notification_feature: str - the feature name to subscribe to
-    - _on_notification: async callback method to handle notifications
-    """
-
-    _notification_feature: str
-
-    async def _on_notification(self, value: str) -> None:
-        """Handle notification callback. Override in subclass."""
-        raise NotImplementedError
-
-    async def async_added_to_hass(self) -> None:
-        """Register notification callback when entity is added."""
-        await super().async_added_to_hass()
-        self._client.register_notification_callback(
-            self._notification_feature, self._on_notification
-        )
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Unregister notification callback when entity is removed."""
-        await super().async_will_remove_from_hass()
-        self._client.unregister_notification_callback(
-            self._notification_feature, self._on_notification
-        )
-
-
-class BraviaGrpcAvailabilityMixin(Entity):
-    """
-    Mixin that tracks gRPC session availability for HA entities.
-
-    Subclasses must define _grpc_client: BraviaGrpcClientAsync.
-    """
-
-    _grpc_client: BraviaGrpcClientAsync
-
-    @property
-    def available(self) -> bool:
-        """Entity is available when gRPC is connected."""
-        return self._grpc_client.is_connected
-
-    def _on_grpc_availability_changed(self, _available: bool) -> None:  # noqa: FBT001
-        """Handle gRPC session availability change."""
-        self.async_write_ha_state()
-
-    async def async_added_to_hass(self) -> None:
-        """Register gRPC availability callback when entity is added."""
-        await super().async_added_to_hass()
-        self._grpc_client.register_availability_callback(
-            self._on_grpc_availability_changed
-        )
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Unregister gRPC availability callback when entity is removed."""
-        self._grpc_client.unregister_availability_callback(
-            self._on_grpc_availability_changed
-        )
-        await super().async_will_remove_from_hass()
-
-
-class BraviaGrpcPathMixin(BraviaGrpcAvailabilityMixin):
-    """
-    Mixin for entities driven by gRPC field paths.
-
-    Subclasses must define:
-    - _grpc_client: BraviaGrpcClientAsync
-    - _grpc_path: str
-    - _on_grpc_state(value): async handler
-    """
-
-    _grpc_path: str
-
-    def _grpc_state_callback(self, update: Any) -> None:
-        """Filter notify stream updates for this entity's path."""
-        if update.path != self._grpc_path:
-            return
-        self.hass.async_create_task(self._on_grpc_state(update.value))
-
-    async def _on_grpc_state(self, value: Any) -> None:
-        """Handle gRPC state update. Override in subclass."""
-        raise NotImplementedError
-
-    async def async_added_to_hass(self) -> None:
-        """Register gRPC notify callback when entity is added."""
-        await super().async_added_to_hass()
-        self._grpc_client.add_state_callback(self._grpc_state_callback)
-        cached = self._grpc_client.notify_state.get(self._grpc_path)
-        if cached is not None:
-            await self._on_grpc_state(cached)
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Remove gRPC callback when entity is removed."""
-        self._grpc_client.remove_state_callback(self._grpc_state_callback)
-        await super().async_will_remove_from_hass()
+        for unique_id in (f"{uid}_{suffix}", f"{DOMAIN}_{uid}_{suffix}"):
+            if entity_id := entity_registry.async_get_entity_id(
+                "select", DOMAIN, unique_id
+            ):
+                entity_registry.async_remove(entity_id)
 
 
 async def _async_get_entity_last_state(entity: Entity) -> State | None:
@@ -507,196 +412,3 @@ async def restore_notify_only_select(
     if cache_value is not None:
         grpc_client.merge_notify_cache({grpc_path: cache_value})
     return True
-
-
-# Grace period (seconds) after a transition ends during which device
-# notifications are still suppressed.  This prevents stale in-flight
-# notifications from snapping the slider back to an intermediate value.
-TRANSITION_NOTIFICATION_GRACE_PERIOD = 0.5
-
-
-class VolumeStepClient(Protocol):
-    """TCP client used by VolumeTransitionMixin default volume stepping."""
-
-    volume_step_interval: int
-
-    async def async_set_volume(self, volume: int) -> bool: ...
-
-    async def async_get_volume(self) -> int: ...
-
-
-class VolumeTransitionMixin:
-    """
-    Mixin that provides smooth volume transition logic.
-
-    Subclasses must have:
-    - self.hass: HomeAssistant
-    - self.async_write_ha_state(): method
-    - volume_step_interval property (ms between steps)
-    - _async_volume_step(volume: int) -> bool
-
-    Device notifications are suppressed while a transition is running **and**
-    for a short grace period after it finishes so that stale notifications
-    (still in-flight from the device) do not snap the slider back.  User
-    actions (e.g. moving the slider) are never blocked.
-    """
-
-    hass: HomeAssistant
-
-    if TYPE_CHECKING:
-        _client: VolumeStepClient
-
-    def _init_volume_transition(self) -> None:
-        """Initialize volume transition state. Call from __init__."""
-        self._transition_task: asyncio.Task[None] | None = None
-        self._transition_in_progress: bool = False
-        self._transition_generation: int = 0
-        self._notification_suppressed_until: float = 0.0
-
-    @property
-    def volume_step_interval(self) -> int:
-        """Return configured volume step interval in milliseconds."""
-        return self._client.volume_step_interval
-
-    async def _async_volume_step(self, volume: int) -> bool:
-        """Set volume on the device; override for non-TCP transports."""
-        return await self._client.async_set_volume(volume)
-
-    @property
-    def volume_transition_in_progress(self) -> bool:
-        """Return whether a volume transition is in progress."""
-        return self._transition_in_progress
-
-    def should_suppress_volume_notification(self) -> bool:
-        """
-        Return True when device notifications should be ignored.
-
-        Notifications are suppressed while a transition is active and
-        for a short grace period afterwards so that stale in-flight
-        notifications from the device do not snap the UI back.
-        """
-        if self._transition_in_progress:
-            return True
-        return time.monotonic() < self._notification_suppressed_until
-
-    def _cancel_volume_transition(self) -> None:
-        """Cancel any in-progress volume transition."""
-        if self._transition_task:
-            self._transition_task.cancel()
-            self._transition_task = None
-        if self._transition_in_progress:
-            self._transition_in_progress = False
-            self._notification_suppressed_until = (
-                time.monotonic() + TRANSITION_NOTIFICATION_GRACE_PERIOD
-            )
-
-    async def _async_set_volume_with_transition(
-        self,
-        current_volume: int,
-        target_volume: int,
-    ) -> bool:
-        """
-        Set volume, using smooth transition if interval is configured.
-
-        Returns True if the volume was set successfully (immediate) or a
-        background transition was started.  Returns False only when an
-        immediate set_volume call fails.
-        Callers should set optimistic state before calling this method.
-        """
-        interval_ms = self.volume_step_interval
-
-        # Cancel any existing transition
-        self._cancel_volume_transition()
-
-        if interval_ms <= 0 or current_volume == target_volume:
-            self._transition_in_progress = False
-            return await self._async_volume_step(target_volume)
-
-        # Start background transition
-        self._transition_in_progress = True
-        self._transition_generation += 1
-        generation = self._transition_generation
-
-        self._transition_task = self.hass.async_create_task(
-            self._async_volume_transition(
-                current_volume, target_volume, interval_ms, generation
-            )
-        )
-        return True
-
-    async def _async_volume_transition(
-        self,
-        start_volume: int,
-        end_volume: int,
-        interval_ms: int,
-        generation: int,
-    ) -> None:
-        """Transition volume smoothly one step at a time."""
-        steps = abs(end_volume - start_volume)
-        if steps == 0:
-            self._transition_in_progress = False
-            return
-
-        delay = interval_ms / 1000.0
-        step_increment = 1 if end_volume > start_volume else -1
-
-        try:
-            for i in range(1, steps + 1):
-                await asyncio.sleep(delay)
-                next_volume = start_volume + (i * step_increment)
-                success = await self._async_volume_step(next_volume)
-                if not success:
-                    _LOGGER.warning("Failed to set volume step to %d", next_volume)
-                    break
-        except asyncio.CancelledError:
-            _LOGGER.debug("Volume transition cancelled")
-        finally:
-            if self._transition_generation == generation:
-                self._transition_in_progress = False
-                self._notification_suppressed_until = (
-                    time.monotonic() + TRANSITION_NOTIFICATION_GRACE_PERIOD
-                )
-                self._transition_task = None
-
-
-class BraviaQuadVolumeStepIntervalNumber(RestoreNumber):
-    """Local volume step interval for smooth volume transitions."""
-
-    _attr_entity_category = EntityCategory.CONFIG
-    _attr_has_entity_name = True
-    _attr_mode = NumberMode.BOX
-    _attr_native_max_value = MAX_VOLUME_STEP_INTERVAL
-    _attr_native_min_value = 0
-    _attr_native_step = 1
-    _attr_native_unit_of_measurement = "ms"
-    _attr_should_poll = False
-    _attr_translation_key = "volume_step_interval"
-
-    def __init__(
-        self,
-        entry: ConfigEntry,
-        volume_step_client: BraviaQuadClient | BraviaGrpcClientAsync,
-        *,
-        enabled_default: bool = True,
-    ) -> None:
-        self._volume_step_client = volume_step_client
-        self._attr_entity_registry_enabled_default = enabled_default
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_volume_step_interval"
-        self._attr_device_info = get_device_info(entry)
-        self._attr_native_value = volume_step_client.volume_step_interval
-
-    async def async_added_to_hass(self) -> None:
-        await super().async_added_to_hass()
-        if (
-            last_state := await self.async_get_last_number_data()
-        ) is not None and last_state.native_value is not None:
-            self._attr_native_value = last_state.native_value
-        if self._attr_native_value is None:
-            return
-        self._volume_step_client.volume_step_interval = int(self._attr_native_value)
-
-    async def async_set_native_value(self, value: float) -> None:
-        interval = int(value)
-        self._volume_step_client.volume_step_interval = interval
-        self._attr_native_value = value
-        self.async_write_ha_state()

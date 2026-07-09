@@ -7,6 +7,7 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_MAC, CONF_NAME, EVENT_HOMEASSISTANT_STOP, Platform
 from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers import device_registry as dr
@@ -37,7 +38,6 @@ from .helpers import (
 from .transport import migrate_transport_entry, resolve_transport
 
 if TYPE_CHECKING:
-    from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import Event, HomeAssistant
 
     from .bravia_grpc_client import BraviaGrpcClientAsync
@@ -53,6 +53,9 @@ class BraviaQuadData:
     grpc_client: BraviaGrpcClientAsync | None = None
 
 
+type BraviaQuadConfigEntry = ConfigEntry[BraviaQuadData]
+
+
 _LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [
@@ -66,10 +69,8 @@ PLATFORMS: list[Platform] = [
 ]
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_setup_entry(hass: HomeAssistant, entry: BraviaQuadConfigEntry) -> bool:
     """Set up Bravia Quad from a config entry."""
-    hass.data.setdefault(DOMAIN, {})
-
     migrate_transport_entry(hass, entry)
     transport = resolve_transport(entry)
 
@@ -96,7 +97,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     else:
         await _register_device(hass, entry, http_client, _grpc_client=grpc_client)
 
-    hass.data[DOMAIN][entry.entry_id] = BraviaQuadData(
+    entry.runtime_data = BraviaQuadData(
         transport=transport,
         http_client=http_client,
         tcp_client=tcp_client,
@@ -121,13 +122,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return True
 
 
-async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> None:
+async def _async_options_updated(
+    hass: HomeAssistant, entry: BraviaQuadConfigEntry
+) -> None:
     """Reload when integration options change."""
     await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def _setup_tcp_client(
-    hass: HomeAssistant, entry: ConfigEntry
+    hass: HomeAssistant, entry: BraviaQuadConfigEntry
 ) -> BraviaQuadClient:
     """Connect TCP control plane and seed device state."""
     client = BraviaQuadClient(
@@ -165,7 +168,7 @@ async def _setup_tcp_client(
 
 
 async def _backfill_identity(
-    hass: HomeAssistant, entry: ConfigEntry, client: BraviaQuadClient
+    hass: HomeAssistant, entry: BraviaQuadConfigEntry, client: BraviaQuadClient
 ) -> None:
     """Backfill permanent identity for entries created before this version."""
     if CONF_MODEL_ID in entry.data:
@@ -216,7 +219,7 @@ async def _backfill_identity(
 
 async def _register_device(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BraviaQuadConfigEntry,
     http_client: BraviaHttpClient,
     *,
     tcp_client: BraviaQuadClient | None = None,
@@ -270,19 +273,14 @@ async def _register_device(
     remove_legacy_input_select(er.async_get(hass), entry)
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+async def async_unload_entry(hass: HomeAssistant, entry: BraviaQuadConfigEntry) -> bool:
     """Unload a config entry."""
-    domain_data = hass.data.get(DOMAIN)
-    if domain_data and entry.entry_id in domain_data:
-        data: BraviaQuadData = domain_data[entry.entry_id]
+    # Setup may fail before runtime_data is assigned (ConfigEntryNotReady).
+    if hasattr(entry, "runtime_data"):
+        data = entry.runtime_data
         if data.tcp_client:
             await data.tcp_client.async_disconnect()
         if data.grpc_client:
             await data.grpc_client.async_disconnect()
 
-    unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-
-    if domain_data and entry.entry_id in domain_data:
-        domain_data.pop(entry.entry_id)
-
-    return unload_ok
+    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

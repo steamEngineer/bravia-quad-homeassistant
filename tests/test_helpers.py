@@ -18,8 +18,8 @@ from custom_components.bravia_quad.const import (
     CONF_MODEL,
     DOMAIN,
 )
+from custom_components.bravia_quad.entity import get_device_info
 from custom_components.bravia_quad.helpers import (
-    get_device_info,
     migrate_legacy_identifiers,
     verify_feature_value,
 )
@@ -454,7 +454,7 @@ async def test_migrate_entity_unique_ids(
     assert old_entity is None
 
     # New unique_id should exist
-    new_unique_id_full = f"{DOMAIN}_{new_unique_id}_power"
+    new_unique_id_full = f"{new_unique_id}_power"
     new_entity = entity_registry.async_get_entity_id(
         "switch", DOMAIN, new_unique_id_full
     )
@@ -490,7 +490,7 @@ async def test_migrate_entity_when_new_entity_exists(
     )
 
     # Create entity with new unique_id
-    new_unique_id_full = f"{DOMAIN}_{new_unique_id}_power"
+    new_unique_id_full = f"{new_unique_id}_power"
     new_entity = entity_registry.async_get_or_create(
         "switch",
         DOMAIN,
@@ -551,7 +551,7 @@ async def test_migrate_multiple_entities(
     # All entities should be migrated
     for suffix, domain in suffix_to_domain.items():
         old_unique_id = f"{DOMAIN}_{old_entry_id}_{suffix}"
-        new_unique_id_full = f"{DOMAIN}_{new_unique_id}_{suffix}"
+        new_unique_id_full = f"{new_unique_id}_{suffix}"
 
         # Old should not exist
         old_entity = entity_registry.async_get_entity_id(domain, DOMAIN, old_unique_id)
@@ -657,9 +657,7 @@ async def test_migrate_from_ip_based_device_and_entities(
     )
     assert entity_registry.async_get_entity_id("switch", DOMAIN, old_unique_id) is None
     assert (
-        entity_registry.async_get_entity_id(
-            "switch", DOMAIN, f"{DOMAIN}_{target_serial}_power"
-        )
+        entity_registry.async_get_entity_id("switch", DOMAIN, f"{target_serial}_power")
         is not None
     )
 
@@ -709,9 +707,7 @@ async def test_migrate_from_mac_based_device_and_entities(
     )
     assert entity_registry.async_get_entity_id("switch", DOMAIN, old_unique_id) is None
     assert (
-        entity_registry.async_get_entity_id(
-            "switch", DOMAIN, f"{DOMAIN}_{target_serial}_power"
-        )
+        entity_registry.async_get_entity_id("switch", DOMAIN, f"{target_serial}_power")
         is not None
     )
 
@@ -734,7 +730,7 @@ async def test_migrate_removes_duplicate_when_serial_entity_already_exists(
 
     entity_registry = er.async_get(hass)
     old_unique_id = f"{DOMAIN}_{legacy_ip}_power"
-    new_unique_id = f"{DOMAIN}_{target_serial}_power"
+    new_unique_id = f"{target_serial}_power"
     old_entity = entity_registry.async_get_or_create(
         "switch",
         DOMAIN,
@@ -754,6 +750,37 @@ async def test_migrate_removes_duplicate_when_serial_entity_already_exists(
 
     assert entity_registry.async_get(old_entity.entity_id) is None
     assert entity_registry.async_get(new_entity.entity_id) is not None
+
+
+async def test_migrate_strips_domain_prefixed_unique_ids(
+    hass: HomeAssistant,
+) -> None:
+    """Strip historical DOMAIN_ prefix when entry unique_id is already stable."""
+    serial = "1234567"
+    entry = MockConfigEntry(
+        title="Bravia Quad",
+        domain=DOMAIN,
+        data={CONF_HOST: "192.168.1.100", CONF_HAS_SUBWOOFER: True},
+        unique_id=serial,
+        entry_id="test_domain_prefix",
+    )
+    entry.add_to_hass(hass)
+
+    entity_registry = er.async_get(hass)
+    old_unique_id = f"{DOMAIN}_{serial}_power"
+    entity = entity_registry.async_get_or_create(
+        "switch",
+        DOMAIN,
+        old_unique_id,
+        config_entry=entry,
+        suggested_object_id="bravia_theatre_power",
+    )
+
+    migrate_legacy_identifiers(hass, entry)
+
+    updated = entity_registry.async_get(entity.entity_id)
+    assert updated is not None
+    assert updated.unique_id == f"{serial}_power"
 
 
 @pytest.mark.usefixtures("mock_bravia_quad_client")
@@ -819,7 +846,7 @@ async def test_setup_ip_entry_migrates_without_duplicates(
         e for e in bravia_entities if e.unique_id and e.unique_id.endswith("_power")
     ]
     assert len(power_entities) == 1
-    assert power_entities[0].unique_id == f"{DOMAIN}_{target_serial}_power"
+    assert power_entities[0].unique_id == f"{target_serial}_power"
 
 
 # =============================================================================

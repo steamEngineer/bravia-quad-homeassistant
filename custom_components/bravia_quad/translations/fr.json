@@ -21,7 +21,8 @@
     "abort": {
       "already_configured": "L'appareil est déjà configuré",
       "not_bravia_theatre": "L'appareil découvert n'est pas une enceinte Bravia Theatre",
-      "cannot_connect": "Impossible de se connecter à l'appareil"
+      "cannot_connect": "Impossible de se connecter à l'appareil",
+      "wrong_account": "Le compte Sony connecté ne correspond pas à cet appareil Bravia Theatre"
     }
   },
   "entity": {

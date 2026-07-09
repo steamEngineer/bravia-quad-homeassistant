@@ -12,7 +12,11 @@ from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import entity_registry as er
 
 from .const import CONF_HAS_SUBWOOFER, DOMAIN, TRANSPORT_GRPC, TRANSPORT_TCP
-from .helpers import BraviaQuadAvailabilityMixin, get_device_info
+from .entity import (
+    BraviaQuadAvailabilityMixin,
+    entity_unique_id,
+    get_device_info,
+)
 from .transport import GRPC_PATH_SUBWOOFER, infer_subwoofer_from_grpc
 
 if TYPE_CHECKING:
@@ -20,7 +24,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-    from . import BraviaQuadData
+    from . import BraviaQuadConfigEntry
     from .bravia_grpc_client import BraviaGrpcClientAsync
     from .bravia_quad_client import BraviaQuadClient
 
@@ -29,11 +33,11 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(
     hass: HomeAssistant,
-    entry: ConfigEntry,
+    entry: BraviaQuadConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Quad button entities from a config entry."""
-    data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+    data = entry.runtime_data
 
     if data.transport == TRANSPORT_GRPC:
         if data.grpc_client is None:
@@ -72,7 +76,7 @@ class BraviaQuadDetectSubwooferButton(BraviaQuadAvailabilityMixin, ButtonEntity)
         self._client = client
         self._entry = entry
         self._detection_lock = asyncio.Lock()
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_detect_subwoofer"
+        self._attr_unique_id = entity_unique_id(entry, "detect_subwoofer")
         self._attr_device_info = get_device_info(entry)
 
     async def async_press(self) -> None:
@@ -112,7 +116,7 @@ class BraviaQuadDetectSubwooferButton(BraviaQuadAvailabilityMixin, ButtonEntity)
                     "bass_level_select" if has_subwoofer else "bass_level_slider"
                 )
 
-                old_unique_id = f"{DOMAIN}_{self._entry.unique_id}_{entity_suffix}"
+                old_unique_id = entity_unique_id(self._entry, entity_suffix)
                 if old_entity := entity_registry.async_get_entity_id(
                     platform,
                     DOMAIN,
@@ -154,7 +158,7 @@ class BraviaQuadBluetoothPairingButton(BraviaQuadAvailabilityMixin, ButtonEntity
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the Bluetooth pairing button entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_bluetooth_pairing"
+        self._attr_unique_id = entity_unique_id(entry, "bluetooth_pairing")
         self._attr_device_info = get_device_info(entry)
 
     async def async_press(self) -> None:
@@ -235,13 +239,13 @@ class BraviaGrpcDetectSubwooferButton(ButtonEntity):
         self,
         hass: HomeAssistant,
         grpc_client: BraviaGrpcClientAsync,
-        entry: ConfigEntry,
+        entry: BraviaQuadConfigEntry,
     ) -> None:
         self._hass = hass
         self._grpc_client = grpc_client
         self._entry = entry
         self._detection_lock = asyncio.Lock()
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_detect_subwoofer"
+        self._attr_unique_id = entity_unique_id(entry, "detect_subwoofer")
         self._attr_device_info = get_device_info(entry)
 
     async def async_press(self) -> None:
@@ -281,13 +285,13 @@ class BraviaGrpcDetectSubwooferButton(ButtonEntity):
 
             entity_registry = er.async_get(self._hass)
             if has_subwoofer:
-                old_unique_id = f"{DOMAIN}_{self._entry.unique_id}_bass_level_select"
+                old_unique_id = entity_unique_id(self._entry, "bass_level_select")
                 if old_entity := entity_registry.async_get_entity_id(
                     "select", DOMAIN, old_unique_id
                 ):
                     entity_registry.async_remove(old_entity)
             else:
-                old_unique_id = f"{DOMAIN}_{self._entry.unique_id}_subwoofer_level"
+                old_unique_id = entity_unique_id(self._entry, "subwoofer_level")
                 if old_entity := entity_registry.async_get_entity_id(
                     "number", DOMAIN, old_unique_id
                 ):

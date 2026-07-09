@@ -16,7 +16,6 @@ from homeassistant.const import EntityCategory, UnitOfTemperature
 
 from .bravia_http_client import DeviceDetails
 from .const import (
-    DOMAIN,
     FEATURE_360SSM,
     FEATURE_DESTINATION,
     FEATURE_DEVICE_NAME,
@@ -29,8 +28,12 @@ from .const import (
     FEATURE_VOICE_ZOOM_LEVEL,
     TRANSPORT_GRPC,
 )
+from .entity import (
+    BraviaQuadNotificationMixin,
+    entity_unique_id,
+    get_device_info,
+)
 from .grpc_mapped_entities import mapped_sensor_entities
-from .helpers import BraviaQuadNotificationMixin, get_device_info
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -39,7 +42,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-    from . import BraviaQuadData
+    from . import BraviaQuadConfigEntry
     from .bravia_http_client import BraviaHttpClient
     from .bravia_quad_client import BraviaQuadClient
 
@@ -98,12 +101,12 @@ HTTP_SENSOR_DESCRIPTIONS: tuple[BraviaHttpSensorDescription, ...] = (
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
+    _hass: HomeAssistant,
+    entry: BraviaQuadConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Quad sensor entities."""
-    data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+    data = entry.runtime_data
 
     entities: list[SensorEntity] = []
 
@@ -147,13 +150,13 @@ class BraviaHttpSensor(SensorEntity):
     def __init__(
         self,
         http_client: BraviaHttpClient,
-        entry: ConfigEntry,
+        entry: BraviaQuadConfigEntry,
         description: BraviaHttpSensorDescription,
     ) -> None:
         """Initialize the sensor."""
         self._http_client = http_client
         self.entity_description = description
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_{description.key}"
+        self._attr_unique_id = entity_unique_id(entry, description.key)
         self._attr_device_info = get_device_info(entry)
 
     async def async_update(self) -> None:
@@ -180,7 +183,7 @@ class BraviaQuadTemperatureSensor(BraviaQuadNotificationMixin, SensorEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the temperature sensor."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_temperature"
+        self._attr_unique_id = entity_unique_id(entry, "temperature")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 
@@ -225,7 +228,7 @@ class BraviaQuadTimezoneSensor(BraviaQuadNotificationMixin, SensorEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the timezone sensor."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_timezone"
+        self._attr_unique_id = entity_unique_id(entry, "timezone")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 
@@ -255,7 +258,7 @@ class BraviaQuad360SsmSensor(BraviaQuadNotificationMixin, SensorEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the 360SSM sensor."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_360ssm"
+        self._attr_unique_id = entity_unique_id(entry, "360ssm")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 
@@ -285,7 +288,7 @@ class BraviaQuadVoiceZoomLevelSensor(BraviaQuadNotificationMixin, SensorEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the voice zoom level sensor."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_voice_zoom_level"
+        self._attr_unique_id = entity_unique_id(entry, "voice_zoom_level")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 
@@ -317,7 +320,7 @@ class BraviaQuadNetworkModeSensor(BraviaQuadNotificationMixin, SensorEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the network mode sensor."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_network_mode"
+        self._attr_unique_id = entity_unique_id(entry, "network_mode")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 
@@ -346,7 +349,7 @@ class BraviaQuadIpAddressSensor(BraviaQuadNotificationMixin, SensorEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the IP address sensor."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_ip_address"
+        self._attr_unique_id = entity_unique_id(entry, "ip_address")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 
@@ -375,7 +378,7 @@ class BraviaQuadDeviceNameSensor(BraviaQuadNotificationMixin, SensorEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the device name sensor."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_device_name"
+        self._attr_unique_id = entity_unique_id(entry, "device_name")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 
@@ -405,7 +408,7 @@ class BraviaQuadDestinationSensor(BraviaQuadNotificationMixin, SensorEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the destination sensor."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_destination"
+        self._attr_unique_id = entity_unique_id(entry, "destination")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 
@@ -435,7 +438,7 @@ class BraviaQuadLanguageSensor(BraviaQuadNotificationMixin, SensorEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the language sensor."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_language"
+        self._attr_unique_id = entity_unique_id(entry, "language")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 
@@ -465,7 +468,7 @@ class BraviaQuadDhcpSensor(BraviaQuadNotificationMixin, SensorEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the DHCP sensor."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_dhcp"
+        self._attr_unique_id = entity_unique_id(entry, "dhcp")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 
