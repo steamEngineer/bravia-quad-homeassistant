@@ -74,12 +74,8 @@ Enum strings match gRPC exec values (`"auto"`, `"mid"`, `"Neural:X"`, etc.). Dis
 
 **Recommendation:** Enable Seeds cloud reads in gRPC transport (opt-in default `false` until users validate; target default-on once stable). Replace TCP seed in [`async_backfill_entity_paths()`](../custom_components/bravia_quad/bravia_grpc_client.py) when enabled. Do **not** replace local gRPC writes.
 
-Probe script: `bravia-quad-investigation/probes/seeds_device_states_probe.py`
-Sample capture: `bravia-quad-investigation/reports/seeds-device-states-20260706-013641.json` (local, not committed if gitignored)
-
 ## Related docs
 
 - [grpc-auth-lifecycle.md](grpc-auth-lifecycle.md) — OAuth tokens and notify-only reads
 - [grpc-tcp-mapping.md](grpc-tcp-mapping.md) — entity seeding order (gRPC mode → Seeds)
-- [reverse-engineering-bravia-connect.md](reverse-engineering-bravia-connect.md) — Layer 9
 - [sony-grpc-reference.md](sony-grpc-reference.md) — notify-only path table

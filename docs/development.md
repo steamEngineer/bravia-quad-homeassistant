@@ -133,11 +133,11 @@ Integration patterns and review guidance: [`.github/copilot-instructions.md`](..
 
 ## Private local artifacts
 
-Some paths are **local-only** and must never be committed or pushed. See [`.gitignore`](../.gitignore) for the canonical denylist; `scripts/forbid_private_commit.sh` also blocks `.cache/*` because `git check-ignore` fails on the investigation-repo symlink at `.cache/frida`.
+Some paths are **local-only** and must never be committed or pushed. See [`.gitignore`](../.gitignore) for the canonical denylist; `scripts/forbid_private_commit.sh` also blocks gitignored `.cache/` trees that may not be reported correctly by `git check-ignore` in every layout.
 
 Tracked dev helpers include `scripts/check_connection.py`, `scripts/grpc/get_session_keys.py`, and `scripts/grpc/session_keys_example.json` (placeholders only — never commit `scripts/grpc/session_keys.json`).
 
-Extended gRPC wire-capture tests optionally read Frida fixtures from `.cache/frida/`; they skip when captures are absent (CI does not require them).
+Extended gRPC wire-capture tests optionally read local capture fixtures under gitignored `.cache/`; they skip when captures are absent (CI does not require them).
 
 ### How protection works
 

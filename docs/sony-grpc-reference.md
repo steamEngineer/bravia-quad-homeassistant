@@ -29,9 +29,9 @@ Quick reference for the BRAVIA Connect gRPC transport used in gRPC mode. See als
 
 ## Request envelope
 
-This repo ships **generated** gRPC stubs ([`bravia_control_pb2.py`](../custom_components/bravia_quad/grpc/bravia_control_pb2.py), [`bravia_control_pb2_grpc.py`](../custom_components/bravia_quad/grpc/bravia_control_pb2_grpc.py)) for handshake and notify RPCs only — not a checked-in `.proto`. An early monolithic proto was removed because it was an incorrectly reconstructed schema. Per [@mafredri](https://github.com/mafredri)'s reflected schema ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), authoritative auth RPCs use outer wrappers with `serialized_request + hmac` (reflected protos live in the investigation repo, not committed here).
+This repo ships **generated** gRPC stubs ([`bravia_control_pb2.py`](../custom_components/bravia_quad/grpc/bravia_control_pb2.py), [`bravia_control_pb2_grpc.py`](../custom_components/bravia_quad/grpc/bravia_control_pb2_grpc.py)) for handshake and notify RPCs only — not a checked-in `.proto`. An early monolithic proto was removed because it did not match the live wire layout. Per [@mafredri](https://github.com/mafredri)'s reflected schema ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), authoritative auth RPCs use outer wrappers with `serialized_request + hmac`. Hand encoders in this integration build those envelopes to match observed device traffic.
 
-Hand encoders in [`get_states_request.py`](../custom_components/bravia_quad/grpc/get_states_request.py) and [`exec_command_request.py`](../custom_components/bravia_quad/grpc/exec_command_request.py) build the inner serialized blobs and outer HMAC envelope to match app captures.
+Hand encoders in [`get_states_request.py`](../custom_components/bravia_quad/grpc/get_states_request.py) and [`exec_command_request.py`](../custom_components/bravia_quad/grpc/exec_command_request.py) build the inner serialized blobs and outer HMAC envelope.
 
 ## Error codes
 

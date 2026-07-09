@@ -16,7 +16,7 @@ The integration supports automatic discovery of Bravia Theatre devices on your l
 During setup, you will be prompted to provide:
 
 - **IP Address**: The IP address of your Bravia Theatre device (required if not auto-discovered)
-- **Transport**: **gRPC** (recommended, **EXPERIMENTAL** — BRAVIA Connect via Sony sign-in) or **TCP** (legacy IP control, no sign-in)
+- **Transport**: **gRPC** (recommended — BRAVIA Connect via Sony sign-in) or **TCP** (legacy IP control, no sign-in)
 - **Sony sign-in** (gRPC only): Complete the in-integration OAuth flow when prompted (session keys refresh automatically when possible)
 - **Name** (optional): A friendly name for the device (defaults to "Bravia Theatre")
 
@@ -24,8 +24,10 @@ During setup, you will be prompted to provide:
 
 | Mode | Connection | Highlights |
 |------|------------|------------|
-| **gRPC** (recommended, **EXPERIMENTAL**) | gRPC port 55051 + HTTP | BRAVIA Connect control plane: live notify, now-playing metadata, play/pause/next on streaming inputs, sound field mode, DSEE Ultimate, 360SSM height, center speaker, DTS Dialog Control, subwoofer level (~40 entities). Expect parity gaps and breaking changes |
-| **TCP** (legacy) | TCP port 33336 + HTTP | No Sony sign-in; fewer streaming and sound features (~44 entities). Extras include Bluetooth pairing button, HDMI passthrough, temperature, and network diagnostics |
+| **gRPC** (recommended) | gRPC port 55051 + HTTP | BRAVIA Connect control plane: live notify, now-playing metadata, play/pause/next on streaming inputs, sound field mode, DSEE Ultimate, 360SSM height, center speaker, DTS Dialog Control, subwoofer level. See [entities.md](entities.md) and [grpc-tcp-mapping.md](grpc-tcp-mapping.md) |
+| **TCP** (legacy) | TCP port 33336 + HTTP | No Sony sign-in; fewer streaming and sound features. Extras include Bluetooth pairing button, HDMI passthrough, temperature, and network diagnostics |
+
+> **Beta Feature:** gRPC is the recommended transport and still evolving — expect parity gaps vs TCP and occasional changes across releases or firmware.
 
 **gRPC setup walkthrough** (Sony sign-in, Chrome Network redirect, Seeds options): [grpc-setup.md](grpc-setup.md).
 
@@ -64,3 +66,13 @@ The integration will automatically test the connection during setup.
 External control is checked and enabled automatically during gRPC setup when possible — see [grpc-setup.md](grpc-setup.md).
 
 See [troubleshooting.md](troubleshooting.md) for connection debugging.
+
+## Removal
+
+To remove the integration and its entities:
+
+1. Go to **Settings** → **Devices & Services**
+2. Select **Bravia Theatre**
+3. Open the three-dot menu on the config entry → **Delete**
+
+This removes the config entry and associated entities. Automations that reference those entity IDs will need updating. To switch between gRPC and TCP, remove the entry and add the integration again (entity sets differ per transport).

@@ -10,14 +10,14 @@
       },
       "transport": {
         "title": "Connection method",
-        "description": "Choose how Home Assistant controls your Bravia Theatre.\n\n**gRPC — BRAVIA Connect (recommended, EXPERIMENTAL)**\nSame control plane as the Sony Home Entertainment Connect app: live push updates, now-playing metadata, play/pause/next on Spotify and AirPlay, sound field mode, DSEE Ultimate, 360SSM height, center speaker mode, DTS Dialog Control, and subwoofer level. Requires a one-time Sony account sign-in. This mode is **experimental** — expect rough edges, parity gaps, and breaking changes between releases.\n\n**TCP — legacy IP control**\nOriginal reverse-engineered protocol (port 33336). No Sony sign-in, but fewer features: no streaming transport controls, no now-playing metadata, and no BRAVIA Connect-only sound settings. TCP still exposes a few extras such as the Bluetooth pairing button, HDMI passthrough, temperature, and detailed network diagnostics.\n\nBoth modes use HTTP for firmware and network sensors. To switch later, remove and re-add the integration.",
+        "description": "Choose how Home Assistant controls your Bravia Theatre.\n\n**gRPC — BRAVIA Connect (recommended)**\nSame control plane as the Sony Home Entertainment Connect app: live push updates, now-playing metadata, play/pause/next on Spotify and AirPlay, sound field mode, DSEE Ultimate, 360SSM height, center speaker mode, DTS Dialog Control, and subwoofer level. Requires a one-time Sony account sign-in. **Beta Feature:** still evolving — expect parity gaps vs TCP and occasional changes across releases or firmware.\n\n**TCP — legacy IP control**\nOriginal reverse-engineered protocol (port 33336). No Sony sign-in, but fewer features: no streaming transport controls, no now-playing metadata, and no BRAVIA Connect-only sound settings. TCP still exposes a few extras such as the Bluetooth pairing button, HDMI passthrough, temperature, and detailed network diagnostics.\n\nBoth modes use HTTP for firmware and network sensors. To switch later, remove and re-add the integration.",
         "data": {
           "transport": "Connection method"
         }
       },
       "grpc_oauth": {
-        "title": "Sign in to Sony (EXPERIMENTAL)",
-        "description": "**gRPC is experimental.** Use **Chrome** (recommended) and open developer tools **before** you sign in:\n\n1. Press **F12** → **Network** → enable **Preserve log**\n2. Open this sign-in link and complete Sony login for Home Entertainment & Sound Service:\n\n{authorize_url}\n\n3. After login, Chrome tries to open `ssh-app://signin?...` and fails on desktop. That is expected — the URL is **not** shown in the address bar.\n4. In **Network**, filter `signin` and find the request to `ssh-app://signin?code=...`. Copy the full URL from **Request URL** or the **Location** header.\n5. Select **Submit** below and paste the URL (or just the `code` value) on the next step."
+        "title": "Sign in to Sony",
+        "description": "Use **Chrome** (recommended) and open developer tools **before** you sign in:\n\n1. Press **F12** → **Network** → enable **Preserve log**\n2. Open this sign-in link and complete Sony login for Home Entertainment & Sound Service:\n\n{authorize_url}\n\n3. After login, Chrome tries to open `ssh-app://signin?...` and fails on desktop. That is expected — the URL is **not** shown in the address bar.\n4. In **Network**, filter `signin` and find the request to `ssh-app://signin?code=...`. Copy the full URL from **Request URL** or the **Location** header.\n5. Select **Submit** below and paste the URL (or just the `code` value) on the next step."
       },
       "grpc_oauth_callback": {
         "title": "Paste Sony sign-in redirect",
@@ -390,7 +390,7 @@
   "selector": {
     "transport": {
       "options": {
-        "grpc": "gRPC — BRAVIA Connect (recommended, EXPERIMENTAL)",
+        "grpc": "gRPC — BRAVIA Connect (recommended)",
         "tcp": "TCP — legacy IP control"
       }
     }

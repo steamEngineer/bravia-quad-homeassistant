@@ -19,8 +19,6 @@ Primary implementation files:
 - [`grpc/client.py`](../custom_components/bravia_quad/grpc/client.py) — device handshake and rolling `auth_token`
 - [`grpc/get_states_auth.py`](../custom_components/bravia_quad/grpc/get_states_auth.py) — HMAC signing for GetStates/ExecCommand
 
-See also [reverse-engineering-bravia-connect.md](reverse-engineering-bravia-connect.md) for how this was discovered.
-
 ---
 
 ## Overview
