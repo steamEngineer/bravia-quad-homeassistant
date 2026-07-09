@@ -5,7 +5,7 @@
 ![GitHub Release](https://img.shields.io/github/v/release/steamEngineer/bravia-quad-homeassistant)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A Home Assistant custom integration for Sony Bravia Theatre home theater systems. Choose **gRPC** (experimental, BRAVIA Connect control plane) or **TCP** (legacy IP control, no Sony sign-in) at setup.
+A Home Assistant custom integration for Sony Bravia Theatre home theater systems. Choose **gRPC** (recommended, BRAVIA Connect control plane) or **TCP** (legacy IP control, no Sony sign-in) at setup.
 
 > **Legal and ethical note**
 >
@@ -34,7 +34,7 @@ A Home Assistant custom integration for Sony Bravia Theatre home theater systems
 - **Rear and bass level** — bass adapts automatically (slider with subwoofer, MIN/MID/MAX without)
 - **Audio settings** — voice enhancer, sound field, night mode, DRC, auto volume, HDMI CEC, auto standby
 - **Real-time updates** from the device where the transport supports notify/push
-- **gRPC extras (experimental)** — now-playing metadata, sound field mode select, play/pause/next on Spotify/Bluetooth/AirPlay, DSEE Ultimate, 360SSM height, and more (~40 entities)
+- **gRPC extras** — now-playing metadata, sound field mode select, play/pause/next on Spotify/Bluetooth/AirPlay, DSEE Ultimate, 360SSM height, and more (see [docs/entities.md](docs/entities.md))
 - **Single device** — all entities nested under one Bravia Theatre device in Home Assistant
 
 Full entity list: [docs/entities.md](docs/entities.md)
@@ -72,11 +72,12 @@ The integration discovers Bravia Theatre devices automatically. If yours is not 
 During setup you choose a **transport**:
 
 
-| Mode                                     | Connection        | Summary                                                                              |
-| ---------------------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
-| **gRPC** (recommended, **EXPERIMENTAL**) | Port 55051 + HTTP | BRAVIA Connect plane; Sony sign-in; streaming controls and extended sound settings   |
-| **TCP** (legacy)                         | Port 33336 + HTTP | No sign-in; full diagnostic extras (Bluetooth pairing, temperature, network sensors) |
+| Mode                        | Connection        | Summary                                                                              |
+| --------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
+| **gRPC** (recommended)      | Port 55051 + HTTP | BRAVIA Connect plane; Sony sign-in; streaming controls and extended sound settings   |
+| **TCP** (legacy)            | Port 33336 + HTTP | No sign-in; full diagnostic extras (Bluetooth pairing, temperature, network sensors) |
 
+> **Beta Feature:** gRPC is the recommended transport and still evolving — expect parity gaps vs TCP and occasional changes across releases or firmware.
 
 gRPC mode prompts for Sony sign-in (OAuth). Session keys refresh automatically when possible.
 

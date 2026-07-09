@@ -2,7 +2,9 @@
 
 Step-by-step guide for setting up **gRPC** (BRAVIA Connect) control in Home Assistant.
 
-gRPC is the **recommended** transport but is still **experimental**. It uses the same local control plane as the Sony Home Entertainment Connect app: live push updates, now-playing metadata, streaming transport controls, and extended sound settings. Expect parity gaps and breaking changes between releases.
+gRPC is the **recommended** transport. It uses the same local control plane as the Sony Home Entertainment Connect app: live push updates, now-playing metadata, streaming transport controls, and extended sound settings.
+
+> **Beta Feature:** gRPC is still evolving — expect parity gaps vs TCP and occasional changes across releases or firmware.
 
 For a short transport comparison, see [configuration.md](configuration.md#transport-modes). For entity differences vs TCP, see [grpc-tcp-mapping.md](grpc-tcp-mapping.md#parity-gaps).
 
@@ -23,7 +25,7 @@ Verified on BRAVIA Theatre Quad (HT-A9M2). Other models that expose gRPC may wor
 1. Go to **Settings** → **Devices & Services** → **Add Integration**.
 2. Search for **Bravia Theatre**.
 3. If the device was discovered, confirm it. Otherwise enter the device **IP address**.
-4. On **Connection method**, choose **gRPC — BRAVIA Connect (recommended, EXPERIMENTAL)**.
+4. On **Connection method**, choose **gRPC — BRAVIA Connect (recommended)**.
 5. Complete **Sony sign-in** (next section).
 6. If your Sony account has more than one device, select the Bravia Theatre you are setting up.
 7. Confirm the successful connection to finish.
