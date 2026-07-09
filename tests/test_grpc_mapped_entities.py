@@ -192,7 +192,7 @@ def test_playback_command_false_availability_none_reason_is_available() -> None:
 
 
 def _entity_suffixes(entities: list, grpc_entry: MagicMock) -> set[str]:
-    prefix = f"{DOMAIN}_{grpc_entry.unique_id}_"
+    prefix = f"{grpc_entry.unique_id}_"
     return {e._attr_unique_id.removeprefix(prefix) for e in entities}
 
 

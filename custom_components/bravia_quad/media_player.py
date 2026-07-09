@@ -13,7 +13,6 @@ from homeassistant.components.media_player import (
 )
 
 from .const import (
-    DOMAIN,
     FEATURE_INPUT,
     FEATURE_MUTE,
     FEATURE_POWER,
@@ -27,27 +26,32 @@ from .const import (
     TRANSPORT_GRPC,
     TRANSPORT_TCP,
 )
+from .entity import (
+    BraviaQuadAvailabilityMixin,
+    VolumeTransitionMixin,
+    entity_unique_id,
+    get_device_info,
+)
 from .grpc_media_player import BraviaGrpcMediaPlayer
-from .helpers import BraviaQuadAvailabilityMixin, VolumeTransitionMixin, get_device_info
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-    from . import BraviaQuadData
+    from . import BraviaQuadConfigEntry
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
+    _hass: HomeAssistant,
+    entry: BraviaQuadConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Quad media player from a config entry."""
-    data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+    data = entry.runtime_data
 
     if data.transport == TRANSPORT_GRPC:
         if data.grpc_client is None:
@@ -84,7 +88,7 @@ class BraviaQuadMediaPlayer(
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the media player."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_media_player"
+        self._attr_unique_id = entity_unique_id(entry, "media_player")
         self._attr_device_info = get_device_info(entry)
         self._attr_source_list = list(INPUT_OPTIONS)
         self._update_state_from_client()
@@ -226,32 +230,16 @@ class BraviaQuadMediaPlayer(
     async def async_added_to_hass(self) -> None:
         """Register notification callbacks when entity is added."""
         await super().async_added_to_hass()
-        self._client.register_notification_callback(
-            FEATURE_POWER, self._on_power_notification
-        )
-        self._client.register_notification_callback(
-            FEATURE_VOLUME, self._on_volume_notification
-        )
-        self._client.register_notification_callback(
-            FEATURE_INPUT, self._on_input_notification
-        )
-        self._client.register_notification_callback(
-            FEATURE_MUTE, self._on_mute_notification
-        )
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Unregister callbacks and cancel any ongoing transition."""
-        self._client.unregister_notification_callback(
-            FEATURE_POWER, self._on_power_notification
-        )
-        self._client.unregister_notification_callback(
-            FEATURE_VOLUME, self._on_volume_notification
-        )
-        self._client.unregister_notification_callback(
-            FEATURE_INPUT, self._on_input_notification
-        )
-        self._client.unregister_notification_callback(
-            FEATURE_MUTE, self._on_mute_notification
-        )
-        self._cancel_volume_transition()
-        await super().async_will_remove_from_hass()
+        for feature, callback in (
+            (FEATURE_POWER, self._on_power_notification),
+            (FEATURE_VOLUME, self._on_volume_notification),
+            (FEATURE_INPUT, self._on_input_notification),
+            (FEATURE_MUTE, self._on_mute_notification),
+        ):
+            self._client.register_notification_callback(feature, callback)
+            self.async_on_remove(
+                lambda feature=feature, callback=callback: (
+                    self._client.unregister_notification_callback(feature, callback)
+                )
+            )
+        self.async_on_remove(self._cancel_volume_transition)

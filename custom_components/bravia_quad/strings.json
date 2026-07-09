@@ -61,6 +61,7 @@
       "not_bravia_theatre": "Discovered device is not a Bravia Theatre speaker",
       "cannot_connect": "Could not connect to device",
       "reauth_successful": "Re-authentication was successful",
+      "wrong_account": "The signed-in Sony account does not match this Bravia Theatre device",
       "not_grpc_transport": "gRPC options are only available for gRPC transport entries"
     }
   },

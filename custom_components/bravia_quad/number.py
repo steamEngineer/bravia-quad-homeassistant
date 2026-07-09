@@ -27,12 +27,15 @@ from .const import (
     TRANSPORT_GRPC,
     TRANSPORT_TCP,
 )
-from .grpc_mapped_entities import mapped_number_entities
-from .helpers import (
+from .entity import (
     BraviaQuadNotificationMixin,
     BraviaQuadVolumeStepIntervalNumber,
     VolumeTransitionMixin,
+    entity_unique_id,
     get_device_info,
+)
+from .grpc_mapped_entities import mapped_number_entities
+from .helpers import (
     raise_set_rejected,
     verify_feature_value,
 )
@@ -42,7 +45,7 @@ if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-    from . import BraviaQuadData
+    from . import BraviaQuadConfigEntry
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,12 +58,12 @@ MAX_VOLUME = 100
 
 
 async def async_setup_entry(
-    hass: HomeAssistant,
-    entry: ConfigEntry,
+    _hass: HomeAssistant,
+    entry: BraviaQuadConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Quad number entities from a config entry."""
-    data: BraviaQuadData = hass.data[DOMAIN][entry.entry_id]
+    data = entry.runtime_data
 
     if data.transport == TRANSPORT_GRPC:
         if data.grpc_client is None:
@@ -112,7 +115,7 @@ class BraviaQuadVolumeNumber(
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the volume number entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_volume"
+        self._attr_unique_id = entity_unique_id(entry, "volume")
         self._attr_native_value = client.volume
         self._attr_device_info = get_device_info(entry)
         self._init_volume_transition()
@@ -150,10 +153,10 @@ class BraviaQuadVolumeNumber(
             self.async_write_ha_state()
             _LOGGER.error("Failed to set volume to %d", target_volume)
 
-    async def async_will_remove_from_hass(self) -> None:
-        """Cancel any ongoing transition when entity is removed."""
-        self._cancel_volume_transition()
-        await super().async_will_remove_from_hass()
+    async def async_added_to_hass(self) -> None:
+        """Register callbacks and cancel volume transition on remove."""
+        await super().async_added_to_hass()
+        self.async_on_remove(self._cancel_volume_transition)
 
     async def async_update(self) -> None:
         """Update the volume value."""
@@ -180,7 +183,7 @@ class BraviaQuadRearLevelNumber(BraviaQuadNotificationMixin, NumberEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the rear level number entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_rear_level"
+        self._attr_unique_id = entity_unique_id(entry, "rear_level")
         self._attr_native_value = client.rear_level
         self._attr_device_info = get_device_info(entry)
 
@@ -229,7 +232,7 @@ class BraviaQuadBassLevelNumber(BraviaQuadNotificationMixin, NumberEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the bass level number entity."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_bass_level_slider"
+        self._attr_unique_id = entity_unique_id(entry, "bass_level_slider")
         self._attr_native_value = client.bass_level
         self._attr_device_info = get_device_info(entry)
 
@@ -279,7 +282,7 @@ class BraviaQuadAvSyncNumber(BraviaQuadNotificationMixin, NumberEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the AV sync number."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_av_sync"
+        self._attr_unique_id = entity_unique_id(entry, "av_sync")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 
@@ -344,7 +347,7 @@ class BraviaQuadTvAvSyncNumber(BraviaQuadNotificationMixin, NumberEntity):
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:
         """Initialize the TV AV sync number."""
         self._client = client
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_tv_av_sync"
+        self._attr_unique_id = entity_unique_id(entry, "tv_av_sync")
         self._attr_native_value = None
         self._attr_device_info = get_device_info(entry)
 

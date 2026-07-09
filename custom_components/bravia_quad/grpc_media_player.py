@@ -19,7 +19,6 @@ from homeassistant.components.media_player import (
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    DOMAIN,
     INPUT_OPTIONS,
     MAX_VOLUME,
     MUTE_OFF,
@@ -29,17 +28,18 @@ from .const import (
     SOUND_EFFECT_HA_TO_DEVICE,
     SOUND_EFFECT_OPTIONS,
 )
+from .entity import (
+    BraviaGrpcPathMixin,
+    VolumeTransitionMixin,
+    entity_unique_id,
+    get_device_info,
+)
 from .grpc_entity_registry import entity_spec_for_path
 from .grpc_value_normalize import (
     denormalize_for_exec,
     grpc_exec_unavailable_reason,
     normalize_grpc_value,
     normalize_input_source,
-)
-from .helpers import (
-    BraviaGrpcPathMixin,
-    VolumeTransitionMixin,
-    get_device_info,
 )
 
 if TYPE_CHECKING:
@@ -354,7 +354,7 @@ class BraviaGrpcMediaPlayer(
         self._grpc_client = grpc_client
         self._entry = entry
         self._grpc_path = _PATH_POWER
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_media_player"
+        self._attr_unique_id = entity_unique_id(entry, "media_player")
         self._attr_device_info = get_device_info(entry)
         self._attr_source_list = _filter_source_list(list(INPUT_OPTIONS), current=None)
         self._attr_sound_mode_list = list(SOUND_EFFECT_OPTIONS)
@@ -880,15 +880,17 @@ class BraviaGrpcMediaPlayer(
         """Register gRPC callbacks and backfill playback state."""
         await super().async_added_to_hass()
         self._grpc_client.add_state_callback(self._grpc_state_callback)
+        self.async_on_remove(
+            lambda: self._grpc_client.remove_state_callback(self._grpc_state_callback)
+        )
+        self.async_on_remove(self._cancel_volume_transition)
+
+        def _cancel_position_write() -> None:
+            if self._position_write_task:
+                self._position_write_task.cancel()
+
+        self.async_on_remove(_cancel_position_write)
         await self._grpc_client.async_fetch_field_paths(list(_PLAYBACK_BACKFILL_PATHS))
         self._seed_from_cache()
         self._invalidate_media_cached_properties()
         self.async_write_ha_state()
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Unregister gRPC callbacks."""
-        self._grpc_client.remove_state_callback(self._grpc_state_callback)
-        self._cancel_volume_transition()
-        if self._position_write_task:
-            self._position_write_task.cancel()
-        await super().async_will_remove_from_hass()

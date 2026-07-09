@@ -34,6 +34,12 @@ from .const import (
     MIN_REAR_LEVEL,
     MIN_VOICE_ZOOM_LEVEL,
 )
+from .entity import (
+    BraviaGrpcPathMixin,
+    BraviaQuadVolumeStepIntervalNumber,
+    entity_unique_id,
+    get_device_info,
+)
 from .grpc_entity_registry import EntitySpec, entity_spec_for_mapping
 from .grpc_mapping import (
     GrpcTcpMapping,
@@ -49,9 +55,6 @@ from .grpc_value_normalize import (
     normalize_grpc_value,
 )
 from .helpers import (
-    BraviaGrpcPathMixin,
-    BraviaQuadVolumeStepIntervalNumber,
-    get_device_info,
     persist_notify_only_restore_state,
     restore_last_select_option,
     restore_last_switch_state,
@@ -62,6 +65,7 @@ from .helpers import (
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
 
+    from . import BraviaQuadConfigEntry
     from .bravia_grpc_client import BraviaGrpcClientAsync
 
 _LOGGER = logging.getLogger(__name__)
@@ -112,7 +116,7 @@ class BraviaGrpcMappedSwitch(BraviaGrpcPathMixin, RestoreEntity, SwitchEntity):
     def __init__(
         self,
         grpc_client: BraviaGrpcClientAsync,
-        entry: ConfigEntry,
+        entry: BraviaQuadConfigEntry,
         spec: EntitySpec,
     ) -> None:
         """Initialize gRPC mapped switch."""
@@ -120,7 +124,7 @@ class BraviaGrpcMappedSwitch(BraviaGrpcPathMixin, RestoreEntity, SwitchEntity):
         self._spec = spec
         self._grpc_path = spec.grpc_path
         self._attr_translation_key = spec.translation_key
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_{spec.unique_id_suffix}"
+        self._attr_unique_id = entity_unique_id(entry, spec.unique_id_suffix)
         self._attr_device_info = get_device_info(entry)
         self._attr_entity_registry_enabled_default = spec.enabled_default
         raw = grpc_client.notify_state.get(spec.grpc_path)
@@ -194,7 +198,7 @@ class BraviaGrpcMappedSelect(BraviaGrpcPathMixin, RestoreEntity, SelectEntity):
     def __init__(
         self,
         grpc_client: BraviaGrpcClientAsync,
-        entry: ConfigEntry,
+        entry: BraviaQuadConfigEntry,
         spec: EntitySpec,
         *,
         options: list[str] | None = None,
@@ -204,7 +208,7 @@ class BraviaGrpcMappedSelect(BraviaGrpcPathMixin, RestoreEntity, SelectEntity):
         self._spec = spec
         self._grpc_path = spec.grpc_path
         self._attr_translation_key = spec.translation_key
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_{spec.unique_id_suffix}"
+        self._attr_unique_id = entity_unique_id(entry, spec.unique_id_suffix)
         self._attr_device_info = get_device_info(entry)
         self._attr_entity_registry_enabled_default = spec.enabled_default
         if spec.grpc_path not in _PLAYBACK_SELECT_PATHS:
@@ -288,7 +292,7 @@ class BraviaGrpcMappedNumber(BraviaGrpcPathMixin, NumberEntity):
     def __init__(
         self,
         grpc_client: BraviaGrpcClientAsync,
-        entry: ConfigEntry,
+        entry: BraviaQuadConfigEntry,
         spec: EntitySpec,
         *,
         native_min_value: float,
@@ -299,7 +303,7 @@ class BraviaGrpcMappedNumber(BraviaGrpcPathMixin, NumberEntity):
         self._spec = spec
         self._grpc_path = spec.grpc_path
         self._attr_translation_key = spec.translation_key
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_{spec.unique_id_suffix}"
+        self._attr_unique_id = entity_unique_id(entry, spec.unique_id_suffix)
         self._attr_device_info = get_device_info(entry)
         self._attr_entity_registry_enabled_default = spec.enabled_default
         self._attr_native_min_value = native_min_value
@@ -362,7 +366,7 @@ class BraviaGrpcMappedSensor(BraviaGrpcPathMixin, SensorEntity):
     def __init__(
         self,
         grpc_client: BraviaGrpcClientAsync,
-        entry: ConfigEntry,
+        entry: BraviaQuadConfigEntry,
         spec: EntitySpec,
         *,
         entity_category: EntityCategory | None = EntityCategory.DIAGNOSTIC,
@@ -373,7 +377,7 @@ class BraviaGrpcMappedSensor(BraviaGrpcPathMixin, SensorEntity):
         self._spec = spec
         self._grpc_path = spec.grpc_path
         self._attr_translation_key = spec.translation_key
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_{spec.unique_id_suffix}"
+        self._attr_unique_id = entity_unique_id(entry, spec.unique_id_suffix)
         self._attr_device_info = get_device_info(entry)
         self._attr_entity_category = entity_category
         self._attr_entity_registry_enabled_default = (
@@ -396,7 +400,7 @@ class BraviaGrpcBassLevelSelect(BraviaGrpcMappedSelect):
     def __init__(
         self,
         grpc_client: BraviaGrpcClientAsync,
-        entry: ConfigEntry,
+        entry: BraviaQuadConfigEntry,
         spec: EntitySpec,
     ) -> None:
         """Initialize bass level select."""
@@ -406,7 +410,7 @@ class BraviaGrpcBassLevelSelect(BraviaGrpcMappedSelect):
             spec,
             options=list(BASS_LEVEL_OPTIONS.keys()),
         )
-        self._attr_unique_id = f"{DOMAIN}_{entry.unique_id}_bass_level_select"
+        self._attr_unique_id = entity_unique_id(entry, "bass_level_select")
         self._attr_options = list(BASS_LEVEL_OPTIONS.keys())
         normalized = normalize_grpc_value(
             spec.mapping, grpc_client.notify_state.get(spec.grpc_path)

@@ -9,8 +9,6 @@ import pytest
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import Platform
 
-from custom_components.bravia_quad.const import DOMAIN
-
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
     from pytest_homeassistant_custom_component.common import MockConfigEntry
@@ -36,8 +34,8 @@ async def test_setup_entry(
         await hass.async_block_till_done()
 
     assert mock_config_entry.state is ConfigEntryState.LOADED
-    assert DOMAIN in hass.data
-    assert mock_config_entry.entry_id in hass.data[DOMAIN]
+    assert mock_config_entry.runtime_data is not None
+    assert mock_config_entry.runtime_data.http_client is not None
 
 
 @pytest.mark.usefixtures("mock_bravia_quad_client", "mock_bravia_http_client")
@@ -59,7 +57,23 @@ async def test_unload_entry(
     await hass.async_block_till_done()
 
     assert mock_config_entry.state is ConfigEntryState.NOT_LOADED
-    assert mock_config_entry.entry_id not in hass.data[DOMAIN]
+
+
+async def test_unload_entry_without_runtime_data(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Unload must not crash when setup never assigned runtime_data."""
+    from custom_components.bravia_quad import async_unload_entry
+
+    mock_config_entry.add_to_hass(hass)
+    assert not hasattr(mock_config_entry, "runtime_data")
+
+    with patch(
+        "homeassistant.config_entries.ConfigEntries.async_unload_platforms",
+        return_value=True,
+    ):
+        assert await async_unload_entry(hass, mock_config_entry)
 
 
 async def test_setup_entry_connection_error(
