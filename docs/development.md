@@ -116,6 +116,8 @@ GitHub Actions on every pull request:
 - **Lint** — Ruff and Ty (`custom_components/bravia_quad`)
 - **Tests** — pytest
 
+CI installs Python from [`.python-version`](../.python-version). `requires-python` in `pyproject.toml` is the install floor (aligned with Home Assistant Core) and is bumped manually when HA raises its minimum.
+
 Release workflow validates version format, updates `pyproject.toml` and `manifest.json`, tags, and publishes GitHub releases.
 
 Dependencies are kept up to date via [Renovate](https://docs.renovatebot.com/) (GitHub Actions, Python packages).
