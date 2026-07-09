@@ -24,6 +24,8 @@ If you encounter connection problems:
 
 ## gRPC-specific issues
 
+Full gRPC setup walkthrough (including Chrome Network redirect copy): [grpc-setup.md](grpc-setup.md).
+
 ### Sony sign-in or session refresh failed
 
 - Reconfigure the integration and complete Sony sign-in again
