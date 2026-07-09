@@ -212,6 +212,13 @@
               "airplay2": "AirPlay"
             }
           },
+          "sound_mode": {
+            "state": {
+              "dolby_speaker_virtualizer": "Dolby Speaker Virtualizer",
+              "neural_x": "DTS Neural:X",
+              "ssm_360": "360 Spatial Sound Mapping"
+            }
+          },
           "audio_format": {
             "name": "Audio format"
           },
@@ -300,7 +307,7 @@
         "name": "DTS Dialog Control"
       },
       "audio_return_channel": {
-        "name": "ARC (TV)"
+        "name": "HDMI ARC (TV)"
       }
     },
     "sensor": {
