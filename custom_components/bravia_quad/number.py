@@ -341,7 +341,6 @@ class BraviaQuadTvAvSyncNumber(BraviaQuadNotificationMixin, NumberEntity):
     _attr_native_max_value = MAX_AV_SYNC
     _attr_native_step = 25
     _attr_native_unit_of_measurement = "ms"
-    _attr_entity_registry_enabled_default = False
     _notification_feature = FEATURE_TV_AV_SYNC
 
     def __init__(self, client: BraviaQuadClient, entry: ConfigEntry) -> None:

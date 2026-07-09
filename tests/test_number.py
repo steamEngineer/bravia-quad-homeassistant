@@ -650,11 +650,11 @@ async def test_av_sync_number_entities(
     assert state is not None
     assert state.state == "0"
 
-    # TV AV sync should be disabled by default
     tv_entity_id = get_entity_id_by_unique_id_suffix(entity_registry, "_tv_av_sync")
     assert tv_entity_id is not None
     state = hass.states.get(tv_entity_id)
-    assert state is None  # Disabled
+    assert state is not None
+    assert state.state == "0"
 
 
 @pytest.mark.usefixtures("init_integration")
