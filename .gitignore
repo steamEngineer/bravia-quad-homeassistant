@@ -24,6 +24,9 @@ docs/*
 !docs/troubleshooting.md
 !docs/grpc-auth-lifecycle.md
 !docs/seeds-cloud-states.md
+!docs/grpc-setup.md
+!docs/images/
+!docs/images/**
 
 scripts/grpc/session_keys.json
 *.pcap

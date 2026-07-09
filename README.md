@@ -80,7 +80,7 @@ During setup you choose a **transport**:
 
 gRPC mode prompts for Sony sign-in (OAuth). Session keys refresh automatically when possible.
 
-Details, parity gaps, and migration: [docs/configuration.md](docs/configuration.md#transport-modes)
+Step-by-step gRPC setup (Chrome Network redirect, Seeds options): [docs/grpc-setup.md](docs/grpc-setup.md). Transport comparison and migration: [docs/configuration.md](docs/configuration.md#transport-modes).
 
 ## Device compatibility
 
@@ -149,6 +149,7 @@ Automate settings (**Voice Enhancer**, **Auto Volume**, **Sound Field**, **Night
 | ------------------------- | ---------------------------------------------------------------------------------------- |
 | **All docs**              | [docs/README.md](docs/README.md)                                                         |
 | Setup & transport         | [docs/configuration.md](docs/configuration.md)                                           |
+| gRPC setup guide          | [docs/grpc-setup.md](docs/grpc-setup.md)                                                 |
 | Entities                  | [docs/entities.md](docs/entities.md)                                                     |
 | Troubleshooting           | [docs/troubleshooting.md](docs/troubleshooting.md)                                       |
 | TCP protocol              | [docs/tcp-protocol.md](docs/tcp-protocol.md)                                             |

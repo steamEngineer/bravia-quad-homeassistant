@@ -7,6 +7,7 @@ Reference and guides for the [Bravia Theatre Home Assistant integration](../READ
 | Document | Description |
 |----------|-------------|
 | [configuration.md](configuration.md) | Setup, transport modes (TCP vs gRPC), migration |
+| [grpc-setup.md](grpc-setup.md) | gRPC transport: Sony sign-in, options, Seeds cloud reads |
 | [entities.md](entities.md) | Entity reference by transport |
 | [troubleshooting.md](troubleshooting.md) | Connection, state sync, and gRPC issues |
 | [Blueprints](../README.md#blueprints) | Source-based automation (import link in README) |
