@@ -13,6 +13,7 @@ from homeassistant.helpers import entity_registry as er
 
 from .const import CONF_HAS_SUBWOOFER, DOMAIN, TRANSPORT_GRPC, TRANSPORT_TCP
 from .entity import (
+    BraviaGrpcAvailabilityMixin,
     BraviaQuadAvailabilityMixin,
     entity_unique_id,
     get_device_info,
@@ -29,6 +30,8 @@ if TYPE_CHECKING:
     from .bravia_quad_client import BraviaQuadClient
 
 _LOGGER = logging.getLogger(__name__)
+
+PARALLEL_UPDATES = 1
 
 
 async def async_setup_entry(
@@ -227,7 +230,7 @@ class BraviaQuadBluetoothPairingButton(BraviaQuadAvailabilityMixin, ButtonEntity
             raise HomeAssistantError(msg) from err
 
 
-class BraviaGrpcDetectSubwooferButton(ButtonEntity):
+class BraviaGrpcDetectSubwooferButton(BraviaGrpcAvailabilityMixin, ButtonEntity):
     """Re-detect subwoofer via gRPC GetStates (no TCP bass probe)."""
 
     _attr_entity_category = EntityCategory.DIAGNOSTIC
