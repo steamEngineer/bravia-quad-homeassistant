@@ -57,14 +57,22 @@ class BraviaQuadAvailabilityMixin(Entity):
     """
 
     _client: BraviaQuadClient
+    _unavailable_logged: bool = False
 
     @property
     def available(self) -> bool:
         """Return True if entity is available."""
         return self._client.is_connected
 
-    def _on_availability_changed(self, _available: bool) -> None:  # noqa: FBT001
+    def _on_availability_changed(self, available: bool) -> None:  # noqa: FBT001
         """Handle connection availability change."""
+        if not available:
+            if not self._unavailable_logged:
+                _LOGGER.info("%s is unavailable", self.entity_id)
+                self._unavailable_logged = True
+        elif self._unavailable_logged:
+            _LOGGER.info("%s is back online", self.entity_id)
+            self._unavailable_logged = False
         self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:
@@ -115,14 +123,22 @@ class BraviaGrpcAvailabilityMixin(Entity):
     """
 
     _grpc_client: BraviaGrpcClientAsync
+    _unavailable_logged: bool = False
 
     @property
     def available(self) -> bool:
         """Entity is available when gRPC is connected."""
         return self._grpc_client.is_connected
 
-    def _on_grpc_availability_changed(self, _available: bool) -> None:  # noqa: FBT001
+    def _on_grpc_availability_changed(self, available: bool) -> None:  # noqa: FBT001
         """Handle gRPC session availability change."""
+        if not available:
+            if not self._unavailable_logged:
+                _LOGGER.info("%s is unavailable", self.entity_id)
+                self._unavailable_logged = True
+        elif self._unavailable_logged:
+            _LOGGER.info("%s is back online", self.entity_id)
+            self._unavailable_logged = False
         self.async_write_ha_state()
 
     async def async_added_to_hass(self) -> None:

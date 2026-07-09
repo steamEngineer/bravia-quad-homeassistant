@@ -142,8 +142,7 @@ async def test_update_entity_firmware_check_error(
     hass: HomeAssistant,
     mock_bravia_http_client: MagicMock,
 ) -> None:
-    """Test update entity when firmware check returns error."""
-    # Override return value for the update call
+    """Test update entity becomes unavailable when firmware check errors."""
     mock_bravia_http_client.async_check_firmware_update.return_value = (
         FirmwareUpdateStatus.ERROR
     )
@@ -151,9 +150,33 @@ async def test_update_entity_firmware_check_error(
     await async_update_entity(hass, ENTITY_ID)
     await hass.async_block_till_done()
 
-    # State should remain unchanged (still shows installed version)
     state = hass.states.get(ENTITY_ID)
     assert state is not None
+    assert state.state == "unavailable"
+
+
+@pytest.mark.usefixtures("init_integration")
+async def test_update_entity_recovers_after_firmware_check_error(
+    hass: HomeAssistant,
+    mock_bravia_http_client: MagicMock,
+) -> None:
+    """Test update entity recovers availability after a successful poll."""
+    mock_bravia_http_client.async_check_firmware_update.return_value = (
+        FirmwareUpdateStatus.ERROR
+    )
+    await async_update_entity(hass, ENTITY_ID)
+    await hass.async_block_till_done()
+    assert hass.states.get(ENTITY_ID).state == "unavailable"
+
+    mock_bravia_http_client.async_check_firmware_update.return_value = (
+        FirmwareUpdateStatus.UP_TO_DATE
+    )
+    await async_update_entity(hass, ENTITY_ID)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(ENTITY_ID)
+    assert state is not None
+    assert state.state != "unavailable"
     assert state.attributes["installed_version"] == "001.100"
 
 
@@ -208,7 +231,7 @@ async def test_update_entity_version_persists_through_error(
     hass: HomeAssistant,
     mock_bravia_http_client: MagicMock,
 ) -> None:
-    """Test installed version persists when HTTP API returns empty."""
+    """Test entity goes unavailable on ERROR but recovers with prior version."""
     state = hass.states.get(ENTITY_ID)
     assert state.attributes["installed_version"] == "001.100"
 
@@ -222,6 +245,21 @@ async def test_update_entity_version_persists_through_error(
     await hass.async_block_till_done()
 
     state = hass.states.get(ENTITY_ID)
+    assert state is not None
+    assert state.state == "unavailable"
+
+    mock_bravia_http_client.async_get_system_info.return_value = SystemInfo(
+        version="001.100", model_name="BRAVIA Theatre Quad"
+    )
+    mock_bravia_http_client.async_check_firmware_update.return_value = (
+        FirmwareUpdateStatus.UP_TO_DATE
+    )
+    await async_update_entity(hass, ENTITY_ID)
+    await hass.async_block_till_done()
+
+    state = hass.states.get(ENTITY_ID)
+    assert state is not None
+    assert state.state != "unavailable"
     assert state.attributes["installed_version"] == "001.100"
 
 

@@ -33,6 +33,17 @@ HTTP is always used for firmware update and network diagnostic sensors regardles
 
 Legacy entries with **Enable gRPC state sync** in options are migrated automatically to gRPC transport on reload.
 
+## Options (gRPC transport)
+
+After setup, open the integration → **Configure** to change gRPC options:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| **Verbose gRPC debug logging** (`grpc_debug`) | off | Extra debug logs for the local gRPC session |
+| **Read notify-only settings from Sony Seeds cloud** (`grpc_seeds_poll`) | off | Opt-in cloud reads for settings that local gRPC does not return (same Sony API BRAVIA Connect uses; credit [@mafredri](https://github.com/mafredri)). See [seeds-cloud-states.md](seeds-cloud-states.md). |
+
+TCP transport has no options step.
+
 ## Connection requirements
 
 The integration will automatically test the connection during setup.

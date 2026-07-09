@@ -195,6 +195,7 @@ class BraviaQuadFirmwareUpdate(UpdateEntity):
         status = await self._http_client.async_check_firmware_update()
         match status:
             case FirmwareUpdateStatus.UPDATE_AVAILABLE:
+                self._attr_available = True
                 self._update_available = True
                 if not self._latest_fw or not self._latest_fw.version:
                     self._latest_fw = (
@@ -203,11 +204,12 @@ class BraviaQuadFirmwareUpdate(UpdateEntity):
                         )
                     )
             case FirmwareUpdateStatus.UP_TO_DATE:
+                self._attr_available = True
                 self._update_available = False
                 self._latest_fw = None
                 self._install_started_at = 0
             case FirmwareUpdateStatus.ERROR:
-                pass
+                self._attr_available = False
 
     async def _async_delayed_refresh(self, delay: int) -> None:
         """Backstop refresh after install cooldown expires."""
