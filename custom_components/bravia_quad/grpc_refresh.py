@@ -194,13 +194,13 @@ async def async_setup_grpc_client(
         if not connected:
             raise ConfigEntryNotReady
 
+        await grpc_client.async_fetch_capabilities()
+
         await async_ensure_external_control_enabled(
             entry.data["host"],
             name=entry.data.get(CONF_NAME, DEFAULT_NAME),
             grpc_client=grpc_client,
         )
-
-        await grpc_client.async_fetch_capabilities()
 
         seeded = await grpc_client.async_seed_notify_from_snapshot()
         if seeded:

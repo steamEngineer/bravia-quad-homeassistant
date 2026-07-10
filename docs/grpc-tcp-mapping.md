@@ -62,6 +62,8 @@ AirPlay is **detect-only** in HA: `airplay2` is omitted from the selectable sour
 
 **Notify-only / gRPC-unreadable app settings:** Paths in `NOTIFY_ONLY_GRPC_PATHS` (DRC, 360SSM height, eARC, auto standby, etc.) accept ExecCommand writes but are **not readable** over local gRPC on fw 001.454 — single-path and bulk GetStates return `UNKNOWN`, and the notify stream never includes these paths. [@mafredri](https://github.com/mafredri) confirmed ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)) that BRAVIA Connect reads them via Seeds `GET /devices/{device_id}/states`. In gRPC mode, enable **Seeds cloud reads** (`grpc_seeds_poll`) to seed entity state without TCP — see [seeds-cloud-states.md](seeds-cloud-states.md). When Seeds is off, initial state comes from TCP seed (TCP-capable models only), HA restore, or the last Exec write cache.
 
+**External control TCP probe:** gRPC setup still tries `:33336` to ensure external control is on (needed for hybrid TCP seed on Quad). Connect failures are logged at debug — expected on gRPC-only models such as HT-A8 with no TCP listener. `GetCapabilities` does not advertise `system_setting.external_control` on current firmware (notify-only / Seeds path), so capabilities cannot gate this probe.
+
 ## GetStates snapshot vs entity seeding
 
 Bulk GetStates (static HA path list, app-sequence with HMAC signing; filtered to `GetCapabilities` names when available — see [sony-grpc-reference.md](sony-grpc-reference.md#getcapabilities-path-filtering)) parses into `notify_state` at startup. Many HA entities still show `unknown` because the device does not always return usable values:

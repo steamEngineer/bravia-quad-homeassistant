@@ -39,12 +39,16 @@ async def async_ensure_external_control_enabled(
 
     Reads the flag over TCP when possible. When off, enables via TCP first; if that
     fails, logs a warning and falls back to gRPC ``system_setting.external_control``.
+
+    TCP connect failures are logged at debug (expected on gRPC-only models with no
+    ``:33336`` listener). GetCapabilities does not advertise this path on current
+    firmware, so it cannot gate the probe.
     """
     tcp = BraviaQuadClient(host, name)
     try:
         await tcp.async_connect()
     except (OSError, TimeoutError) as err:
-        _LOGGER.warning(
+        _LOGGER.debug(
             "Could not open TCP control plane on %s to verify external control: %s",
             host,
             err,
@@ -101,7 +105,8 @@ async def _grpc_fallback_enable(
     """Enable external control via gRPC when TCP check/set is unavailable or failed."""
     if grpc_client is None or not grpc_client.is_connected:
         msg = "gRPC client not connected; cannot enable external control"
-        _LOGGER.error(
+        log = _LOGGER.debug if not tcp_reachable else _LOGGER.error
+        log(
             "External control is off on %s and %s",
             host,
             msg.lower(),
@@ -120,7 +125,8 @@ async def _grpc_fallback_enable(
     )
     if not ok:
         msg = "gRPC ExecCommand for external control returned failure"
-        _LOGGER.error(
+        log = _LOGGER.debug if not tcp_reachable else _LOGGER.error
+        log(
             "External control is off on %s and could not be enabled via TCP or gRPC",
             host,
         )
@@ -155,6 +161,12 @@ async def _grpc_fallback_enable(
     if verified_on:
         _LOGGER.info(
             "Enabled external control on %s via gRPC fallback (TCP verify OK)",
+            host,
+        )
+    elif not tcp_reachable:
+        _LOGGER.debug(
+            "gRPC external-control fallback on %s with no TCP plane "
+            "(expected on gRPC-only models)",
             host,
         )
     else:

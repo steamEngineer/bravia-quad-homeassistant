@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
+
+import pytest
 
 from custom_components.bravia_quad.external_control import (
     ExternalControlEnsureResult,
@@ -104,6 +107,27 @@ async def test_tcp_unreachable_uses_grpc_fallback() -> None:
     assert result.enabled_via == "grpc"
     assert result.tcp_reachable is False
     assert result.external_control_on is True
+
+
+async def test_tcp_unreachable_logs_at_debug(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """TCP connect refusal is debug, not warning (gRPC-only models)."""
+    grpc = _grpc_mock()
+    verify_tcp = _tcp_mock(get_values=["on"])
+    with (
+        caplog.at_level(
+            logging.DEBUG, logger="custom_components.bravia_quad.external_control"
+        ),
+        patch(
+            "custom_components.bravia_quad.external_control.BraviaQuadClient",
+            side_effect=[_tcp_mock(connect_ok=False), verify_tcp],
+        ),
+    ):
+        await async_ensure_external_control_enabled(TEST_HOST, grpc_client=grpc)
+
+    assert not any(r.levelno >= logging.WARNING for r in caplog.records)
+    assert any("Could not open TCP control plane" in r.message for r in caplog.records)
 
 
 async def test_both_transports_fail() -> None:

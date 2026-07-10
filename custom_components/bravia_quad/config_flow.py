@@ -196,9 +196,9 @@ async def validate_grpc_input(host: str, keys_json: str) -> dict[str, Any]:
             msg = "gRPC authentication failed. Check Sony Seeds keys."
             raise CannotConnectError(msg)
 
-        await async_ensure_external_control_enabled(host, grpc_client=grpc_client)
-
         await grpc_client.async_fetch_capabilities()
+
+        await async_ensure_external_control_enabled(host, grpc_client=grpc_client)
 
         snapshot = await grpc_client.async_get_states_dict()
         if not snapshot:
