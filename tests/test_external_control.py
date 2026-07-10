@@ -30,11 +30,80 @@ def _tcp_mock(
     return mock
 
 
-def _grpc_mock(*, connected: bool = True, exec_ok: bool = True) -> MagicMock:
+def _grpc_mock(
+    *,
+    connected: bool = True,
+    exec_ok: bool = True,
+    capability_paths: frozenset[str] | None = None,
+) -> MagicMock:
     mock = MagicMock()
     mock.is_connected = connected
     mock.async_exec_command = AsyncMock(return_value=exec_ok)
+    mock.capability_paths = capability_paths
     return mock
+
+
+async def test_skips_when_path_absent_from_capabilities() -> None:
+    """No TCP probe or gRPC exec when GetCapabilities omits external_control."""
+    grpc = _grpc_mock(capability_paths=frozenset({"power"}))
+    with patch(
+        "custom_components.bravia_quad.external_control.BraviaQuadClient",
+    ) as tcp_cls:
+        result = await async_ensure_external_control_enabled(
+            TEST_HOST, grpc_client=grpc
+        )
+
+    assert result == ExternalControlEnsureResult(
+        was_already_on=False,
+        enabled_via=None,
+        tcp_reachable=False,
+        external_control_on=False,
+        skipped=True,
+    )
+    tcp_cls.assert_not_called()
+    grpc.async_exec_command.assert_not_called()
+
+
+async def test_probes_when_path_present_in_capabilities() -> None:
+    """TCP ensure still runs when capabilities advertise external_control."""
+    tcp = _tcp_mock(get_values=["on"])
+    grpc = _grpc_mock(
+        capability_paths=frozenset({"system_setting.external_control", "power"})
+    )
+    with patch(
+        "custom_components.bravia_quad.external_control.BraviaQuadClient",
+        return_value=tcp,
+    ):
+        result = await async_ensure_external_control_enabled(
+            TEST_HOST, grpc_client=grpc
+        )
+
+    assert result == ExternalControlEnsureResult(
+        was_already_on=True,
+        enabled_via=None,
+        tcp_reachable=True,
+        external_control_on=True,
+    )
+    tcp.async_connect.assert_awaited()
+    grpc.async_exec_command.assert_not_called()
+
+
+async def test_probes_when_capabilities_none() -> None:
+    """Soft-fail capabilities (None) keep legacy TCP → gRPC fallback."""
+    grpc = _grpc_mock(capability_paths=None)
+    verify_tcp = _tcp_mock(get_values=["on"])
+    with patch(
+        "custom_components.bravia_quad.external_control.BraviaQuadClient",
+        side_effect=[_tcp_mock(connect_ok=False), verify_tcp],
+    ):
+        result = await async_ensure_external_control_enabled(
+            TEST_HOST, grpc_client=grpc
+        )
+
+    assert result.enabled_via == "grpc"
+    assert result.tcp_reachable is False
+    assert result.external_control_on is True
+    assert result.skipped is False
 
 
 async def test_already_on_skips_enable() -> None:

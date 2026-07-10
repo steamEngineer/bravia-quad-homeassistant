@@ -223,6 +223,11 @@ class BraviaGrpcClientAsync:
         """Cached field-path values from the notify stream."""
         return self._client.notify_state
 
+    @property
+    def capability_paths(self) -> frozenset[str] | None:
+        """Device-advertised path names from GetCapabilities, if fetched."""
+        return self._client.capability_paths
+
     def merge_notify_cache(self, updates: dict[str, Any]) -> None:
         """Merge values into the underlying notify cache (GetStates/TCP seed)."""
         self._client.update_notify_cache(updates)
@@ -676,9 +681,9 @@ class BraviaGrpcClientAsync:
             else:
                 return False
 
-        await async_ensure_external_control_enabled(self.host, grpc_client=self)
-
         await self.async_fetch_capabilities()
+
+        await async_ensure_external_control_enabled(self.host, grpc_client=self)
 
         seeded = await self.async_seed_notify_from_snapshot()
         if seeded:
