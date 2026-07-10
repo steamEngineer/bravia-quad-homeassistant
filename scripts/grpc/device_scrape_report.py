@@ -69,6 +69,15 @@ _PII_PATH_FRAGMENTS = (
     "wifi_mac",
     "mac_address",
     "device_id",
+    # Now-playing / playlist metadata (listening history).
+    "playback_control.title",
+    "playback_control.artist",
+    "playback_control.album",
+    "playback_control.jacket_url",
+    "playback_control.spotify_playlist_name",
+    "playback_control.bt_device_name",
+    # Room layout / speaker placement coordinates.
+    "sound_gps.speaker_location",
 )
 
 

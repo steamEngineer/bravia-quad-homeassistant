@@ -109,6 +109,12 @@ _FIXTURE_SNAPSHOT = {
     "speaker_connection_setting.connection_status.rr": "connected",
     "speaker_connection_setting.connection_status.sw": "connected",
     "system_setting.auto_standby": True,
+    "playback_control.title": "Secret Track",
+    "playback_control.artist": "Secret Artist",
+    "playback_control.album": "Secret Album",
+    "playback_control.jacket_url": "https://example.invalid/cover.jpg",
+    "playback_control.spotify_playlist_name": "Secret Playlist",
+    "sound_optimization.sound_gps.speaker_location": '[{"0":{"x":1.0}}]',
 }
 
 _FIXTURE_SEEDS = {
@@ -247,6 +253,20 @@ def test_build_full_report_and_redact() -> None:
         == "[redacted]"
     )
     assert redacted["seeds"]["flat"]["system_setting.ipv4_address"] == "[redacted]"
+    assert redacted["grpc_snapshot"]["playback_control.title"] == "[redacted]"
+    assert redacted["grpc_snapshot"]["playback_control.artist"] == "[redacted]"
+    assert redacted["grpc_snapshot"]["playback_control.album"] == "[redacted]"
+    assert redacted["grpc_snapshot"]["playback_control.jacket_url"] == "[redacted]"
+    assert (
+        redacted["grpc_snapshot"]["playback_control.spotify_playlist_name"]
+        == "[redacted]"
+    )
+    assert (
+        redacted["grpc_snapshot"]["sound_optimization.sound_gps.speaker_location"]
+        == "[redacted]"
+    )
+    # Non-PII playback fields stay visible for quirk analysis.
+    assert redacted["grpc_snapshot"]["power"] is True
     ip_row = next(
         row
         for row in redacted["entity_matrix"]

@@ -35,4 +35,4 @@ uv run python scripts/grpc/scrape_device_capabilities.py <DEVICE_IP> \
   --refresh --out ./scrape-reports
 ```
 
-Attach both generated files (`.md` summary and `.json` full report) to the issue. Output is PII-redacted by default (`--include-pii` keeps serial/MAC/IP for local debugging only). Optional `--tcp` also dumps TCP feature reads when port 33336 is open; reachability of that port is always recorded.
+Attach both generated files (`.md` summary and `.json` full report) to the issue. Output is PII-redacted by default: serial/MAC/IP/device id, now-playing metadata (title/artist/album/artwork/playlist), and speaker GPS layout. Use `--include-pii` only for local debugging. Optional `--tcp` also dumps TCP feature reads when port 33336 is open; reachability of that port is always recorded.
