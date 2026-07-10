@@ -196,11 +196,12 @@ async def async_setup_grpc_client(
 
         await grpc_client.async_fetch_capabilities()
 
-        await async_ensure_external_control_enabled(
+        ensure_result = await async_ensure_external_control_enabled(
             entry.data["host"],
             name=entry.data.get(CONF_NAME, DEFAULT_NAME),
             grpc_client=grpc_client,
         )
+        grpc_client.note_external_control_ensure(ensure_result)
 
         seeded = await grpc_client.async_seed_notify_from_snapshot()
         if seeded:

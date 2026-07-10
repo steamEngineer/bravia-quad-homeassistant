@@ -81,6 +81,7 @@ async def test_backfill_uses_seeds_not_tcp_when_enabled() -> None:
         hass=MagicMock(),
     )
     client._connected = True
+    client._tcp_reachable = False
     client._client._notify_state = {"sound_setting.drc": None}
 
     with (
@@ -102,8 +103,10 @@ async def test_backfill_uses_seeds_not_tcp_when_enabled() -> None:
 
 @pytest.mark.asyncio
 async def test_backfill_uses_tcp_when_seeds_disabled() -> None:
+    """Unknown tcp_reachable (None) still tries TCP seed — legacy soft-fail."""
     client = BraviaGrpcClientAsync("10.0.0.1", device_id="d", key_id="k")
     client._connected = True
+    assert client._tcp_reachable is None
     client._client._notify_state = {}
 
     with (
@@ -120,6 +123,97 @@ async def test_backfill_uses_tcp_when_seeds_disabled() -> None:
 
     mock_seeds.assert_not_awaited()
     mock_tcp.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_backfill_uses_tcp_when_tcp_reachable() -> None:
+    client = BraviaGrpcClientAsync("10.0.0.1", device_id="d", key_id="k")
+    client._connected = True
+    client._tcp_reachable = True
+    client._client._notify_state = {}
+
+    with (
+        patch(
+            "custom_components.bravia_quad.bravia_grpc_client.async_seed_from_seeds",
+            new=AsyncMock(return_value=0),
+        ) as mock_seeds,
+        patch(
+            "custom_components.bravia_quad.bravia_grpc_client.async_seed_notify_only_from_tcp",
+            new=AsyncMock(return_value=2),
+        ) as mock_tcp,
+    ):
+        _bulk_r, notify_r, _still = await client.async_backfill_entity_paths()
+
+    mock_seeds.assert_not_awaited()
+    mock_tcp.assert_awaited_once()
+    assert notify_r == 2
+
+
+@pytest.mark.asyncio
+async def test_backfill_skips_tcp_seed_when_tcp_unreachable() -> None:
+    client = BraviaGrpcClientAsync("10.0.0.1", device_id="d", key_id="k")
+    client._connected = True
+    client._tcp_reachable = False
+    client._client._notify_state = {}
+
+    with (
+        patch(
+            "custom_components.bravia_quad.bravia_grpc_client.async_seed_from_seeds",
+            new=AsyncMock(return_value=0),
+        ) as mock_seeds,
+        patch(
+            "custom_components.bravia_quad.bravia_grpc_client.async_seed_notify_only_from_tcp",
+            new=AsyncMock(return_value=2),
+        ) as mock_tcp,
+    ):
+        _bulk_r, notify_r, _still = await client.async_backfill_entity_paths()
+
+    mock_seeds.assert_not_awaited()
+    mock_tcp.assert_not_awaited()
+    assert notify_r == 0
+
+
+@pytest.mark.asyncio
+async def test_backfill_logs_seeds_hint_once_when_tcp_down() -> None:
+    client = BraviaGrpcClientAsync("10.0.0.1", device_id="d", key_id="k")
+    client._connected = True
+    client._tcp_reachable = False
+    client._client._notify_state = {}
+
+    with (
+        patch(
+            "custom_components.bravia_quad.bravia_grpc_client.async_seed_notify_only_from_tcp",
+            new=AsyncMock(return_value=0),
+        ),
+        patch("custom_components.bravia_quad.bravia_grpc_client._LOGGER") as mock_log,
+    ):
+        await client.async_backfill_entity_paths()
+        await client.async_backfill_entity_paths()
+
+    info_msgs = [
+        call.args[0]
+        for call in mock_log.info.call_args_list
+        if call.args and "Seeds cloud reads" in call.args[0]
+    ]
+    assert len(info_msgs) == 1
+
+
+def test_note_external_control_ensure_sets_tcp_reachable() -> None:
+    from custom_components.bravia_quad.external_control import (
+        ExternalControlEnsureResult,
+    )
+
+    client = BraviaGrpcClientAsync("10.0.0.1")
+    assert client._tcp_reachable is None
+    client.note_external_control_ensure(
+        ExternalControlEnsureResult(
+            was_already_on=False,
+            enabled_via="grpc",
+            tcp_reachable=False,
+            external_control_on=True,
+        )
+    )
+    assert client._tcp_reachable is False
 
 
 def test_seeds_seed_paths_cover_notify_only_and_sound_effect() -> None:

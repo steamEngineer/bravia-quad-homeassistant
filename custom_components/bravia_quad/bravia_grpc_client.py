@@ -12,7 +12,10 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from .const import DEFAULT_GRPC_PORT, RECONNECT_INITIAL_DELAY, RECONNECT_MAX_DELAY
-from .external_control import async_ensure_external_control_enabled
+from .external_control import (
+    ExternalControlEnsureResult,
+    async_ensure_external_control_enabled,
+)
 from .grpc.client import BraviaGrpcClient, NotifyStateUpdate, load_keys_from_file
 from .grpc_mapping import (
     NOTIFY_ONLY_GRPC_PATHS,
@@ -90,6 +93,13 @@ class BraviaGrpcClientAsync:
         self._refresh_keys_callback: RefreshKeysCallback | None = None
         self._availability_callbacks: set[Callable[[bool], None]] = set()
         self.volume_step_interval: int = 0
+        # None = ensure never ran (try TCP seed); False skips redundant connect.
+        self._tcp_reachable: bool | None = None
+        self._tcp_seed_skip_hint_logged: bool = False
+
+    def note_external_control_ensure(self, result: ExternalControlEnsureResult) -> None:
+        """Record TCP reachability from the external-control ensure probe."""
+        self._tcp_reachable = result.tcp_reachable
 
     @classmethod
     def from_keys_dict(
@@ -401,6 +411,16 @@ class BraviaGrpcClientAsync:
                 self._credentials,
                 self,
             )
+        elif self._tcp_reachable is False:
+            notify_only_resolved = 0
+            if not self._tcp_seed_skip_hint_logged:
+                self._tcp_seed_skip_hint_logged = True
+                _LOGGER.info(
+                    "TCP control port unreachable on %s; notify-only settings "
+                    "need Seeds cloud reads (enable in integration options) "
+                    "or HA restore / last write",
+                    self.host,
+                )
         else:
             notify_only_resolved = await async_seed_notify_only_from_tcp(
                 self.host, self
@@ -683,7 +703,10 @@ class BraviaGrpcClientAsync:
 
         await self.async_fetch_capabilities()
 
-        await async_ensure_external_control_enabled(self.host, grpc_client=self)
+        ensure_result = await async_ensure_external_control_enabled(
+            self.host, grpc_client=self
+        )
+        self.note_external_control_ensure(ensure_result)
 
         seeded = await self.async_seed_notify_from_snapshot()
         if seeded:
