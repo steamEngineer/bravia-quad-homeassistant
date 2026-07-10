@@ -24,8 +24,18 @@ Quick reference for the BRAVIA Connect gRPC transport used in gRPC mode. See als
 | `StartNotifyStates` | Push stream of field path updates |
 | `StopNotifyStates` | End notify stream |
 | `ExecCommandWithAuth` | Write a single field path (`int_value`, `bool_value`, or `string_value`) |
-| `GetCapabilities` | Device capability JSON |
+| `GetCapabilities` | Device capability JSON (unauthenticated); path names filter bulk GetStates |
 | `GetResources` | Fetch binary resources by URI |
+
+## GetCapabilities path filtering
+
+`GetCapabilities` returns JSON of the form `{"capabilities":[{"name":"<path>", "type":"...", "props":{...}}, ...]}`. After connect (and on reconnect), the integration fetches this list and intersects it with the static HA path list in [`grpc/all_field_paths.txt`](../custom_components/bravia_quad/grpc/all_field_paths.txt) when building bulk `GetStatesWithAuth` batches.
+
+- Only advertised `name` values are used for filtering (props are ignored for path allowlists).
+- Order follows the HA path list; capability-only paths are never added.
+- If the RPC fails or the intersection is empty, GetStates keeps the full static list (soft fallback) so known-good Quad behavior is preserved.
+- Notify-only settings (for example DRC, DSEE Ultimate, eARC) are often omitted from capabilities on current firmware — they stay off the GetStates batch; Seeds cloud reads / HA restore still supply initial state ([seeds-cloud-states.md](seeds-cloud-states.md)).
+- `StartNotifyStates` is session-scoped and does not take a path list; notify is unchanged.
 
 ## Request envelope
 
@@ -47,7 +57,7 @@ Reflected schema `ErrorCode` values (local reference):
 
 ## Field paths
 
-177 paths in Connect's bulk snapshot list ([`grpc/all_field_paths.txt`](../custom_components/bravia_quad/grpc/all_field_paths.txt)). Per @mafredri ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), the device accepts valid path names individually or in flexible batches — 177 is a Connect mirror, not a hard requirement. Mapped HA entities use a subset documented in [grpc-tcp-mapping.md](grpc-tcp-mapping.md).
+177 paths in Connect's bulk snapshot list ([`grpc/all_field_paths.txt`](../custom_components/bravia_quad/grpc/all_field_paths.txt)). Per @mafredri ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), the device accepts valid path names individually or in flexible batches — 177 is a Connect mirror, not a hard requirement. Bulk snapshots are filtered to paths advertised by `GetCapabilities` when that call succeeds (see [GetCapabilities path filtering](#getcapabilities-path-filtering)). Mapped HA entities use a subset documented in [grpc-tcp-mapping.md](grpc-tcp-mapping.md).
 
 Common paths:
 

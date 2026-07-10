@@ -49,6 +49,7 @@ def _grpc_client_mock(
 ) -> MagicMock:
     mock_client = MagicMock()
     mock_client.async_connect = AsyncMock(side_effect=connect_results)
+    mock_client.async_fetch_capabilities = AsyncMock(return_value=frozenset({"power"}))
     mock_client.async_seed_notify_from_snapshot = AsyncMock(return_value=1)
     mock_client.async_backfill_entity_paths = AsyncMock(return_value=(0, 0, 0))
     mock_client.async_start_notify = AsyncMock()

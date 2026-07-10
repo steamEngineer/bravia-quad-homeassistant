@@ -1,0 +1,70 @@
+{
+  "capabilities": [
+    {
+      "name": "power",
+      "type": "bool",
+      "props": {
+        "get": true,
+        "notify": true,
+        "commands": [
+          "set"
+        ]
+      }
+    },
+    {
+      "name": "volume",
+      "type": "int",
+      "props": {
+        "get": true,
+        "notify": true,
+        "commands": [
+          "set"
+        ]
+      }
+    },
+    {
+      "name": "mute",
+      "type": "bool",
+      "props": {
+        "get": true,
+        "notify": true,
+        "commands": [
+          "set"
+        ]
+      }
+    },
+    {
+      "name": "playback_control.function",
+      "type": "enum",
+      "props": {
+        "get": true,
+        "notify": true,
+        "commands": [
+          "set"
+        ]
+      }
+    },
+    {
+      "name": "sound_setting.night_mode",
+      "type": "bool",
+      "props": {
+        "get": true,
+        "notify": true,
+        "commands": [
+          "set"
+        ]
+      }
+    },
+    {
+      "name": "bluetooth_setting.connection_quality",
+      "type": "enum",
+      "props": {
+        "get": true,
+        "notify": true,
+        "commands": [
+          "set"
+        ]
+      }
+    }
+  ]
+}

@@ -198,6 +198,8 @@ async def validate_grpc_input(host: str, keys_json: str) -> dict[str, Any]:
 
         await async_ensure_external_control_enabled(host, grpc_client=grpc_client)
 
+        await grpc_client.async_fetch_capabilities()
+
         snapshot = await grpc_client.async_get_states_dict()
         if not snapshot:
             snapshot = await grpc_client.async_get_states_app_sequence()

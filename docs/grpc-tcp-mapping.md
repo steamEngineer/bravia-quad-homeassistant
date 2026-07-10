@@ -64,7 +64,7 @@ AirPlay is **detect-only** in HA: `airplay2` is omitted from the selectable sour
 
 ## GetStates snapshot vs entity seeding
 
-Bulk GetStates (177 paths, app-sequence with HMAC signing) parses into `notify_state` at startup. Many HA entities still show `unknown` because the device does not always return usable values:
+Bulk GetStates (static HA path list, app-sequence with HMAC signing; filtered to `GetCapabilities` names when available — see [sony-grpc-reference.md](sony-grpc-reference.md#getcapabilities-path-filtering)) parses into `notify_state` at startup. Many HA entities still show `unknown` because the device does not always return usable values:
 
 | Category | Example paths | Bulk GetStates | Single-path GetStates | Notify at startup |
 |----------|---------------|----------------|----------------------|-------------------|
