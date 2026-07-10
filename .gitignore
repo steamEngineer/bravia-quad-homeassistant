@@ -29,6 +29,7 @@ docs/*
 !docs/images/**
 
 scripts/grpc/session_keys.json
+scrape-reports/
 *.pcap
 *.pcapng
 

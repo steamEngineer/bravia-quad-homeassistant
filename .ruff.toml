@@ -35,10 +35,15 @@ max-complexity = 25
     "D",       # Don't require docstrings in scripts
     "FBT001",  # Allow boolean positional args in scripts
     "FBT003",  # Allow boolean positional values in CLI argparse/help
+    "INP001",  # scripts/grpc are CLI modules, not packages
+    "PLR0912", # Report builders branch on capability shape
+    "PLR0913", # CLI/report helpers take many scrape inputs
     "PLR0915", # Allow many statements in scripts (long procedural flows)
     "PLR2004", # Allow magic values in scripts (OAuth CLI positional args)
     "PLW2901", # Allow loop variable reassignment in scripts
     "S101",    # Allow assert statements in scripts
+    "S110",    # Probe notify thread may swallow stream errors
+    "BLE001",  # gRPC probe threads catch broad failures
     "SLF001",  # Allow private member access in scripts
     "T20",     # Allow print statements in scripts
     "E501",    # Allow long help strings in CLI scripts
