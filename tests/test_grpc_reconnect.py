@@ -55,6 +55,7 @@ async def test_reconnects_after_notify_stream_ends(
     grpc_async._client.start_notify_states = fake_notify
     grpc_async._client.disconnect = MagicMock()
     grpc_async.async_connect = AsyncMock(return_value=True)
+    grpc_async.async_fetch_capabilities = AsyncMock(return_value=frozenset({"power"}))
     grpc_async.async_seed_notify_from_snapshot = AsyncMock(return_value=3)
 
     with patch.object(grpc_async, "_async_wait", new=AsyncMock()):
@@ -91,6 +92,7 @@ async def test_reconnect_callback_and_snapshot_callbacks(
     grpc_async._client.start_notify_states = fake_notify
     grpc_async._client.disconnect = MagicMock()
     grpc_async.async_connect = AsyncMock(return_value=True)
+    grpc_async.async_fetch_capabilities = AsyncMock(return_value=frozenset({"power"}))
     grpc_async.async_seed_notify_from_snapshot = AsyncMock(return_value=1)
 
     with patch.object(grpc_async, "_async_wait", new=AsyncMock()):
