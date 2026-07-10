@@ -200,6 +200,8 @@ async def async_setup_grpc_client(
             grpc_client=grpc_client,
         )
 
+        await grpc_client.async_fetch_capabilities()
+
         seeded = await grpc_client.async_seed_notify_from_snapshot()
         if seeded:
             _LOGGER.info(

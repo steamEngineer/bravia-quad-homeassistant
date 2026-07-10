@@ -315,6 +315,14 @@ class BraviaGrpcClientAsync:
             return None
         return await asyncio.to_thread(self._client.get_states)
 
+    async def async_fetch_capabilities(self) -> frozenset[str] | None:
+        """
+        Fetch GetCapabilities and cache path names for GetStates filtering.
+
+        Soft-fail: returns None on error; bulk GetStates keeps the full HA list.
+        """
+        return await asyncio.to_thread(self._client.fetch_capabilities)
+
     async def async_get_states_dict(self) -> dict[str, Any] | None:
         """Fetch GetStatesWithAuth as parsed field-path dict."""
         if not self._connected:
@@ -669,6 +677,8 @@ class BraviaGrpcClientAsync:
                 return False
 
         await async_ensure_external_control_enabled(self.host, grpc_client=self)
+
+        await self.async_fetch_capabilities()
 
         seeded = await self.async_seed_notify_from_snapshot()
         if seeded:

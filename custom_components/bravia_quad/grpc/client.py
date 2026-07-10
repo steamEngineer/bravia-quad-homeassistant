@@ -34,6 +34,11 @@ from .exec_command_request import (
     parse_exec_response,
     sign_exec_auth_token,
 )
+from .get_capabilities_response import (
+    filter_field_paths,
+    get_capabilities_method,
+    parse_capability_paths,
+)
 from .get_nonce_request import build_get_nonce_request, parse_get_nonce_response
 from .get_states_auth import (
     build_get_states_signing_preimage,
@@ -109,6 +114,7 @@ class BraviaGrpcClient:
         self.auth_mode = AuthMode(auth_mode)
         self._notify_state: dict[str, Any] = {}
         self._notify_stream: Any | None = None
+        self._capability_paths: frozenset[str] | None = None
         self.last_rpc_error: str | None = None
         self.last_error_is_transport = False
 
@@ -116,6 +122,27 @@ class BraviaGrpcClient:
     def notify_state(self) -> dict[str, Any]:
         """Latest values from StartNotifyStates deltas (path → value)."""
         return dict(self._notify_state)
+
+    @property
+    def capability_paths(self) -> frozenset[str] | None:
+        """Device-advertised path names from GetCapabilities, if fetched."""
+        return self._capability_paths
+
+    def field_paths_for_get_states(self) -> list[str]:
+        """
+        Return HA field paths filtered to device capabilities.
+
+        Falls back to the full ``all_field_paths.txt`` list when capabilities
+        were not fetched or the intersection is empty.
+        """
+        ha_paths = load_field_paths()
+        filtered = filter_field_paths(ha_paths, self._capability_paths)
+        if self._capability_paths is not None and len(filtered) < len(ha_paths):
+            self._debug(
+                f"GetStates path filter: {len(filtered)}/{len(ha_paths)} "
+                f"(capabilities={len(self._capability_paths)})"
+            )
+        return filtered
 
     def update_notify_cache(self, updates: dict[str, Any]) -> None:
         """Merge path values into the notify cache."""
@@ -539,6 +566,56 @@ class BraviaGrpcClient:
             response_deserializer=lambda payload: payload,
         )
 
+    def _get_capabilities_unary_callable(self):
+        return self.channel.unary_unary(
+            get_capabilities_method(),
+            request_serializer=lambda payload: (
+                payload if isinstance(payload, bytes) else b""
+            ),
+            response_deserializer=lambda payload: payload,
+        )
+
+    def fetch_capabilities(self) -> frozenset[str] | None:
+        """
+        Fetch GetCapabilities and cache path names for GetStates filtering.
+
+        Soft-fail: returns None and leaves prior allowlist unchanged on error.
+        Does not require authentication (empty request).
+        """
+        if self.channel is None:
+            self._say("GetCapabilities skipped: channel not connected")
+            return None
+        try:
+            raw = self._get_capabilities_unary_callable().future(b"").result()
+        except grpc.RpcError as err:
+            self._record_rpc_error(err)
+            _LOGGER.warning(
+                "GetCapabilities failed on %s:%s: %s",
+                self.host,
+                self.port,
+                self.last_rpc_error or err,
+            )
+            return None
+        except Exception:
+            _LOGGER.warning(
+                "GetCapabilities failed on %s:%s",
+                self.host,
+                self.port,
+                exc_info=True,
+            )
+            return None
+        names = parse_capability_paths(raw)
+        if names is None:
+            _LOGGER.warning(
+                "GetCapabilities returned no usable path names on %s:%s",
+                self.host,
+                self.port,
+            )
+            return None
+        self._capability_paths = names
+        self._say(f"GetCapabilities: {len(names)} paths on {self.host}:{self.port}")
+        return names
+
     def get_states_raw(self, request_bytes: bytes) -> tuple[bytes | None, str | None]:
         """
         Send raw GetStatesWithAuth bytes.
@@ -581,7 +658,11 @@ class BraviaGrpcClient:
         if not self.authenticated:
             self._say("Not authenticated. Call authenticate() first.")
             return None
-        paths = field_paths or load_field_paths()
+        paths = (
+            field_paths
+            if field_paths is not None
+            else self.field_paths_for_get_states()
+        )
         token = auth_token if auth_token is not None else self.auth_token
         if use_signed_auth and self.hmac_key_hex:
             inner_parts = b"".join(
@@ -603,7 +684,9 @@ class BraviaGrpcClient:
         )
         raw, err = self.get_states_raw(request_bytes)
         if err or not raw:
-            if field_paths is not None and len(field_paths) != len(load_field_paths()):
+            if field_paths is not None and len(field_paths) != len(
+                self.field_paths_for_get_states()
+            ):
                 _LOGGER.debug("GetStates batch (%d paths) failed: %s", len(paths), err)
             else:
                 self._say(f"GetStates error: {err}")
@@ -704,7 +787,7 @@ class BraviaGrpcClient:
         if not self.authenticated:
             self._say("Not authenticated. Call authenticate() first.")
             return None
-        paths = load_field_paths()
+        paths = self.field_paths_for_get_states()
         full_token = self.auth_token
         if self.hmac_key_hex:
             inner_parts = b"".join(
