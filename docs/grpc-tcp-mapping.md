@@ -62,7 +62,7 @@ AirPlay is **detect-only** in HA: `airplay2` is omitted from the selectable sour
 
 **Notify-only / gRPC-unreadable app settings:** Paths in `NOTIFY_ONLY_GRPC_PATHS` (DRC, 360SSM height, eARC, auto standby, etc.) accept ExecCommand writes but are **not readable** over local gRPC on fw 001.454 — single-path and bulk GetStates return `UNKNOWN`, and the notify stream never includes these paths. [@mafredri](https://github.com/mafredri) confirmed ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)) that BRAVIA Connect reads them via Seeds `GET /devices/{device_id}/states`. In gRPC mode, enable **Seeds cloud reads** (`grpc_seeds_poll`) to seed entity state without TCP — see [seeds-cloud-states.md](seeds-cloud-states.md). When Seeds is off, initial state comes from TCP seed (TCP-capable models only), HA restore, or the last Exec write cache.
 
-**External control TCP probe:** gRPC setup still tries `:33336` to ensure external control is on (needed for hybrid TCP seed on Quad). Connect failures are logged at debug — expected on gRPC-only models such as HT-A8 with no TCP listener. `GetCapabilities` does not advertise `system_setting.external_control` on current firmware (notify-only / Seeds path), so capabilities cannot gate this probe.
+**External control TCP probe:** gRPC setup still tries `:33336` to ensure external control is on (needed for hybrid TCP seed on Quad). Connect failures are logged at debug — expected on gRPC-only models such as HT-A8 with no TCP listener. `GetCapabilities` does not advertise `system_setting.external_control` on current firmware (notify-only / Seeds path), so capabilities cannot gate this probe. TCP notify-only seed runs only when that probe found `:33336` reachable; when TCP is down and Seeds cloud reads are off, enable **Seeds cloud reads** in integration options (opt-in; not auto-enabled) — see [seeds-cloud-states.md](seeds-cloud-states.md).
 
 ## GetStates snapshot vs entity seeding
 
@@ -79,7 +79,7 @@ Startup sequence in [`__init__.py`](../custom_components/bravia_quad/__init__.py
 
 1. Bulk GetStates app-sequence → seed `notify_state`
 2. Per-path backfill for entity-critical paths still unset ([`async_backfill_entity_paths`](../custom_components/bravia_quad/bravia_grpc_client.py))
-3. **Seeds seed** when `grpc_seeds_poll` enabled ([`grpc_seeds_seed.py`](../custom_components/bravia_quad/grpc_seeds_seed.py)) — preferred in gRPC mode (works on HT-A8 where TCP is blocked). Otherwise TCP seed ([`grpc_tcp_seed.py`](../custom_components/bravia_quad/grpc_tcp_seed.py)) for paths with `tcp_feature` mappings still unset
+3. **Seeds seed** when `grpc_seeds_poll` enabled ([`grpc_seeds_seed.py`](../custom_components/bravia_quad/grpc_seeds_seed.py)) — preferred in gRPC mode (works on HT-A8 where TCP is blocked). Otherwise TCP seed ([`grpc_tcp_seed.py`](../custom_components/bravia_quad/grpc_tcp_seed.py)) for paths with `tcp_feature` mappings still unset, **only if** the external-control probe found `:33336` reachable
 4. Start notify stream + path-aware warmup (up to 3s for missing entity paths)
 5. Platform setup reads `notify_state`; HA restore fills gaps where device sends no initial value
 
