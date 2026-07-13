@@ -62,15 +62,22 @@ def _nested_string(payload: bytes) -> str | None:
     return None
 
 
+def _maybe_signed_int(value: int) -> int:
+    """Reinterpret protobuf int64 varints that arrived as unsigned."""
+    if value >= 1 << 63:
+        return value - (1 << 64)
+    return value
+
+
 def _extract_value(fields: dict[int, tuple[int, Any]]) -> Any:
     if 2 in fields:
         wire_type, raw = fields[2]
         if wire_type == 0:
-            return raw
+            return _maybe_signed_int(int(raw)) if isinstance(raw, int) else raw
         if wire_type == 2 and raw:
             nested = _nested_varint(raw)
             if nested is not None:
-                return nested
+                return _maybe_signed_int(nested)
             try:
                 text = raw.decode("utf-8")
             except UnicodeDecodeError:

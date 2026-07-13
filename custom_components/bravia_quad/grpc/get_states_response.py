@@ -7,6 +7,7 @@ from typing import Any
 from .notify_decode import (
     _decode_field,
     _decode_varint,
+    _maybe_signed_int,
     _nested_string,
     _nested_varint,
 )
@@ -144,7 +145,4 @@ def _extract_get_states_value(fields: dict[int, tuple[int, Any]]) -> Any:
     return None
 
 
-def _maybe_signed_int(value: int) -> int:
-    if value >= 1 << 63:
-        return value - (1 << 64)
-    return value
+# _maybe_signed_int lives in notify_decode (shared with GetStates).
