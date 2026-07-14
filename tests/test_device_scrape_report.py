@@ -151,7 +151,8 @@ def test_build_hardware_profile_subwoofer_and_topology() -> None:
     hw = build_hardware_profile(_FIXTURE_SNAPSHOT, index)
     assert hw["model_id"] == "HT-A9M2"
     assert hw["firmware"] == "001.454"
-    assert hw["has_subwoofer"] is False
+    assert hw["has_subwoofer"] is True
+    assert hw["subwoofer_connected"] is True
     assert hw["has_rear_speakers"] is True
     assert hw["speaker_topology"]["fl"] == "connected"
 
@@ -178,11 +179,9 @@ def test_entity_matrix_mapped_and_seeds_read() -> None:
     assert by_path["power"]["suggested_enabled_default"] is True
     assert by_path["sound_setting.drc"]["read_source"] == "seeds_cloud"
     assert by_path["sound_setting.drc"]["value_type"] == "str"
-    assert by_path["sound_setting.volume.subwoofer"]["device_gates"] == [
-        "requires_subwoofer"
-    ]
+    assert by_path["sound_setting.volume.subwoofer"]["device_gates"] == []
     assert (
-        by_path["sound_setting.volume.subwoofer"]["suggested_enabled_default"] is False
+        by_path["sound_setting.volume.subwoofer"]["suggested_enabled_default"] is True
     )
     assert (
         by_path["system_setting.network_diagnostic_probe"]["ha_status"]

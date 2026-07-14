@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock
 
+import pytest
+
 from custom_components.bravia_quad.const import (
     CONF_GRPC_KEYS,
     CONF_HAS_SUBWOOFER,
@@ -12,10 +14,14 @@ from custom_components.bravia_quad.const import (
     TRANSPORT_GRPC,
 )
 from custom_components.bravia_quad.transport import (
+    GRPC_PATH_SUBWOOFER,
+    GRPC_PATH_SW_HISTORY,
+    GRPC_PATH_SW_STATUS,
+    detect_subwoofer_from_grpc,
     identity_from_grpc_snapshot,
-    infer_subwoofer_from_grpc,
     migrate_transport_entry,
     resolve_transport,
+    subwoofer_currently_linked,
 )
 
 
@@ -56,14 +62,64 @@ def test_identity_from_grpc_snapshot() -> None:
             "system_setting.wifi_mac_address_wired": "f8:4e:17:22:ce:25",
             "system_setting.model_name": "HT-A9M2",
             "system_setting.manufacturer": "SONY",
-            "sound_setting.volume.subwoofer": 5,
+            GRPC_PATH_SW_STATUS: "connected",
+            GRPC_PATH_SUBWOOFER: None,
         }
     )
     assert info[CONF_SERIAL] == "8804927"
     assert info[CONF_HAS_SUBWOOFER] is True
 
 
-def test_infer_subwoofer_from_grpc() -> None:
-    assert infer_subwoofer_from_grpc(1) is False
-    assert infer_subwoofer_from_grpc(5) is True
-    assert infer_subwoofer_from_grpc(-1) is True
+@pytest.mark.parametrize(
+    ("snapshot", "expected"),
+    [
+        ({GRPC_PATH_SW_STATUS: "connected"}, True),
+        ({GRPC_PATH_SW_STATUS: "protected"}, True),
+        (
+            {
+                GRPC_PATH_SW_STATUS: "disconnected",
+                GRPC_PATH_SW_HISTORY: True,
+            },
+            True,
+        ),
+        (
+            {
+                GRPC_PATH_SW_STATUS: "disconnected",
+                GRPC_PATH_SW_HISTORY: None,
+                GRPC_PATH_SUBWOOFER: 5,
+            },
+            False,
+        ),
+        (
+            {
+                GRPC_PATH_SW_STATUS: "disconnected",
+                GRPC_PATH_SUBWOOFER: None,
+            },
+            False,
+        ),
+        ({GRPC_PATH_SUBWOOFER: 5}, True),
+        ({GRPC_PATH_SUBWOOFER: 1}, False),
+        ({GRPC_PATH_SUBWOOFER: -1}, True),
+        ({GRPC_PATH_SUBWOOFER: None}, False),
+        ({}, False),
+    ],
+)
+def test_detect_subwoofer_from_grpc(
+    snapshot: dict[str, object], expected: bool
+) -> None:
+    assert detect_subwoofer_from_grpc(snapshot) is expected
+
+
+@pytest.mark.parametrize(
+    ("snapshot", "expected"),
+    [
+        ({GRPC_PATH_SW_STATUS: "connected"}, True),
+        ({GRPC_PATH_SW_STATUS: "protected"}, True),
+        ({GRPC_PATH_SW_STATUS: "disconnected", GRPC_PATH_SW_HISTORY: True}, False),
+        ({}, False),
+    ],
+)
+def test_subwoofer_currently_linked(
+    snapshot: dict[str, object], expected: bool
+) -> None:
+    assert subwoofer_currently_linked(snapshot) is expected

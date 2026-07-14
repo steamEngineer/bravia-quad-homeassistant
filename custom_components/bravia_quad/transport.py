@@ -33,6 +33,10 @@ GRPC_PATH_SERIAL = "system_setting.serial_number"
 GRPC_PATH_FRIENDLY_NAME = "system_setting.friendly_name"
 GRPC_PATH_MAC_WIRED = "system_setting.wifi_mac_address_wired"
 GRPC_PATH_SUBWOOFER = "sound_setting.volume.subwoofer"
+GRPC_PATH_SW_STATUS = "speaker_connection_setting.connection_status.sw"
+GRPC_PATH_SW_HISTORY = "speaker_connection_setting.connection_history.sw"
+
+_SW_LINKED = frozenset({"connected", "protected"})
 
 
 def resolve_transport(entry: ConfigEntry) -> str:
@@ -74,8 +78,8 @@ def migrate_transport_entry(hass: HomeAssistant, entry: ConfigEntry) -> None:
     )
 
 
-def infer_subwoofer_from_grpc(value: Any) -> bool:
-    """Infer subwoofer presence from GetStates subwoofer level."""
+def _level_outside_no_sub_band(value: Any) -> bool:
+    """Return True when subwoofer level is outside the no-sub {0,1,2} band."""
     if value is None:
         return False
     try:
@@ -85,12 +89,31 @@ def infer_subwoofer_from_grpc(value: Any) -> bool:
     return level < 0 or level > 2
 
 
+def subwoofer_currently_linked(snapshot: dict[str, Any]) -> bool:
+    """Return True when connection_status.sw reports a live link."""
+    return snapshot.get(GRPC_PATH_SW_STATUS) in _SW_LINKED
+
+
+def detect_subwoofer_from_grpc(snapshot: dict[str, Any]) -> bool:
+    """
+    Detect whether a subwoofer level entity should exist.
+
+    True when currently linked or previously paired (history). Level range is
+    only a fallback when the topology path is absent from the snapshot.
+    """
+    if subwoofer_currently_linked(snapshot):
+        return True
+    if snapshot.get(GRPC_PATH_SW_HISTORY) is True:
+        return True
+    if GRPC_PATH_SW_STATUS not in snapshot:
+        return _level_outside_no_sub_band(snapshot.get(GRPC_PATH_SUBWOOFER))
+    return False
+
+
 def identity_from_grpc_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     """Build config-entry identity fields from a GetStates dict."""
     result: dict[str, Any] = {
-        CONF_HAS_SUBWOOFER: infer_subwoofer_from_grpc(
-            snapshot.get(GRPC_PATH_SUBWOOFER)
-        ),
+        CONF_HAS_SUBWOOFER: detect_subwoofer_from_grpc(snapshot),
     }
 
     serial = snapshot.get(GRPC_PATH_SERIAL)
