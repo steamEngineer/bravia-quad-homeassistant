@@ -237,43 +237,28 @@ def test_switch_factory_includes_power_and_aav(
     assert "advanced_auto_volume" in suffixes
 
 
-def test_select_factory_bass_select_without_subwoofer(
+def test_select_and_number_both_exist_availability_flips(
     grpc_client: MagicMock, grpc_entry: MagicMock
 ) -> None:
-    """No sub: bass min/mid/max select on sound_setting.volume.bass."""
-    grpc_entry.data = {}
-    entities = mapped_select_entities(grpc_client, grpc_entry)
-    suffixes = _entity_suffixes(entities, grpc_entry)
-    assert "bass_level_select" in suffixes
+    """Bass select and subwoofer number always exist; availability follows link."""
+    grpc_client.notify_state = {
+        "speaker_connection_setting.connection_status.sw": "disconnected"
+    }
+    selects = mapped_select_entities(grpc_client, grpc_entry)
+    numbers = mapped_number_entities(grpc_client, grpc_entry)
+    assert "bass_level_select" in _entity_suffixes(selects, grpc_entry)
+    assert "subwoofer_level" in _entity_suffixes(numbers, grpc_entry)
 
+    bass = next(e for e in selects if e._attr_unique_id.endswith("_bass_level_select"))
+    sub = next(e for e in numbers if e._attr_unique_id.endswith("_subwoofer_level"))
+    assert bass.available is True
+    assert sub.available is False
 
-def test_select_factory_no_bass_select_with_subwoofer(
-    grpc_client: MagicMock, grpc_entry: MagicMock
-) -> None:
-    """With sub: bass select replaced by subwoofer level number."""
-    grpc_entry.data = {"has_subwoofer": True}
-    entities = mapped_select_entities(grpc_client, grpc_entry)
-    suffixes = _entity_suffixes(entities, grpc_entry)
-    assert "bass_level_select" not in suffixes
-
-
-def test_number_factory_subwoofer_only_with_subwoofer(
-    grpc_client: MagicMock, grpc_entry: MagicMock
-) -> None:
-    """Subwoofer -10..10 number only when has_subwoofer; bass select otherwise."""
-    grpc_entry.data = {}
-    number_suffixes = _entity_suffixes(
-        mapped_number_entities(grpc_client, grpc_entry), grpc_entry
-    )
-    assert "subwoofer_level" not in number_suffixes
-    assert "bass_level_slider" not in number_suffixes
-
-    grpc_entry.data = {"has_subwoofer": True}
-    number_suffixes = _entity_suffixes(
-        mapped_number_entities(grpc_client, grpc_entry), grpc_entry
-    )
-    assert "subwoofer_level" in number_suffixes
-    assert "bass_level_slider" not in number_suffixes
+    grpc_client.notify_state = {
+        "speaker_connection_setting.connection_status.sw": "connected"
+    }
+    assert bass.available is False
+    assert sub.available is True
 
 
 @pytest.mark.parametrize(

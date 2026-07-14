@@ -18,7 +18,7 @@ from homeassistant.helpers.restore_state import (
 )
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import CONF_HAS_SUBWOOFER, DOMAIN
 
 if TYPE_CHECKING:
     from homeassistant.components.select import SelectEntity
@@ -31,6 +31,43 @@ if TYPE_CHECKING:
     from .grpc_mapping import GrpcTcpMapping
 
 _LOGGER = logging.getLogger(__name__)
+
+
+async def async_apply_has_subwoofer(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    *,
+    has_subwoofer: bool,
+    reload: bool = False,
+) -> bool:
+    """
+    Persist CONF_HAS_SUBWOOFER from topology detection.
+
+    gRPC bass/subwoofer entities both exist and flip availability on link
+    status, so this only updates entry data unless *reload* is True.
+    Returns True when the stored flag changed.
+    """
+    if entry.data.get(CONF_HAS_SUBWOOFER) == has_subwoofer:
+        return False
+
+    _LOGGER.info(
+        "Subwoofer detection result changed: %s -> %s",
+        entry.data.get(CONF_HAS_SUBWOOFER),
+        has_subwoofer,
+    )
+    hass.config_entries.async_update_entry(
+        entry, data={**entry.data, CONF_HAS_SUBWOOFER: has_subwoofer}
+    )
+
+    if not reload:
+        return True
+
+    if not await hass.config_entries.async_reload(entry.entry_id):
+        raise HomeAssistantError(
+            translation_domain=DOMAIN,
+            translation_key="reload_failed",
+        )
+    return True
 
 
 def verify_feature_value[T: (str, int)](

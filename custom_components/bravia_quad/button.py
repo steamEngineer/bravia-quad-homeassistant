@@ -18,7 +18,8 @@ from .entity import (
     entity_unique_id,
     get_device_info,
 )
-from .transport import GRPC_PATH_SUBWOOFER, infer_subwoofer_from_grpc
+from .helpers import async_apply_has_subwoofer
+from .transport import detect_subwoofer_from_grpc
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -252,7 +253,7 @@ class BraviaGrpcDetectSubwooferButton(BraviaGrpcAvailabilityMixin, ButtonEntity)
         self._attr_device_info = get_device_info(entry)
 
     async def async_press(self) -> None:
-        """Re-read subwoofer level from gRPC and reload if detection changed."""
+        """Re-detect subwoofer link and update CONF_HAS_SUBWOOFER (no reload)."""
         if self._detection_lock.locked():
             _LOGGER.debug("Subwoofer detection already in progress, ignoring request")
             return
@@ -268,40 +269,11 @@ class BraviaGrpcDetectSubwooferButton(BraviaGrpcAvailabilityMixin, ButtonEntity)
                     translation_key="detection_failed",
                 )
 
-            has_subwoofer = infer_subwoofer_from_grpc(snapshot.get(GRPC_PATH_SUBWOOFER))
-            current_value = self._entry.data.get(CONF_HAS_SUBWOOFER)
-
-            if current_value == has_subwoofer:
+            has_subwoofer = detect_subwoofer_from_grpc(snapshot)
+            if not await async_apply_has_subwoofer(
+                self._hass, self._entry, has_subwoofer=has_subwoofer
+            ):
                 _LOGGER.info(
                     "Subwoofer detection result unchanged: %s",
                     has_subwoofer,
-                )
-                return
-
-            _LOGGER.info(
-                "Subwoofer detection result changed: %s -> %s",
-                current_value,
-                has_subwoofer,
-            )
-            new_data = {**self._entry.data, CONF_HAS_SUBWOOFER: has_subwoofer}
-            self._hass.config_entries.async_update_entry(self._entry, data=new_data)
-
-            entity_registry = er.async_get(self._hass)
-            if has_subwoofer:
-                old_unique_id = entity_unique_id(self._entry, "bass_level_select")
-                if old_entity := entity_registry.async_get_entity_id(
-                    "select", DOMAIN, old_unique_id
-                ):
-                    entity_registry.async_remove(old_entity)
-            else:
-                old_unique_id = entity_unique_id(self._entry, "subwoofer_level")
-                if old_entity := entity_registry.async_get_entity_id(
-                    "number", DOMAIN, old_unique_id
-                ):
-                    entity_registry.async_remove(old_entity)
-
-            if not await self._hass.config_entries.async_reload(self._entry.entry_id):
-                raise HomeAssistantError(
-                    translation_domain=DOMAIN,
-                    translation_key="reload_failed",
                 )

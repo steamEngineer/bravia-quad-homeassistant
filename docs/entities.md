@@ -27,7 +27,7 @@ Core entities (gRPC mode covers most of these with matching unique-ID suffixes w
 | `button.bravia_quad_*_detect_subwoofer` | Button | Re-detect subwoofer | — |
 | `button.bravia_quad_*_bluetooth_pairing` | Button | Bluetooth pairing mode | — |
 
-Only one bass-level entity is created, based on subwoofer detection.
+Only one bass-level control is writable at a time based on whether a wireless sub is currently linked. On **gRPC**, both the −10…10 subwoofer number and the min/mid/max bass select always exist: the linked control is available and the other is unavailable. Link state comes from local `speaker_connection_setting.connection_status.sw` via GetStates and notify — not Seeds, not a TCP bass-range probe.
 
 ## gRPC transport
 

@@ -30,12 +30,17 @@ from .const import (
 )
 from .grpc_refresh import async_setup_grpc_client
 from .helpers import (
+    async_apply_has_subwoofer,
     migrate_legacy_identifiers,
     remove_legacy_group_subdevices,
     remove_legacy_input_select,
     require_unique_id,
 )
-from .transport import migrate_transport_entry, resolve_transport
+from .transport import (
+    detect_subwoofer_from_grpc,
+    migrate_transport_entry,
+    resolve_transport,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import Event, HomeAssistant
@@ -86,6 +91,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BraviaQuadConfigEntry) -
         grpc_client = await async_setup_grpc_client(hass, entry)
         if grpc_client is None:
             raise ConfigEntryNotReady
+        await _async_recompute_grpc_subwoofer(hass, entry, grpc_client)
 
     migrate_legacy_identifiers(hass, entry)
 
@@ -120,6 +126,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: BraviaQuadConfigEntry) -
         )
 
     return True
+
+
+async def _async_recompute_grpc_subwoofer(
+    hass: HomeAssistant,
+    entry: BraviaQuadConfigEntry,
+    grpc_client: BraviaGrpcClientAsync,
+) -> None:
+    """Correct CONF_HAS_SUBWOOFER from seeded notify_state (no reload)."""
+    detected = detect_subwoofer_from_grpc(grpc_client.notify_state)
+    if await async_apply_has_subwoofer(hass, entry, has_subwoofer=detected):
+        _LOGGER.info("gRPC subwoofer detection at setup: %s", detected)
 
 
 async def _async_options_updated(

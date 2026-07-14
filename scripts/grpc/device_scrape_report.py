@@ -270,8 +270,6 @@ def build_hardware_profile(
     identity = identity_from_grpc_snapshot(grpc_snapshot)
     has_subwoofer = bool(identity.get("has_subwoofer"))
     bass_unavail = grpc_snapshot.get("sound_setting.volume.bass.unavailable_reason")
-    if bass_unavail == "no_speaker":
-        has_subwoofer = False
 
     sw_status = grpc_snapshot.get("speaker_connection_setting.connection_status.sw")
     rear_rl = grpc_snapshot.get("speaker_connection_setting.connection_status.rl")

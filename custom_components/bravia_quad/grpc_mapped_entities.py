@@ -17,7 +17,6 @@ from .const import (
     AV_SYNC_STEP,
     BASS_LEVEL_OPTIONS,
     BASS_LEVEL_VALUES_TO_OPTIONS,
-    CONF_HAS_SUBWOOFER,
     DOMAIN,
     FEATURE_AV_SYNC,
     FEATURE_BASS_LEVEL,
@@ -66,6 +65,7 @@ from .helpers import (
     restore_notify_only_select,
     restore_notify_only_switch,
 )
+from .transport import GRPC_PATH_SW_STATUS, subwoofer_currently_linked
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -387,6 +387,24 @@ class BraviaGrpcMappedNumber(BraviaGrpcPathMixin, NumberEntity):
             return
 
 
+class BraviaGrpcSubwooferNumber(BraviaGrpcMappedNumber):
+    """Subwoofer level; unavailable while the wireless sub is not linked."""
+
+    @property
+    def available(self) -> bool:
+        """Require gRPC session and a live subwoofer link."""
+        if not super().available:
+            return False
+        return subwoofer_currently_linked(self._grpc_client.notify_state)
+
+    def _grpc_state_callback(self, update: Any) -> None:
+        """Refresh on level deltas and link status changes."""
+        if update.path == GRPC_PATH_SW_STATUS:
+            self.async_write_ha_state()
+            return
+        super()._grpc_state_callback(update)
+
+
 class BraviaGrpcMappedSensor(BraviaGrpcPathMixin, SensorEntity):
     """Read-only gRPC path exposed as a sensor."""
 
@@ -425,7 +443,7 @@ class BraviaGrpcMappedSensor(BraviaGrpcPathMixin, SensorEntity):
 
 
 class BraviaGrpcBassLevelSelect(BraviaGrpcMappedSelect):
-    """Bass level select (min/mid/max) on sound_setting.volume.bass."""
+    """Bass level select (min/mid/max); unavailable while a wireless sub is linked."""
 
     def __init__(
         self,
@@ -446,6 +464,20 @@ class BraviaGrpcBassLevelSelect(BraviaGrpcMappedSelect):
             spec.mapping, grpc_client.notify_state.get(spec.grpc_path)
         )
         self._attr_current_option = _coerce_bass_option(normalized)
+
+    @property
+    def available(self) -> bool:
+        """Require gRPC session and no live subwoofer link."""
+        if not super().available:
+            return False
+        return not subwoofer_currently_linked(self._grpc_client.notify_state)
+
+    def _grpc_state_callback(self, update: Any) -> None:
+        """Refresh on bass deltas and link status changes."""
+        if update.path == GRPC_PATH_SW_STATUS:
+            self.async_write_ha_state()
+            return
+        super()._grpc_state_callback(update)
 
     async def _on_grpc_state(self, value: Any) -> None:
         normalized = normalize_grpc_value(self._spec.mapping, value)
@@ -520,7 +552,7 @@ def mapped_select_entities(
         )
 
     bass = mapping_for_grpc_path(_GRPC_BASS_PATH)
-    if bass and not entry.data.get(CONF_HAS_SUBWOOFER, False):
+    if bass:
         entities.append(
             BraviaGrpcBassLevelSelect(grpc_client, entry, entity_spec_for_mapping(bass))
         )
@@ -549,9 +581,16 @@ def mapped_number_entities(
     for mapping in mappings_for_platform("number", writable=True):
         if mapping.grpc_path == _GRPC_BASS_PATH:
             continue
-        if mapping.grpc_path == "sound_setting.volume.subwoofer" and not entry.data.get(
-            CONF_HAS_SUBWOOFER, False
-        ):
+        if mapping.grpc_path == "sound_setting.volume.subwoofer":
+            spec = entity_spec_for_mapping(mapping)
+            lo, hi = _number_range(
+                mapping, capability_index=grpc_client.capability_index
+            )
+            entities.append(
+                BraviaGrpcSubwooferNumber(
+                    grpc_client, entry, spec, native_min_value=lo, native_max_value=hi
+                )
+            )
             continue
         spec = entity_spec_for_mapping(mapping)
         lo, hi = _number_range(mapping, capability_index=grpc_client.capability_index)
