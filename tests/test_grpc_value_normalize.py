@@ -56,6 +56,51 @@ def test_normalize_rear_signed_int() -> None:
     assert normalize_grpc_value(mapping, -3) == -3
 
 
+def test_normalize_omit_zero_int_paths() -> None:
+    """Proto3 omits zero ints — normalize to 0 for mapped int number paths."""
+    for path in (
+        "sound_setting.volume.rear",
+        "sound_setting.volume.subwoofer",
+        "sound_setting.av_sync.hdmi_0",
+        "sound_setting.av_sync.arc",
+        "sound_setting.voice_zoom",
+        "volume",
+    ):
+        mapping = mapping_for_grpc_path(path)
+        assert mapping is not None
+        assert normalize_grpc_value(mapping, None) == 0
+
+
+def test_normalize_omit_zero_uses_capability_type() -> None:
+    from custom_components.bravia_quad.grpc.get_capabilities_response import (
+        CapabilityMeta,
+    )
+
+    mapping = mapping_for_grpc_path("sound_setting.night_mode")
+    assert mapping is not None
+    # Bool path: omitted value stays unknown (do not coerce to 0).
+    assert normalize_grpc_value(mapping, None) is None
+    # Capability says int for an otherwise non-fallback path.
+    fake = mapping_for_grpc_path("playback_control.function")
+    assert fake is not None
+    index = {
+        "playback_control.function": CapabilityMeta(
+            name="playback_control.function",
+            type="int",
+            min=0,
+            max=10,
+        )
+    }
+    assert normalize_grpc_value(fake, None, capability_index=index) == 0
+    index_bool = {
+        "playback_control.function": CapabilityMeta(
+            name="playback_control.function",
+            type="enum",
+        )
+    }
+    assert normalize_grpc_value(fake, None, capability_index=index_bool) is None
+
+
 def test_normalize_voice_mode_bool() -> None:
     mapping = mapping_for_grpc_path("sound_setting.voice_mode")
     assert mapping is not None

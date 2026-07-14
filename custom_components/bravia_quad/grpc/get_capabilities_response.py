@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from typing import Any
 
 _LOGGER = logging.getLogger(__name__)
@@ -14,6 +15,16 @@ _GET_CAPABILITIES_METHOD = (
 _WIRE_TYPE_LEN = 2
 _FIELD_CAPABILITIES = 1
 _MAX_VARINT_SHIFT = 64
+
+
+@dataclass(frozen=True, slots=True)
+class CapabilityMeta:
+    """Per-path metadata from GetCapabilities JSON."""
+
+    name: str
+    type: str
+    min: int | None = None
+    max: int | None = None
 
 
 def get_capabilities_method() -> str:
@@ -75,41 +86,103 @@ def decode_capabilities_json_text(raw: bytes) -> str | None:
     return None
 
 
-def capability_path_names(cap_json: dict[str, Any] | str) -> frozenset[str]:
-    """Return the set of capability ``name`` strings from parsed JSON."""
+def _optional_int(value: Any) -> int | None:
+    if value is None:
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def capability_index_from_json(
+    cap_json: dict[str, Any] | str,
+) -> dict[str, CapabilityMeta]:
+    """Build path → CapabilityMeta from parsed GetCapabilities JSON."""
     if isinstance(cap_json, str):
         parsed: Any = json.loads(cap_json)
     else:
         parsed = cap_json
     if not isinstance(parsed, dict):
-        return frozenset()
+        return {}
     entries = parsed.get("capabilities")
     if not isinstance(entries, list):
-        return frozenset()
-    names: set[str] = set()
+        return {}
+    index: dict[str, CapabilityMeta] = {}
     for entry in entries:
         if not isinstance(entry, dict):
             continue
         name = entry.get("name")
-        if isinstance(name, str) and name:
-            names.add(name)
-    return frozenset(names)
+        if not isinstance(name, str) or not name:
+            continue
+        props = entry.get("props") if isinstance(entry.get("props"), dict) else {}
+        cap_type = entry.get("type")
+        index[name] = CapabilityMeta(
+            name=name,
+            type=str(cap_type) if cap_type is not None else "unknown",
+            min=_optional_int(props.get("min")),
+            max=_optional_int(props.get("max")),
+        )
+    return index
 
 
-def parse_capability_paths(raw: bytes) -> frozenset[str] | None:
-    """Decode GetCapabilities response bytes into a path-name allowlist."""
+def capability_path_names(cap_json: dict[str, Any] | str) -> frozenset[str]:
+    """Return the set of capability ``name`` strings from parsed JSON."""
+    return frozenset(capability_index_from_json(cap_json))
+
+
+def parse_capability_index(raw: bytes) -> dict[str, CapabilityMeta] | None:
+    """Decode GetCapabilities response bytes into a path metadata index."""
     text = decode_capabilities_json_text(raw)
     if not text:
         _LOGGER.debug("GetCapabilities response had no JSON text payload")
         return None
     try:
-        names = capability_path_names(text)
+        index = capability_index_from_json(text)
     except (json.JSONDecodeError, TypeError, ValueError):
         _LOGGER.debug("GetCapabilities JSON parse failed", exc_info=True)
         return None
-    if not names:
+    if not index:
         return None
-    return names
+    return index
+
+
+def parse_capability_paths(raw: bytes) -> frozenset[str] | None:
+    """Decode GetCapabilities response bytes into a path-name allowlist."""
+    index = parse_capability_index(raw)
+    if index is None:
+        return None
+    return frozenset(index)
+
+
+def is_int_capability(
+    path: str, capability_index: dict[str, CapabilityMeta] | None
+) -> bool | None:
+    """
+    Return True/False when *path* is in the index; None when unknown.
+
+    Callers should fall back to mapped int-path allowlists when this is None.
+    """
+    if capability_index is None:
+        return None
+    meta = capability_index.get(path)
+    if meta is None:
+        return None
+    return meta.type == "int"
+
+
+def int_range_from_capability(
+    path: str, capability_index: dict[str, CapabilityMeta] | None
+) -> tuple[int, int] | None:
+    """Return (min, max) when both are present for an int capability path."""
+    if capability_index is None:
+        return None
+    meta = capability_index.get(path)
+    if meta is None or meta.type != "int":
+        return None
+    if meta.min is None or meta.max is None:
+        return None
+    return (meta.min, meta.max)
 
 
 def filter_field_paths(

@@ -695,7 +695,11 @@ class BraviaGrpcMediaPlayer(
         if path == _PATH_VOLUME and self.should_suppress_volume_notification():
             return
         mapping = self._mapping(path)
-        normalized = normalize_grpc_value(mapping, value)
+        normalized = normalize_grpc_value(
+            mapping,
+            value,
+            capability_index=self._grpc_client.capability_index,
+        )
         if path == _PATH_POWER:
             self._update_media_player_state()
         elif path == _PATH_MUTE:

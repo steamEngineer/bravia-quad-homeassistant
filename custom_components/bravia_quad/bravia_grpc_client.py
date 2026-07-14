@@ -30,6 +30,8 @@ if TYPE_CHECKING:
 
     from homeassistant.core import HomeAssistant
 
+    from .grpc.get_capabilities_response import CapabilityMeta
+
     ReconnectCallback = Callable[[], Awaitable[None]]
     RefreshKeysCallback = Callable[[], Awaitable[bool]]
 
@@ -238,6 +240,19 @@ class BraviaGrpcClientAsync:
         """Device-advertised path names from GetCapabilities, if fetched."""
         return self._client.capability_paths
 
+    @property
+    def capability_index(self) -> dict[str, CapabilityMeta] | None:
+        """Per-path GetCapabilities metadata (type/min/max), if fetched."""
+        return self._client.capability_index
+
+    def is_int_capability(self, path: str) -> bool | None:
+        """Return whether *path* is capability type int; None if unknown."""
+        return self._client.is_int_capability(path)
+
+    def int_range(self, path: str) -> tuple[int, int] | None:
+        """Return capability min/max for an int path when both are present."""
+        return self._client.int_range(path)
+
     def merge_notify_cache(self, updates: dict[str, Any]) -> None:
         """Merge values into the underlying notify cache (GetStates/TCP seed)."""
         self._client.update_notify_cache(updates)
@@ -352,6 +367,20 @@ class BraviaGrpcClientAsync:
             self._client.get_states_dict,
             use_signed_auth=True,
         )
+
+    async def async_get_states_single_path(self, path: str) -> Any | None:
+        """Return one field from a signed single-path GetStates, or None."""
+        if not self._connected:
+            return None
+        result = await asyncio.to_thread(
+            self._client.get_states_single_path,
+            path,
+            use_signed_auth=True,
+            quiet=True,
+        )
+        if not result:
+            return None
+        return result.get(path)
 
     async def async_get_states_app_sequence(self) -> dict[str, Any] | None:
         """Mirror BRAVIA Connect GetStates RPC order (signed full + mutex)."""

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from typing import TYPE_CHECKING, Any, Literal
 
 from .const import (
@@ -53,12 +54,54 @@ from .const import (
     VOICE_ZOOM_OFF,
     VOICE_ZOOM_ON,
 )
+from .grpc_mapping import GRPC_TCP_MAPPINGS
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
+    from .grpc.get_capabilities_response import CapabilityMeta
     from .grpc_mapping import GrpcTcpMapping
 
 ExecValueKind = Literal["bool_value", "int_value", "string_value"]
 ExecPayload = bool | int | str | None
+
+
+@lru_cache(maxsize=1)
+def _fallback_omit_zero_int_paths() -> frozenset[str]:
+    """Return mapped number paths plus volume for proto3 omit-zero defaults."""
+    paths = {
+        mapping.grpc_path
+        for mapping in GRPC_TCP_MAPPINGS
+        if mapping.ha_platform == "number" or mapping.grpc_path == "volume"
+    }
+    paths.update(
+        {
+            "sound_setting.volume.rear",
+            "sound_setting.volume.subwoofer",
+            "sound_setting.av_sync.hdmi_0",
+            "sound_setting.av_sync.arc",
+            "sound_setting.voice_zoom",
+            "volume",
+        }
+    )
+    return frozenset(paths)
+
+
+def path_is_omit_zero_int(
+    path: str,
+    capability_index: Mapping[str, CapabilityMeta] | None,
+) -> bool:
+    """Return whether an omitted value for *path* should normalize to 0."""
+    if capability_index is not None:
+        meta = capability_index.get(path)
+        if meta is not None:
+            return meta.type == "int"
+    return path in _fallback_omit_zero_int_paths()
+
+
+# Back-compat alias for call sites written during omit-zero work.
+_path_is_omit_zero_int = path_is_omit_zero_int
+
 
 _ON_OFF_BY_FEATURE: dict[str, tuple[str, str]] = {
     "main.power": (POWER_ON, POWER_OFF),
@@ -148,12 +191,24 @@ def denormalize_input_source(ha_value: str) -> str:
     return ha_value
 
 
-def normalize_grpc_value(mapping: GrpcTcpMapping, raw_value: Any) -> Any | None:
+def normalize_grpc_value(
+    mapping: GrpcTcpMapping,
+    raw_value: Any,
+    *,
+    capability_index: Mapping[str, CapabilityMeta] | None = None,
+) -> Any | None:
     """Convert a gRPC field value to TCP notification conventions."""
+    grpc_path = mapping.grpc_path
     if raw_value is None:
+        # Proto3 omits zero ints; path may be present with no value field.
+        if _path_is_omit_zero_int(grpc_path, capability_index):
+            return 0
         return None
 
-    grpc_path = mapping.grpc_path
+    # Safety net: unsigned int64 that skipped notify/GetStates signed decode.
+    if isinstance(raw_value, int) and raw_value >= 1 << 63:
+        raw_value = raw_value - (1 << 64)
+
     tcp_feature = mapping.tcp_feature
 
     if grpc_path.endswith((".availability", ".unavailable_reason")):
