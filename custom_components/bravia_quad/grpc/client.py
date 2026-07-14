@@ -35,9 +35,12 @@ from .exec_command_request import (
     sign_exec_auth_token,
 )
 from .get_capabilities_response import (
+    CapabilityMeta,
     filter_field_paths,
     get_capabilities_method,
-    parse_capability_paths,
+    int_range_from_capability,
+    is_int_capability,
+    parse_capability_index,
 )
 from .get_nonce_request import build_get_nonce_request, parse_get_nonce_response
 from .get_states_auth import (
@@ -115,6 +118,7 @@ class BraviaGrpcClient:
         self._notify_state: dict[str, Any] = {}
         self._notify_stream: Any | None = None
         self._capability_paths: frozenset[str] | None = None
+        self._capability_index: dict[str, CapabilityMeta] | None = None
         self.last_rpc_error: str | None = None
         self.last_error_is_transport = False
 
@@ -127,6 +131,19 @@ class BraviaGrpcClient:
     def capability_paths(self) -> frozenset[str] | None:
         """Device-advertised path names from GetCapabilities, if fetched."""
         return self._capability_paths
+
+    @property
+    def capability_index(self) -> dict[str, CapabilityMeta] | None:
+        """Per-path GetCapabilities metadata (type/min/max), if fetched."""
+        return self._capability_index
+
+    def is_int_capability(self, path: str) -> bool | None:
+        """Return whether *path* is capability type int; None if unknown."""
+        return is_int_capability(path, self._capability_index)
+
+    def int_range(self, path: str) -> tuple[int, int] | None:
+        """Return capability min/max for an int path when both are present."""
+        return int_range_from_capability(path, self._capability_index)
 
     def field_paths_for_get_states(self) -> list[str]:
         """
@@ -604,7 +621,7 @@ class BraviaGrpcClient:
                 exc_info=True,
             )
             return None
-        names = parse_capability_paths(raw)
+        names = parse_capability_index(raw)
         if names is None:
             _LOGGER.warning(
                 "GetCapabilities returned no usable path names on %s:%s",
@@ -612,9 +629,10 @@ class BraviaGrpcClient:
                 self.port,
             )
             return None
-        self._capability_paths = names
+        self._capability_index = names
+        self._capability_paths = frozenset(names)
         self._say(f"GetCapabilities: {len(names)} paths on {self.host}:{self.port}")
-        return names
+        return self._capability_paths
 
     def get_states_raw(self, request_bytes: bytes) -> tuple[bytes | None, str | None]:
         """

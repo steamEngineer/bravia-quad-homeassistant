@@ -40,6 +40,10 @@ from .entity import (
     entity_unique_id,
     get_device_info,
 )
+from .grpc.get_capabilities_response import (
+    CapabilityMeta,
+    int_range_from_capability,
+)
 from .grpc_entity_registry import EntitySpec, entity_spec_for_mapping
 from .grpc_mapping import (
     GrpcTcpMapping,
@@ -53,6 +57,7 @@ from .grpc_value_normalize import (
     grpc_exec_unavailable_reason,
     ha_options_for_mapping,
     normalize_grpc_value,
+    path_is_omit_zero_int,
 )
 from .helpers import (
     persist_notify_only_restore_state,
@@ -316,7 +321,11 @@ class BraviaGrpcMappedNumber(BraviaGrpcPathMixin, NumberEntity):
             self._attr_mode = NumberMode.SLIDER
             self._attr_native_step = 1
         raw = grpc_client.notify_state.get(spec.grpc_path)
-        normalized = normalize_grpc_value(spec.mapping, raw)
+        normalized = normalize_grpc_value(
+            spec.mapping,
+            raw,
+            capability_index=grpc_client.capability_index,
+        )
         try:
             self._attr_native_value = (
                 float(normalized) if normalized is not None else None
@@ -330,13 +339,30 @@ class BraviaGrpcMappedNumber(BraviaGrpcPathMixin, NumberEntity):
         self.async_write_ha_state()
 
     async def _on_grpc_state(self, value: Any) -> None:
-        normalized = normalize_grpc_value(self._spec.mapping, value)
-        try:
-            self._attr_native_value = (
-                float(normalized) if normalized is not None else None
+        # Sibling int notifies often omit the value field (proto3). Blind
+        # None→0 would wipe rear when subwoofer changes (and vice versa).
+        if value is None and path_is_omit_zero_int(
+            self._grpc_path, self._grpc_client.capability_index
+        ):
+            value = await self._grpc_client.async_get_states_single_path(
+                self._grpc_path
             )
+
+        normalized = normalize_grpc_value(
+            self._spec.mapping,
+            value,
+            capability_index=self._grpc_client.capability_index,
+        )
+        try:
+            native = float(normalized) if normalized is not None else None
         except (TypeError, ValueError):
             return
+        # Reject out-of-range (catches any remaining unsigned wrap).
+        if native is not None and (
+            native < self._attr_native_min_value or native > self._attr_native_max_value
+        ):
+            return
+        self._attr_native_value = native
         self.async_write_ha_state()
 
     async def async_set_native_value(self, value: float) -> None:
@@ -348,7 +374,11 @@ class BraviaGrpcMappedNumber(BraviaGrpcPathMixin, NumberEntity):
 
     def _sync_number_from_notify(self) -> None:
         raw = self._grpc_client.notify_state.get(self._grpc_path)
-        normalized = normalize_grpc_value(self._spec.mapping, raw)
+        normalized = normalize_grpc_value(
+            self._spec.mapping,
+            raw,
+            capability_index=self._grpc_client.capability_index,
+        )
         try:
             self._attr_native_value = (
                 float(normalized) if normalized is not None else None
@@ -436,7 +466,14 @@ class BraviaGrpcBassLevelSelect(BraviaGrpcMappedSelect):
             self._attr_current_option = option
 
 
-def _number_range(mapping: GrpcTcpMapping) -> tuple[float, float]:  # noqa: PLR0911
+def _number_range(  # noqa: PLR0911
+    mapping: GrpcTcpMapping,
+    *,
+    capability_index: dict[str, CapabilityMeta] | None = None,
+) -> tuple[float, float]:
+    cap_range = int_range_from_capability(mapping.grpc_path, capability_index)
+    if cap_range is not None:
+        return (float(cap_range[0]), float(cap_range[1]))
     if mapping.grpc_path == "sound_setting.volume.subwoofer":
         return (MIN_BASS_LEVEL, MAX_BASS_LEVEL)
     if mapping.tcp_feature == FEATURE_REAR_LEVEL:
@@ -517,7 +554,7 @@ def mapped_number_entities(
         ):
             continue
         spec = entity_spec_for_mapping(mapping)
-        lo, hi = _number_range(mapping)
+        lo, hi = _number_range(mapping, capability_index=grpc_client.capability_index)
         entities.append(
             BraviaGrpcMappedNumber(
                 grpc_client, entry, spec, native_min_value=lo, native_max_value=hi

@@ -8,8 +8,8 @@ Home Assistant **gRPC transport mode** exposes entities via mapping-driven facto
 
 - **`grpc_mapping.py`** — canonical path → TCP feature → HA platform table
 - **`grpc_entity_registry.py`** — translation keys and unique ID suffixes aligned with TCP
-- **`grpc_value_normalize.py`** — read (`normalize_grpc_value`) and write (`denormalize_for_exec`) value conversion
-- **`grpc_mapped_entities.py`** — generic switch/select/number/sensor factories
+- **`grpc_value_normalize.py`** — read (`normalize_grpc_value`) and write (`denormalize_for_exec`) value conversion. Proto3 omits zero ints; `normalize_grpc_value` treats a missing value as `0` when GetCapabilities reports `type: int` (mapped number/volume paths are the fallback when capabilities were not fetched).
+- **`grpc_mapped_entities.py`** — generic switch/select/number/sensor factories. Number slider min/max prefer GetCapabilities `props.min` / `props.max` when present.
 - **`grpc_media_player.py`** — media player (power, volume, mute, source, sound field mode, now-playing metadata, playback info attributes, streaming transport controls)
 
 Input source and gRPC sound field mode (`sound_setting.sound_effect`) are exposed only on the media player — standalone `select.*_input` and `select.*_sound_effect` entities are removed on setup.

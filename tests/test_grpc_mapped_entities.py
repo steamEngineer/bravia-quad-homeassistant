@@ -141,6 +141,38 @@ def test_voice_zoom_level_number_spec_and_range(
     assert entity._attr_native_step == 1
 
 
+def test_mapped_number_omit_zero_and_capability_range(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    from custom_components.bravia_quad.grpc.get_capabilities_response import (
+        CapabilityMeta,
+    )
+    from custom_components.bravia_quad.grpc_mapped_entities import (
+        BraviaGrpcMappedNumber,
+        _number_range,
+    )
+
+    mapping = mapping_for_grpc_path("sound_setting.volume.rear")
+    assert mapping is not None
+    spec = entity_spec_for_mapping(mapping)
+    index = {
+        "sound_setting.volume.rear": CapabilityMeta(
+            name="sound_setting.volume.rear",
+            type="int",
+            min=-10,
+            max=10,
+        )
+    }
+    grpc_client.capability_index = index
+    grpc_client.notify_state = {"sound_setting.volume.rear": None}
+    lo, hi = _number_range(mapping, capability_index=index)
+    assert (lo, hi) == (-10.0, 10.0)
+    entity = BraviaGrpcMappedNumber(
+        grpc_client, grpc_entry, spec, native_min_value=lo, native_max_value=hi
+    )
+    assert entity._attr_native_value == 0.0
+
+
 def test_av_sync_mapped_numbers_match_tcp_slider(
     grpc_client: MagicMock, grpc_entry: MagicMock
 ) -> None:

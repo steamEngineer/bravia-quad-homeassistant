@@ -10,9 +10,14 @@ import pytest
 
 from custom_components.bravia_quad.grpc.client import BraviaGrpcClient
 from custom_components.bravia_quad.grpc.get_capabilities_response import (
+    CapabilityMeta,
+    capability_index_from_json,
     capability_path_names,
     decode_capabilities_json_text,
     filter_field_paths,
+    int_range_from_capability,
+    is_int_capability,
+    parse_capability_index,
     parse_capability_paths,
 )
 from custom_components.bravia_quad.grpc.get_states_request import load_field_paths
@@ -150,7 +155,57 @@ def test_get_states_dict_uses_filtered_paths(monkeypatch: pytest.MonkeyPatch) ->
     assert captured["request"] == b"req"
 
 
-def test_fetch_capabilities_caches_names(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_capability_index_includes_type_and_range() -> None:
+    data = {
+        "capabilities": [
+            {
+                "name": "sound_setting.volume.rear",
+                "type": "int",
+                "props": {
+                    "get": True,
+                    "notify": True,
+                    "commands": ["set"],
+                    "min": -10,
+                    "max": 10,
+                    "span": 1,
+                },
+            },
+            {
+                "name": "power",
+                "type": "bool",
+                "props": {"get": True, "notify": True, "commands": ["set"]},
+            },
+            {
+                "name": "volume",
+                "type": "int",
+                "props": {"get": True, "notify": True, "commands": ["set"]},
+            },
+        ]
+    }
+    index = capability_index_from_json(data)
+    assert index["sound_setting.volume.rear"] == CapabilityMeta(
+        name="sound_setting.volume.rear",
+        type="int",
+        min=-10,
+        max=10,
+    )
+    assert is_int_capability("sound_setting.volume.rear", index) is True
+    assert is_int_capability("power", index) is False
+    assert is_int_capability("missing", index) is None
+    assert int_range_from_capability("sound_setting.volume.rear", index) == (-10, 10)
+    assert int_range_from_capability("volume", index) is None
+
+
+def test_parse_capability_index_from_wire() -> None:
+    raw = CAP_BIN.read_bytes()
+    index = parse_capability_index(raw)
+    assert index is not None
+    assert index["volume"].type == "int"
+    assert index["power"].type == "bool"
+    assert parse_capability_paths(raw) == frozenset(index)
+
+
+def test_fetch_capabilities_caches_index(monkeypatch: pytest.MonkeyPatch) -> None:
     client = BraviaGrpcClient("127.0.0.1")
     client.channel = MagicMock()
     unary = MagicMock()
@@ -160,6 +215,9 @@ def test_fetch_capabilities_caches_names(monkeypatch: pytest.MonkeyPatch) -> Non
     names = client.fetch_capabilities()
     assert names is not None
     assert client.capability_paths == names
+    assert client.capability_index is not None
+    assert client.is_int_capability("volume") is True
+    assert client.is_int_capability("power") is False
     assert "power" in names
     assert len(client.field_paths_for_get_states()) >= 3
 
@@ -173,4 +231,5 @@ def test_fetch_capabilities_soft_fails(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert client.fetch_capabilities() is None
     assert client.capability_paths is None
+    assert client.capability_index is None
     assert client.field_paths_for_get_states() == load_field_paths()
