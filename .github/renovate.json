@@ -9,22 +9,9 @@
     "automerge": true
   },
   "commitMessagePrefix": "⬆️",
-  "customManagers": [
-    {
-      "customType": "regex",
-      "description": "uv python install pins in GitHub Actions workflows",
-      "managerFilePatterns": ["/^\\.github\\/workflows\\/.*\\.ya?ml$/"],
-      "matchStrings": [
-        "run: uv python install (?<currentValue>\\d+\\.\\d+\\.\\d+)"
-      ],
-      "datasourceTemplate": "python-version",
-      "depNameTemplate": "python",
-      "versioningTemplate": "python"
-    }
-  ],
   "packageRules": [
     {
-      "description": "Group .python-version and CI uv python install pins in one PR",
+      "description": "Group .python-version updates in one PR",
       "matchDepNames": ["python"],
       "groupName": "python"
     },
