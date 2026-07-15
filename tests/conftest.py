@@ -488,6 +488,7 @@ def grpc_client() -> MagicMock:
     client = MagicMock()
     client.is_connected = True
     client.notify_state = {}
+    client.capability_paths = None
     client.capability_index = None
     client.volume_step_interval = 0
     client.async_exec_command = AsyncMock(return_value=True)

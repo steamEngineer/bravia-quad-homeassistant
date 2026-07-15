@@ -86,6 +86,21 @@ def grpc_path_needs_ha_restore(path: str) -> bool:
     return path in NOTIFY_ONLY_GRPC_PATHS_SET or path in _HANDCRAFTED_NO_READ_GRPC_PATHS
 
 
+def mapping_allowed_by_capabilities(
+    grpc_path: str, capability_paths: frozenset[str] | None
+) -> bool:
+    """
+    Return whether a mapped entity should be created for this device.
+
+    Soft-fallback when capabilities were not fetched (None). Notify-only
+    Seeds/restore paths are never advertised in GetCapabilities, so they
+    remain allowed even when absent from the capability set.
+    """
+    if capability_paths is None:
+        return True
+    return grpc_path in capability_paths or grpc_path in NOTIFY_ONLY_GRPC_PATHS_SET
+
+
 @dataclass(frozen=True, slots=True)
 class GrpcTcpMapping:
     """Maps gRPC command/state paths to TCP features and HA platforms."""

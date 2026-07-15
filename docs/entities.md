@@ -31,7 +31,7 @@ Only one bass-level control is writable at a time based on whether a wireless su
 
 ## gRPC transport
 
-gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gRPC media player. Exact set depends on model, firmware, and subwoofer detection.
+gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gRPC media player. Exact set depends on model, firmware, and subwoofer detection: mapped entities are created when the path is advertised by `GetCapabilities` (Seeds / notify-only paths are exempt and still created).
 
 | Entity | Type | Description | Range/Options | Notes |
 |--------|------|-------------|---------------|-------|

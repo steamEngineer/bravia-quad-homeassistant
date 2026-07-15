@@ -228,6 +228,49 @@ def _entity_suffixes(entities: list, grpc_entry: MagicMock) -> set[str]:
     return {e._attr_unique_id.removeprefix(prefix) for e in entities}
 
 
+def test_factories_omit_quad_only_when_absent_from_caps(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    """A8-like caps: hide center speaker mode + wired MAC; keep notify-only DRC."""
+    grpc_client.capability_paths = frozenset(
+        {
+            "power",
+            "volume",
+            "mute",
+            "sound_setting.volume.bass",
+            "sound_setting.volume.subwoofer",
+            "sound_setting.volume.rear",
+            "system_setting.ipv4_address",
+            "system_setting.cec_power_off_sync",
+        }
+    )
+    select_paths = {
+        e._grpc_path for e in mapped_select_entities(grpc_client, grpc_entry)
+    }
+    sensor_paths = {
+        e._grpc_path for e in mapped_sensor_entities(grpc_client, grpc_entry)
+    }
+    assert "speaker_sound_setting.center_speaker_mode" not in select_paths
+    assert "system_setting.wifi_mac_address_wired" not in sensor_paths
+    assert "sound_setting.drc" in select_paths
+    assert "system_setting.cec_power_off_sync" in select_paths
+    assert "system_setting.ipv4_address" in sensor_paths
+
+
+def test_factories_soft_fallback_includes_quad_only_when_caps_none(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    grpc_client.capability_paths = None
+    select_paths = {
+        e._grpc_path for e in mapped_select_entities(grpc_client, grpc_entry)
+    }
+    sensor_paths = {
+        e._grpc_path for e in mapped_sensor_entities(grpc_client, grpc_entry)
+    }
+    assert "speaker_sound_setting.center_speaker_mode" in select_paths
+    assert "system_setting.wifi_mac_address_wired" in sensor_paths
+
+
 def test_switch_factory_includes_power_and_aav(
     grpc_client: MagicMock, grpc_entry: MagicMock
 ) -> None:
