@@ -30,6 +30,7 @@ from custom_components.bravia_quad.grpc_mapped_entities import (
     mapped_switch_entities,
 )
 from custom_components.bravia_quad.grpc_mapping import (
+    mapping_allowed_by_capabilities,
     mapping_for_grpc_path,
     mappings_for_platform,
 )
@@ -226,6 +227,77 @@ def test_playback_command_false_availability_none_reason_is_available() -> None:
 def _entity_suffixes(entities: list, grpc_entry: MagicMock) -> set[str]:
     prefix = f"{grpc_entry.unique_id}_"
     return {e._attr_unique_id.removeprefix(prefix) for e in entities}
+
+
+def test_mapping_allowed_by_capabilities_soft_none() -> None:
+    assert mapping_allowed_by_capabilities(
+        "speaker_sound_setting.center_speaker_mode", None
+    )
+
+
+def test_mapping_allowed_by_capabilities_in_set() -> None:
+    caps = frozenset({"power", "speaker_sound_setting.center_speaker_mode"})
+    assert mapping_allowed_by_capabilities(
+        "speaker_sound_setting.center_speaker_mode", caps
+    )
+
+
+def test_mapping_allowed_by_capabilities_notify_only_exempt() -> None:
+    caps = frozenset({"power"})
+    assert mapping_allowed_by_capabilities("sound_setting.drc", caps)
+
+
+def test_mapping_allowed_by_capabilities_denies_missing() -> None:
+    caps = frozenset({"power"})
+    assert not mapping_allowed_by_capabilities(
+        "speaker_sound_setting.center_speaker_mode", caps
+    )
+    assert not mapping_allowed_by_capabilities(
+        "system_setting.wifi_mac_address_wired", caps
+    )
+
+
+def test_factories_omit_quad_only_when_absent_from_caps(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    """A8-like caps: hide center speaker mode + wired MAC; keep notify-only DRC."""
+    grpc_client.capability_paths = frozenset(
+        {
+            "power",
+            "volume",
+            "mute",
+            "sound_setting.volume.bass",
+            "sound_setting.volume.subwoofer",
+            "sound_setting.volume.rear",
+            "system_setting.ipv4_address",
+            "system_setting.cec_power_off_sync",
+        }
+    )
+    select_paths = {
+        e._grpc_path for e in mapped_select_entities(grpc_client, grpc_entry)
+    }
+    sensor_paths = {
+        e._grpc_path for e in mapped_sensor_entities(grpc_client, grpc_entry)
+    }
+    assert "speaker_sound_setting.center_speaker_mode" not in select_paths
+    assert "system_setting.wifi_mac_address_wired" not in sensor_paths
+    assert "sound_setting.drc" in select_paths
+    assert "system_setting.cec_power_off_sync" in select_paths
+    assert "system_setting.ipv4_address" in sensor_paths
+
+
+def test_factories_soft_fallback_includes_quad_only_when_caps_none(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    grpc_client.capability_paths = None
+    select_paths = {
+        e._grpc_path for e in mapped_select_entities(grpc_client, grpc_entry)
+    }
+    sensor_paths = {
+        e._grpc_path for e in mapped_sensor_entities(grpc_client, grpc_entry)
+    }
+    assert "speaker_sound_setting.center_speaker_mode" in select_paths
+    assert "system_setting.wifi_mac_address_wired" in sensor_paths
 
 
 def test_switch_factory_includes_power_and_aav(

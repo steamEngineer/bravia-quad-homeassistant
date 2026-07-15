@@ -47,6 +47,7 @@ from .grpc_entity_registry import EntitySpec, entity_spec_for_mapping
 from .grpc_mapping import (
     GrpcTcpMapping,
     grpc_path_needs_ha_restore,
+    mapping_allowed_by_capabilities,
     mapping_for_grpc_path,
     mappings_for_platform,
 )
@@ -525,15 +526,17 @@ def mapped_switch_entities(
     grpc_client: BraviaGrpcClientAsync, entry: ConfigEntry
 ) -> list[SwitchEntity]:
     """TCP-parity switch entities for gRPC mode."""
+    caps = grpc_client.capability_paths
     entities: list[SwitchEntity] = []
     power = mapping_for_grpc_path("power")
-    if power:
+    if power and mapping_allowed_by_capabilities(power.grpc_path, caps):
         entities.append(
             BraviaGrpcMappedSwitch(grpc_client, entry, entity_spec_for_mapping(power))
         )
     entities.extend(
         BraviaGrpcMappedSwitch(grpc_client, entry, entity_spec_for_mapping(mapping))
         for mapping in mappings_for_platform("switch", writable=True)
+        if mapping_allowed_by_capabilities(mapping.grpc_path, caps)
     )
     return entities
 
@@ -542,17 +545,20 @@ def mapped_select_entities(
     grpc_client: BraviaGrpcClientAsync, entry: ConfigEntry
 ) -> list[SelectEntity]:
     """TCP-parity select entities for gRPC mode."""
+    caps = grpc_client.capability_paths
     entities: list[SelectEntity] = []
 
     for mapping in mappings_for_platform("select", writable=True):
         if mapping.grpc_path == _GRPC_BASS_PATH:
+            continue
+        if not mapping_allowed_by_capabilities(mapping.grpc_path, caps):
             continue
         entities.append(
             BraviaGrpcMappedSelect(grpc_client, entry, entity_spec_for_mapping(mapping))
         )
 
     bass = mapping_for_grpc_path(_GRPC_BASS_PATH)
-    if bass:
+    if bass and mapping_allowed_by_capabilities(bass.grpc_path, caps):
         entities.append(
             BraviaGrpcBassLevelSelect(grpc_client, entry, entity_spec_for_mapping(bass))
         )
@@ -563,10 +569,11 @@ def mapped_number_entities(
     grpc_client: BraviaGrpcClientAsync, entry: ConfigEntry
 ) -> list[NumberEntity]:
     """TCP-parity number entities for gRPC mode."""
+    caps = grpc_client.capability_paths
     entities: list[NumberEntity] = []
 
     volume = mapping_for_grpc_path("volume")
-    if volume:
+    if volume and mapping_allowed_by_capabilities(volume.grpc_path, caps):
         spec = entity_spec_for_mapping(volume)
         entities.append(
             BraviaGrpcMappedNumber(
@@ -580,6 +587,8 @@ def mapped_number_entities(
 
     for mapping in mappings_for_platform("number", writable=True):
         if mapping.grpc_path == _GRPC_BASS_PATH:
+            continue
+        if not mapping_allowed_by_capabilities(mapping.grpc_path, caps):
             continue
         if mapping.grpc_path == "sound_setting.volume.subwoofer":
             spec = entity_spec_for_mapping(mapping)
@@ -609,8 +618,11 @@ def mapped_sensor_entities(
     grpc_client: BraviaGrpcClientAsync, entry: ConfigEntry
 ) -> list[SensorEntity]:
     """TCP-parity sensor entities for gRPC mode."""
+    caps = grpc_client.capability_paths
     entities: list[SensorEntity] = []
     for mapping in mappings_for_platform("sensor", writable=False):
+        if not mapping_allowed_by_capabilities(mapping.grpc_path, caps):
+            continue
         spec = entity_spec_for_mapping(mapping)
         enabled = mapping.grpc_path != "system_setting.serial_number"
         entities.append(
