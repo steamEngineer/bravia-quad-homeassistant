@@ -12,7 +12,12 @@ from homeassistant.components.media_player import (
     MediaType,
 )
 
+from custom_components.bravia_quad.const import (
+    INPUT_OPTIONS,
+    SOUND_EFFECT_OPTIONS,
+)
 from custom_components.bravia_quad.grpc.client import NotifyStateUpdate
+from custom_components.bravia_quad.grpc.get_capabilities_response import CapabilityMeta
 from custom_components.bravia_quad.grpc_media_player import (
     _BASE_SUPPORTED_FEATURES,
     _PATH_ALBUM,
@@ -31,6 +36,7 @@ from custom_components.bravia_quad.grpc_media_player import (
     _PATH_SOUND_EFFECT,
     _PATH_SPOTIFY_PLAYLIST,
     _PATH_TITLE,
+    _PATH_VIRTUALIZER,
     _POSITION_WRITE_INTERVAL,
     _TRANSPORT_FEATURE_BY_ACTION,
     BraviaGrpcMediaPlayer,
@@ -59,6 +65,7 @@ def grpc_client() -> MagicMock:
     client = MagicMock()
     client.is_connected = True
     client.notify_state = _base_notify_state()
+    client.capability_index = None
     client.async_exec_command = AsyncMock(return_value=True)
     client.async_exec_denormalized = AsyncMock(return_value=True)
     client.async_fetch_field_paths = AsyncMock(return_value=0)
@@ -646,6 +653,147 @@ def test_dynamic_source_list_from_notify(
     entity = BraviaGrpcMediaPlayer(grpc_client, entry)
 
     assert entity._attr_source_list == ["tv", "hdmi1", "spotify"]
+
+
+def test_source_list_falls_back_to_input_options_without_caps(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity._attr_source_list == [
+        source for source in INPUT_OPTIONS if source != "airplay2"
+    ]
+    assert entity._attr_sound_mode_list == list(SOUND_EFFECT_OPTIONS)
+
+
+def test_source_list_from_a8_capabilities_excludes_360racast(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.capability_index = {
+        _PATH_INPUT: CapabilityMeta(
+            name=_PATH_INPUT,
+            type="enum",
+            values=("tv", "hdmi", "bluetooth", "spotify", "airplay", "other"),
+        ),
+        _PATH_SOUND_EFFECT: CapabilityMeta(
+            name=_PATH_SOUND_EFFECT,
+            type="enum",
+            values=("Dolby Speaker Virtualizer", "Neural:X", "360SSM"),
+        ),
+    }
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity._attr_source_list == [
+        "tv",
+        "hdmi1",
+        "bluetooth",
+        "spotify",
+    ]
+    assert "360racast" not in entity._attr_source_list
+    assert "other" not in entity._attr_source_list
+    assert "airplay2" not in entity._attr_source_list
+    assert entity._attr_sound_mode_list == [
+        "dolby_speaker_virtualizer",
+        "neural_x",
+        "ssm_360",
+    ]
+
+
+def test_source_list_from_quad_capabilities_hides_detect_only(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.capability_index = {
+        _PATH_INPUT: CapabilityMeta(
+            name=_PATH_INPUT,
+            type="enum",
+            values=(
+                "tv",
+                "hdmi",
+                "bluetooth",
+                "spotify",
+                "360racast",
+                "airplay",
+                "other",
+            ),
+        ),
+    }
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity._attr_source_list == [
+        "tv",
+        "hdmi1",
+        "bluetooth",
+        "spotify",
+    ]
+    assert "360racast" not in entity._attr_source_list
+    assert "other" not in entity._attr_source_list
+    assert "airplay2" not in entity._attr_source_list
+
+
+def test_360racast_in_source_list_when_active(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.capability_index = {
+        _PATH_INPUT: CapabilityMeta(
+            name=_PATH_INPUT,
+            type="enum",
+            values=("tv", "hdmi", "spotify", "360racast", "other"),
+        ),
+    }
+    grpc_client.notify_state[_PATH_INPUT] = "360racast"
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity._attr_source == "360racast"
+    assert "360racast" in entity._attr_source_list
+    assert "other" not in entity._attr_source_list
+
+
+def test_other_in_source_list_when_active(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.capability_index = {
+        _PATH_INPUT: CapabilityMeta(
+            name=_PATH_INPUT,
+            type="enum",
+            values=("tv", "hdmi", "spotify", "360racast", "other"),
+        ),
+    }
+    grpc_client.notify_state[_PATH_INPUT] = "other"
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity._attr_source == "other"
+    assert "other" in entity._attr_source_list
+    assert "360racast" not in entity._attr_source_list
+
+
+def test_available_values_override_capability_source_list(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.capability_index = {
+        _PATH_INPUT: CapabilityMeta(
+            name=_PATH_INPUT,
+            type="enum",
+            values=("tv", "hdmi", "bluetooth", "spotify", "360racast", "airplay"),
+        ),
+    }
+    grpc_client.notify_state[_PATH_AVAILABLE_VALUES] = "tv,spotify"
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity._attr_source_list == ["tv", "spotify"]
+
+
+def test_virtualizer_multi_stereo_accepted(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    grpc_client.notify_state.update(
+        {
+            _PATH_INPUT: "tv",
+            _PATH_VIRTUALIZER: "multi_stereo",
+        }
+    )
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+
+    assert entity.extra_state_attributes["virtualizer"] == "multi_stereo"
 
 
 def test_supported_features_include_sound_mode(

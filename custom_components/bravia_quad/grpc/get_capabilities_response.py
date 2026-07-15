@@ -25,6 +25,7 @@ class CapabilityMeta:
     type: str
     min: int | None = None
     max: int | None = None
+    values: tuple[str, ...] | None = None
 
 
 def get_capabilities_method() -> str:
@@ -95,6 +96,16 @@ def _optional_int(value: Any) -> int | None:
         return None
 
 
+def _optional_enum_values(raw: Any) -> tuple[str, ...] | None:
+    """Return non-empty enum strings from props.values, else None."""
+    if not isinstance(raw, list):
+        return None
+    values = tuple(
+        text for item in raw if isinstance(item, str) and (text := item.strip())
+    )
+    return values or None
+
+
 def capability_index_from_json(
     cap_json: dict[str, Any] | str,
 ) -> dict[str, CapabilityMeta]:
@@ -122,6 +133,7 @@ def capability_index_from_json(
             type=str(cap_type) if cap_type is not None else "unknown",
             min=_optional_int(props.get("min")),
             max=_optional_int(props.get("max")),
+            values=_optional_enum_values(props.get("values")),
         )
     return index
 
@@ -183,6 +195,18 @@ def int_range_from_capability(
     if meta.min is None or meta.max is None:
         return None
     return (meta.min, meta.max)
+
+
+def enum_values_from_capability(
+    path: str, capability_index: dict[str, CapabilityMeta] | None
+) -> tuple[str, ...] | None:
+    """Return props.values for *path* when present; None when unknown/empty."""
+    if capability_index is None:
+        return None
+    meta = capability_index.get(path)
+    if not isinstance(meta, CapabilityMeta) or not meta.values:
+        return None
+    return meta.values
 
 
 def filter_field_paths(

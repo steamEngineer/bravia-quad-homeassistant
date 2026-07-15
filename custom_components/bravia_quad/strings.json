@@ -209,7 +209,9 @@
               "hdmi1": "HDMI",
               "spotify": "Spotify",
               "bluetooth": "Bluetooth",
-              "airplay2": "AirPlay"
+              "airplay2": "AirPlay",
+              "360racast": "360 Reality Audio Cast",
+              "other": "Other"
             }
           },
           "sound_mode": {
