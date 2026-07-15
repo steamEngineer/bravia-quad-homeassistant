@@ -200,3 +200,48 @@ def filter_field_paths(
     if not filtered:
         return list(ha_paths)
     return filtered
+
+
+def _command_independence_blocks_getstates(props: dict[str, Any]) -> bool:
+    independence = props.get("command_independence")
+    if not isinstance(independence, dict):
+        return False
+    return bool(independence.get("getstates_request"))
+
+
+def paths_for_safe_get_states(cap_json: dict[str, Any] | str | None) -> list[str]:
+    """
+    Paths safe for a single bulk GetStates request.
+
+    Include capabilities with ``props.get: true``, excluding those marked
+    ``command_independence.getstates_request`` (device rejects the whole
+    batch if any such path is included). Preserves GetCapabilities order.
+    """
+    if cap_json is None:
+        return []
+    if isinstance(cap_json, str):
+        try:
+            parsed: Any = json.loads(cap_json)
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return []
+    else:
+        parsed = cap_json
+    if not isinstance(parsed, dict):
+        return []
+    entries = parsed.get("capabilities")
+    if not isinstance(entries, list):
+        return []
+    paths: list[str] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        if not isinstance(name, str) or not name:
+            continue
+        props = entry.get("props") if isinstance(entry.get("props"), dict) else {}
+        if props.get("get") is not True:
+            continue
+        if _command_independence_blocks_getstates(props):
+            continue
+        paths.append(name)
+    return paths

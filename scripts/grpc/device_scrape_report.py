@@ -18,7 +18,7 @@ from bravia_quad.grpc_mapping import (
 )
 from bravia_quad.transport import identity_from_grpc_snapshot
 
-REPORT_SCHEMA_VERSION = 1
+REPORT_SCHEMA_VERSION = 2
 
 _METADATA_SUFFIXES = (".availability", ".unavailable_reason", ".range")
 # Keep in sync with bravia_quad.grpc_seeds_seed.SEEDS_SEED_PATHS (avoid HA import here).
@@ -33,6 +33,23 @@ _SPEAKER_STATUS_PATHS = (
     "speaker_connection_setting.connection_status.rl",
     "speaker_connection_setting.connection_status.rr",
     "speaker_connection_setting.connection_status.sw",
+    "speaker_connection_setting.connection_status.sw2",
+)
+
+# Extra topology history paths for scrape backfill (not always in entity-critical).
+_SPEAKER_HISTORY_BACKFILL_PATHS = (
+    "speaker_connection_setting.connection_history.sw",
+    "speaker_connection_setting.connection_history.sw2",
+)
+
+GETSTATES_STRATEGY_SAFE_BULK = "get_true_minus_command_independence"
+
+# Seeds IoT /devices fields preferred for model id when gRPC/HTTP omit it.
+_SEEDS_MODEL_KEYS = (
+    "identified_model_name",
+    "model_name",
+    "model",
+    "product_code",
 )
 
 _PII_KEYS = frozenset(
@@ -262,6 +279,19 @@ def _device_gates_for_path(path: str, hardware: dict[str, Any]) -> list[str]:
     return gates
 
 
+def topology_backfill_paths() -> tuple[str, ...]:
+    """Speaker status + SW history paths scrape should ensure are requested."""
+    return _SPEAKER_STATUS_PATHS + _SPEAKER_HISTORY_BACKFILL_PATHS
+
+
+def battery_paths_from_capabilities(cap_json: dict[str, Any] | None) -> list[str]:
+    """Return ``battery.*`` capability names when present."""
+    if not cap_json:
+        return []
+    index = build_capability_index(cap_json)
+    return sorted(name for name in index if name.startswith("battery."))
+
+
 def build_hardware_profile(
     grpc_snapshot: dict[str, Any],
     cap_index: dict[str, CapabilityEntry],
@@ -272,6 +302,7 @@ def build_hardware_profile(
     bass_unavail = grpc_snapshot.get("sound_setting.volume.bass.unavailable_reason")
 
     sw_status = grpc_snapshot.get("speaker_connection_setting.connection_status.sw")
+    sw2_status = grpc_snapshot.get("speaker_connection_setting.connection_status.sw2")
     rear_rl = grpc_snapshot.get("speaker_connection_setting.connection_status.rl")
     rear_rr = grpc_snapshot.get("speaker_connection_setting.connection_status.rr")
     has_rear = any(
@@ -296,13 +327,98 @@ def build_hardware_profile(
         "serial": identity.get("serial_number"),
         "mac": identity.get("mac"),
         "firmware": grpc_snapshot.get("fw_update.version.main"),
-        "has_subwoofer": has_subwoofer,
+        "has_subwoofer": has_subwoofer or sw2_status in ("connected", "protected"),
         "has_rear_speakers": has_rear,
         "subwoofer_connected": sw_status in ("connected", "protected"),
+        "subwoofer2_connected": sw2_status in ("connected", "protected"),
         "speaker_topology": speaker_topology,
         "playback_inputs_available": playback_inputs,
         "bass_unavailable_reason": bass_unavail,
     }
+
+
+def battery_live_summary(grpc_snapshot: dict[str, Any]) -> dict[str, Any]:
+    """Compact battery.* live values for markdown (empty when none)."""
+    return {
+        path: value
+        for path, value in sorted(grpc_snapshot.items())
+        if path.startswith("battery.") and value is not None
+    }
+
+
+def identity_from_seeds_device(device: dict[str, Any] | None) -> dict[str, Any]:
+    """Extract model/firmware/name fields from a Seeds IoT ``/devices`` row."""
+    if not device:
+        return {}
+    out: dict[str, Any] = {}
+    for key in _SEEDS_MODEL_KEYS:
+        value = device.get(key)
+        if value is None:
+            continue
+        text = str(value).strip()
+        if text:
+            out["model_id"] = text
+            break
+    fw = device.get("firmware_version") or device.get("firmware")
+    if fw is not None and str(fw).strip():
+        out["firmware"] = str(fw).strip()
+    for name_key in ("name", "device_name", "friendly_name"):
+        name = device.get(name_key)
+        if name is not None and str(name).strip():
+            out["friendly_name"] = str(name).strip()
+            break
+    return out
+
+
+def resolve_identity_source(
+    *,
+    grpc_model_id: Any,
+    http_ok: bool | None,
+    http_model_id: Any,
+    seeds_model_id: Any,
+) -> str:
+    """Return which source supplied ``model_id`` (grpc → http → seeds → none)."""
+    if grpc_model_id:
+        return "grpc"
+    if http_ok and http_model_id:
+        return "http"
+    if seeds_model_id:
+        return "seeds_devices"
+    return "none"
+
+
+def _merge_http_identity(
+    hardware: dict[str, Any], http_identity: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Fill model/firmware from HTTP when gRPC snapshot omits them."""
+    if not http_identity:
+        return hardware
+    merged = dict(hardware)
+    if not merged.get("model_id") and http_identity.get("model_id"):
+        merged["model_id"] = http_identity["model_id"]
+        if not merged.get("model_name"):
+            merged["model_name"] = http_identity["model_id"]
+    if not merged.get("firmware") and http_identity.get("firmware"):
+        merged["firmware"] = http_identity["firmware"]
+    return merged
+
+
+def _merge_seeds_identity(
+    hardware: dict[str, Any], seeds_identity: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Fill model/firmware/name from Seeds /devices when still missing."""
+    if not seeds_identity:
+        return hardware
+    merged = dict(hardware)
+    if not merged.get("model_id") and seeds_identity.get("model_id"):
+        merged["model_id"] = seeds_identity["model_id"]
+        if not merged.get("model_name"):
+            merged["model_name"] = seeds_identity["model_id"]
+    if not merged.get("firmware") and seeds_identity.get("firmware"):
+        merged["firmware"] = seeds_identity["firmware"]
+    if not merged.get("friendly_name") and seeds_identity.get("friendly_name"):
+        merged["friendly_name"] = seeds_identity["friendly_name"]
+    return merged
 
 
 def _matrix_row(
@@ -568,22 +684,6 @@ def report_filename_stem(
     return f"device-scrape-{model}-{fw}-{ts}"
 
 
-def _merge_http_identity(
-    hardware: dict[str, Any], http_identity: dict[str, Any] | None
-) -> dict[str, Any]:
-    """Fill model/firmware from HTTP when gRPC snapshot omits them."""
-    if not http_identity:
-        return hardware
-    merged = dict(hardware)
-    if not merged.get("model_id") and http_identity.get("model_id"):
-        merged["model_id"] = http_identity["model_id"]
-        if not merged.get("model_name"):
-            merged["model_name"] = http_identity["model_id"]
-    if not merged.get("firmware") and http_identity.get("firmware"):
-        merged["firmware"] = http_identity["firmware"]
-    return merged
-
-
 def build_full_report(
     *,
     host: str,
@@ -597,12 +697,22 @@ def build_full_report(
     tcp_parity: dict[str, Any] | None = None,
     tcp_reachable: dict[str, Any] | None = None,
     http_identity: dict[str, Any] | None = None,
+    seeds_identity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble the complete scrape report dict."""
     cap_index = build_capability_index(capabilities_json)
-    hardware = _merge_http_identity(
-        build_hardware_profile(grpc_snapshot, cap_index), http_identity
+    grpc_hw = build_hardware_profile(grpc_snapshot, cap_index)
+    hardware = _merge_seeds_identity(
+        _merge_http_identity(grpc_hw, http_identity), seeds_identity
     )
+    identity_source = resolve_identity_source(
+        grpc_model_id=grpc_hw.get("model_id"),
+        http_ok=(http_identity or {}).get("ok"),
+        http_model_id=(http_identity or {}).get("model_id"),
+        seeds_model_id=(seeds_identity or {}).get("model_id"),
+    )
+    meta = dict(scrape_meta)
+    meta.setdefault("identity_source", identity_source)
     entity_matrix = build_entity_matrix(
         cap_index=cap_index,
         grpc_snapshot=grpc_snapshot,
@@ -622,7 +732,7 @@ def build_full_report(
         "host": host,
         "auth_gate": auth_gate,
         "hardware_profile": hardware,
-        "scrape_meta": scrape_meta,
+        "scrape_meta": meta,
         "capabilities": {
             "ok": capabilities_raw.get("ok"),
             "latency_s": capabilities_raw.get("latency_s"),
@@ -637,6 +747,7 @@ def build_full_report(
             "flat": seeds_flat,
         },
         "http_identity": http_identity,
+        "seeds_identity": seeds_identity,
         "tcp_reachable": tcp_reachable,
         "tcp_parity": tcp_parity,
         "diffs": diffs,
@@ -743,6 +854,13 @@ def render_markdown(report: dict[str, Any]) -> str:
     hw = report.get("hardware_profile") or {}
     diffs = report.get("diffs") or {}
     tcp = report.get("tcp_reachable") or {}
+    meta = report.get("scrape_meta") or {}
+    caps_json = (report.get("capabilities") or {}).get("json") or {}
+    cap_names = {
+        entry.get("name")
+        for entry in (caps_json.get("capabilities") or [])
+        if isinstance(entry, dict)
+    }
     local_vs = diffs.get("local_vs_seeds") or {}
     lines = [
         "# Device capability scrape",
@@ -752,6 +870,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- **Integration version:** {report.get('integration_version', 'unknown')}",
         f"- **Model:** {hw.get('model_id', 'unknown')} ({hw.get('model_name', '')})",
         f"- **Firmware:** {hw.get('firmware', 'unknown')}",
+        f"- **Identity source:** {meta.get('identity_source', 'unknown')}",
         f"- **Has subwoofer:** {hw.get('has_subwoofer')}",
         f"- **Has rear speakers:** {hw.get('has_rear_speakers')}",
         f"- **TCP :33336 reachable:** {tcp.get('reachable', 'unknown')}",
@@ -763,6 +882,8 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"{diffs.get('entity_paths_with_live_value', 0)}/"
         f"{diffs.get('entity_paths_total', 0)}",
         f"- gRPC snapshot fields: {report.get('grpc_snapshot_field_count', 0)}",
+        f"- GetStates strategy: {meta.get('getstates_strategy', 'unknown')}",
+        f"- GetStates path count: {meta.get('getstates_path_count', 'n/a')}",
         f"- Seeds paths: {(report.get('seeds') or {}).get('path_count', 0)}",
         f"- Local∩Seeds equal/unequal: "
         f"{local_vs.get('equal_count', 0)}/"
@@ -777,6 +898,26 @@ def render_markdown(report: dict[str, Any]) -> str:
             lines.append(f"- **{key}:** {value}")
     else:
         lines.append("- (no speaker status paths in snapshot)")
+
+    if (
+        tcp.get("reachable") is False
+        and "system_setting.external_control" not in cap_names
+    ):
+        lines.extend(
+            [
+                "",
+                "_TCP refused with no `system_setting.external_control` capability "
+                "is expected on gRPC-only models (e.g. Theatre Trio HT-A8)._ ",
+            ]
+        )
+
+    battery = battery_live_summary(report.get("grpc_snapshot") or {})
+    lines.extend(["", "## Battery", ""])
+    if battery:
+        for path, value in battery.items():
+            lines.append(f"- `{path}`: {value}")
+    else:
+        lines.append("- (no battery.* live values in snapshot)")
 
     lines.extend(["", "## Notify-only regressions", ""])
     regressions = diffs.get("notify_only_regressions") or []

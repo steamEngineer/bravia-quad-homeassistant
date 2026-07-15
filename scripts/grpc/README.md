@@ -26,6 +26,12 @@ The script opens a browser for Sony sign-in, lists your Bravia devices, and writ
 
 For a new Bravia model/firmware, scrape local gRPC state plus Seeds cloud reads into a redacted report you can attach to a GitHub issue. Maintainers use the JSON to compare capability coverage and Seeds-only paths against the HA mapping table.
 
+GetStates uses the device-safe path set: every capability with `get: true`, excluding paths marked `command_independence.getstates_request` (the device rejects the whole batch if any such path is included). That pulls topology, battery, and other capability-only fields that the older HA path-list scrape omitted. Single-path backfill still covers mapped entities plus speaker status/history and `battery.*` when needed.
+
+TCP `:33336` reachability is always recorded. Connection refused is normal on gRPC-only models that do not advertise `system_setting.external_control` (for example Theatre Trio HT-A8). Optional `--tcp` also dumps TCP feature reads when that port is open.
+
+When HTTP identity (`:54545`) and gRPC `system_setting.model_name` are missing, the scrape falls back to Seeds IoT `/devices` (`identified_model_name` / firmware) for the report filename and hardware profile.
+
 ```bash
 # One-time OAuth (if you do not already have session_keys.json)
 uv run python scripts/grpc/get_session_keys.py -o scripts/grpc/session_keys.json
@@ -35,4 +41,4 @@ uv run python scripts/grpc/scrape_device_capabilities.py <DEVICE_IP> \
   --refresh --out ./scrape-reports
 ```
 
-Attach both generated files (`.md` summary and `.json` full report) to the issue. Output is PII-redacted by default: serial/MAC/IP/device id, now-playing metadata (title/artist/album/artwork/playlist), and speaker GPS layout. Use `--include-pii` only for local debugging. Optional `--tcp` also dumps TCP feature reads when port 33336 is open; reachability of that port is always recorded.
+Attach both generated files (`.md` summary and `.json` full report) to the issue. Output is PII-redacted by default: serial/MAC/IP/device id, now-playing metadata (title/artist/album/artwork/playlist), and speaker GPS layout. Use `--include-pii` only for local debugging.

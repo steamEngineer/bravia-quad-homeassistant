@@ -794,6 +794,7 @@ class BraviaGrpcClient:
     def get_states_app_sequence(
         self,
         *,
+        field_paths: list[str] | None = None,
         mutex_repeats: int = 2,
         notify_brief: bool = True,
     ) -> dict[str, Any] | None:
@@ -801,11 +802,18 @@ class BraviaGrpcClient:
         Mirror BRAVIA Connect GetStates flow (Frida capture on fw 001.454).
 
         Order: HMAC-signed full snapshot → StartNotifyStates → signed mutex (×N).
+
+        When *field_paths* is set, use that list instead of
+        :meth:`field_paths_for_get_states` (scrape safe-bulk override).
         """
         if not self.authenticated:
             self._say("Not authenticated. Call authenticate() first.")
             return None
-        paths = self.field_paths_for_get_states()
+        paths = (
+            field_paths
+            if field_paths is not None
+            else self.field_paths_for_get_states()
+        )
         full_token = self.auth_token
         if self.hmac_key_hex:
             inner_parts = b"".join(
@@ -827,6 +835,7 @@ class BraviaGrpcClient:
         )
         raw, err = self.get_states_raw(full_req)
         if err or not raw:
+            self.last_rpc_error = err
             self._say(f"App-sequence full GetStates error: {err}")
             return None
         self._apply_get_states_response_tokens(raw)
@@ -862,7 +871,7 @@ class BraviaGrpcClient:
                 self._say(f"App-sequence mutex GetStates #{i + 1} failed")
                 return snapshot or None
 
-        return snapshot or self.get_states_dict(use_signed_auth=True)
+        return snapshot or self.get_states_dict(field_paths=paths, use_signed_auth=True)
 
     def get_states_with_preflight(
         self,
