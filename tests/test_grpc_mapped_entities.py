@@ -30,7 +30,6 @@ from custom_components.bravia_quad.grpc_mapped_entities import (
     mapped_switch_entities,
 )
 from custom_components.bravia_quad.grpc_mapping import (
-    mapping_allowed_by_capabilities,
     mapping_for_grpc_path,
     mappings_for_platform,
 )
@@ -227,34 +226,6 @@ def test_playback_command_false_availability_none_reason_is_available() -> None:
 def _entity_suffixes(entities: list, grpc_entry: MagicMock) -> set[str]:
     prefix = f"{grpc_entry.unique_id}_"
     return {e._attr_unique_id.removeprefix(prefix) for e in entities}
-
-
-def test_mapping_allowed_by_capabilities_soft_none() -> None:
-    assert mapping_allowed_by_capabilities(
-        "speaker_sound_setting.center_speaker_mode", None
-    )
-
-
-def test_mapping_allowed_by_capabilities_in_set() -> None:
-    caps = frozenset({"power", "speaker_sound_setting.center_speaker_mode"})
-    assert mapping_allowed_by_capabilities(
-        "speaker_sound_setting.center_speaker_mode", caps
-    )
-
-
-def test_mapping_allowed_by_capabilities_notify_only_exempt() -> None:
-    caps = frozenset({"power"})
-    assert mapping_allowed_by_capabilities("sound_setting.drc", caps)
-
-
-def test_mapping_allowed_by_capabilities_denies_missing() -> None:
-    caps = frozenset({"power"})
-    assert not mapping_allowed_by_capabilities(
-        "speaker_sound_setting.center_speaker_mode", caps
-    )
-    assert not mapping_allowed_by_capabilities(
-        "system_setting.wifi_mac_address_wired", caps
-    )
 
 
 def test_factories_omit_quad_only_when_absent_from_caps(

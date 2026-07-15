@@ -60,7 +60,7 @@ gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gR
 | `select.bravia_quad_*_display_brightness` | Select | Display brightness | bright, dark, off | Seeds / restore; gRPC-only |
 | `switch.bravia_quad_*_dsee_ultimate` | Switch | DSEE Ultimate | on/off | Seeds / restore; gRPC-only |
 | `select.bravia_quad_*_ssm_360_height` | Select | 360SSM height | high, mid, low | Seeds / restore; gRPC-only |
-| `select.bravia_quad_*_center_speaker_mode` | Select | Center speaker mode | off, on | Disabled by default; gRPC-only; omitted when not in GetCapabilities |
+| `select.bravia_quad_*_center_speaker_mode` | Select | Center speaker mode | off, on | Disabled by default; gRPC-only |
 | `switch.bravia_quad_*_dts_dialog_control` | Switch | DTS Dialog Control | on/off | Disabled by default; gRPC-only |
 | `switch.bravia_quad_*_net_bt_standby` | Switch | Network/Bluetooth standby | on/off | |
 | `switch.bravia_quad_*_auto_standby` | Switch | Auto standby | on/off | Disabled by default; Seeds / restore |
@@ -71,7 +71,7 @@ gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gR
 | `sensor.bravia_quad_*_device_name` | Sensor | Device name | — | |
 | `sensor.bravia_quad_*_serial_number` | Sensor | Serial number | — | Disabled by default |
 | `sensor.bravia_quad_*_ip_address` | Sensor | IP address | — | |
-| `sensor.bravia_quad_*_mac_wired` | Sensor | MAC address (wired) | — | Omitted when not in GetCapabilities |
+| `sensor.bravia_quad_*_mac_wired` | Sensor | MAC address (wired) | — | |
 | `sensor.bravia_quad_*_timezone` | Sensor | Timezone | — | Disabled by default |
 | `sensor.bravia_quad_*_raee_measured` | Sensor | Room calibration measured | — | Disabled by default; gRPC-only |
 | `update.bravia_quad_*_firmware_update` | Update | Firmware update | — | HTTP |
