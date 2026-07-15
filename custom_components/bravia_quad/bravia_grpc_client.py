@@ -20,6 +20,7 @@ from .grpc.client import BraviaGrpcClient, NotifyStateUpdate, load_keys_from_fil
 from .grpc_mapping import (
     NOTIFY_ONLY_GRPC_PATHS,
     entity_critical_grpc_paths,
+    mapping_allowed_by_capabilities,
     missing_entity_paths,
 )
 from .grpc_seeds_seed import SEEDS_SEED_PATHS, async_seed_from_seeds
@@ -409,13 +410,16 @@ class BraviaGrpcClientAsync:
         Returns ``(bulk_resolved, notify_only_resolved, still_missing_count)``.
         """
         if not self._connected:
-            return 0, 0, len(entity_critical_grpc_paths())
+            return 0, 0, len(missing_entity_paths({}, self._client.capability_paths))
 
         notify_only_set = set(NOTIFY_ONLY_GRPC_PATHS)
         bulk_resolved = 0
+        caps = self._client.capability_paths
 
         for path in sorted(entity_critical_grpc_paths()):
             if path in notify_only_set:
+                continue
+            if not mapping_allowed_by_capabilities(path, caps):
                 continue
             if self._client.notify_state.get(path) is not None:
                 continue
@@ -454,9 +458,13 @@ class BraviaGrpcClientAsync:
             notify_only_resolved = await async_seed_notify_only_from_tcp(
                 self.host, self
             )
-        still_missing = len(missing_entity_paths(self._client.notify_state))
+        still_missing = len(missing_entity_paths(self._client.notify_state, caps))
         if bulk_resolved or notify_only_resolved:
-            total = len(entity_critical_grpc_paths())
+            total = sum(
+                1
+                for p in entity_critical_grpc_paths()
+                if mapping_allowed_by_capabilities(p, caps)
+            )
             resolved = total - still_missing
             seed_source = "seeds-seed" if self.seeds_poll else "tcp-seed"
             _LOGGER.info(
@@ -480,7 +488,9 @@ class BraviaGrpcClientAsync:
 
     def unresolved_entity_paths(self) -> frozenset[str]:
         """Entity paths still missing or ``None`` in notify_state."""
-        return missing_entity_paths(self._client.notify_state)
+        return missing_entity_paths(
+            self._client.notify_state, self._client.capability_paths
+        )
 
     async def async_fetch_field_paths(self, paths: list[str]) -> int:
         """GetStates per path (skips notify-only paths the device rejects)."""

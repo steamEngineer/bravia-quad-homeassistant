@@ -250,11 +250,121 @@ def test_factories_omit_quad_only_when_absent_from_caps(
     sensor_paths = {
         e._grpc_path for e in mapped_sensor_entities(grpc_client, grpc_entry)
     }
+    switch_paths = {
+        e._grpc_path for e in mapped_switch_entities(grpc_client, grpc_entry)
+    }
     assert "speaker_sound_setting.center_speaker_mode" not in select_paths
     assert "system_setting.wifi_mac_address_wired" not in sensor_paths
     assert "sound_setting.drc" in select_paths
     assert "system_setting.cec_power_off_sync" in select_paths
     assert "system_setting.ipv4_address" in sensor_paths
+    assert "battery.life.rl" not in sensor_paths
+    assert "battery.life.rr" not in sensor_paths
+    assert "sound_setting.stereo_playback" not in select_paths
+    assert "speaker_sound_setting.sw_phase" not in select_paths
+    assert "sound_setting.mix_stage" not in switch_paths
+
+
+def test_factories_create_a8_paths_when_in_caps(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    """Capability-gated A8 paths appear only when advertised."""
+    from custom_components.bravia_quad.const import (
+        STEREO_PLAYBACK_OPTIONS,
+        SW_PHASE_OPTIONS,
+    )
+    from custom_components.bravia_quad.grpc_mapped_entities import (
+        BraviaGrpcBatteryLifeSensor,
+    )
+    from custom_components.bravia_quad.grpc_value_normalize import (
+        ha_options_for_mapping,
+    )
+
+    grpc_client.capability_paths = frozenset(
+        {
+            "power",
+            "battery.life.rl",
+            "battery.life.rr",
+            "sound_setting.mix_stage",
+            "sound_setting.stereo_playback",
+            "speaker_sound_setting.sw_phase",
+        }
+    )
+    sensors = mapped_sensor_entities(grpc_client, grpc_entry)
+    selects = mapped_select_entities(grpc_client, grpc_entry)
+    switches = mapped_switch_entities(grpc_client, grpc_entry)
+    sensor_paths = {e._grpc_path for e in sensors}
+    select_paths = {e._grpc_path for e in selects}
+    switch_paths = {e._grpc_path for e in switches}
+
+    assert sensor_paths >= {"battery.life.rl", "battery.life.rr"}
+    assert select_paths >= {
+        "sound_setting.stereo_playback",
+        "speaker_sound_setting.sw_phase",
+    }
+    assert "sound_setting.mix_stage" in switch_paths
+    assert all(
+        isinstance(e, BraviaGrpcBatteryLifeSensor)
+        for e in sensors
+        if e._grpc_path.startswith("battery.life.")
+    )
+
+    stereo = mapping_for_grpc_path("sound_setting.stereo_playback")
+    sw_phase = mapping_for_grpc_path("speaker_sound_setting.sw_phase")
+    assert stereo is not None
+    assert stereo.verified is False
+    assert sw_phase is not None
+    assert sw_phase.verified is False
+    assert ha_options_for_mapping(stereo) == STEREO_PLAYBACK_OPTIONS
+    assert ha_options_for_mapping(sw_phase) == SW_PHASE_OPTIONS
+    assert "0_0" in SW_PHASE_OPTIONS
+    assert "0,0" not in SW_PHASE_OPTIONS
+    kind, payload = denormalize_for_exec(sw_phase, "0_0")
+    assert kind == "string_value"
+    assert payload == "0,0"
+    assert normalize_grpc_value(sw_phase, "0,180") == "0_180"
+
+    for path in (
+        "battery.life.rl",
+        "sound_setting.mix_stage",
+        "sound_setting.stereo_playback",
+    ):
+        spec = entity_spec_for_path(path)
+        assert spec is not None
+        assert spec.enabled_default is False
+
+
+def test_battery_life_unavailable_for_sentinel_or_flag(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    from custom_components.bravia_quad.grpc_mapped_entities import (
+        BraviaGrpcBatteryLifeSensor,
+        _parse_battery_life,
+    )
+
+    assert _parse_battery_life(-1) is None
+    assert _parse_battery_life(0) == 0
+    assert _parse_battery_life(100) == 100
+
+    grpc_client.capability_paths = frozenset({"battery.life.rl"})
+    grpc_client.notify_state = {"battery.life.rl": 72}
+    sensor = next(
+        e
+        for e in mapped_sensor_entities(grpc_client, grpc_entry)
+        if e._grpc_path == "battery.life.rl"
+    )
+    assert isinstance(sensor, BraviaGrpcBatteryLifeSensor)
+    assert sensor.available is True
+    assert sensor.native_value == 72
+
+    grpc_client.notify_state = {"battery.life.rl": -1}
+    assert sensor.available is False
+
+    grpc_client.notify_state = {
+        "battery.life.rl": 40,
+        "battery.life.rl.availability": False,
+    }
+    assert sensor.available is False
 
 
 def test_factories_soft_fallback_includes_quad_only_when_caps_none(
@@ -267,8 +377,14 @@ def test_factories_soft_fallback_includes_quad_only_when_caps_none(
     sensor_paths = {
         e._grpc_path for e in mapped_sensor_entities(grpc_client, grpc_entry)
     }
+    switch_paths = {
+        e._grpc_path for e in mapped_switch_entities(grpc_client, grpc_entry)
+    }
     assert "speaker_sound_setting.center_speaker_mode" in select_paths
     assert "system_setting.wifi_mac_address_wired" in sensor_paths
+    assert "battery.life.rl" in sensor_paths
+    assert "sound_setting.stereo_playback" in select_paths
+    assert "sound_setting.mix_stage" in switch_paths
 
 
 def test_switch_factory_includes_power_and_aav(

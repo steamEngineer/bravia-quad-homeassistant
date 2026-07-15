@@ -14,6 +14,7 @@ from tests.conftest import frida_fixture_dir
 
 CAPTURE_PATH = frida_fixture_dir() / "getstates_tx_seq47.bin"
 CAPTURE_BULK_LEN = 6558
+CAPTURE_PATH_COUNT = 177
 CAPTURE_SESSION_RANDOM = bytes.fromhex("e072a043c7f7c5ef")
 CAPTURE_SESSION_ID = "1531cdf4-aad1-4a09-a17a-c6a9c46e84cf"
 CAPTURE_AUTH_TOKEN = bytes.fromhex(
@@ -29,8 +30,11 @@ def test_encode_varint() -> None:
 
 def test_load_field_paths_count() -> None:
     paths = load_field_paths()
-    assert len(paths) == 177
+    assert len(paths) == 190
     assert paths[0] == "bluetooth_setting.connection_quality"
+    assert "battery.life.rl" in paths
+    assert "sound_setting.stereo_playback" in paths
+    assert "speaker_sound_setting.sw_phase" in paths
 
 
 @pytest.mark.skipif(
@@ -38,7 +42,7 @@ def test_load_field_paths_count() -> None:
     reason="177-path Frida GetStates capture not available",
 )
 def test_build_matches_capture_static_section() -> None:
-    paths = load_field_paths()
+    paths = load_field_paths()[:CAPTURE_PATH_COUNT]
     built = build_get_states_with_auth_request(
         paths,
         session_random=CAPTURE_SESSION_RANDOM,
@@ -53,7 +57,7 @@ def test_build_matches_capture_static_section() -> None:
 def test_build_static_prefix_matches_capture() -> None:
     if not CAPTURE_PATH.is_file() or CAPTURE_PATH.stat().st_size != CAPTURE_BULK_LEN:
         pytest.skip("177-path Frida GetStates capture not available")
-    paths = load_field_paths()
+    paths = load_field_paths()[:CAPTURE_PATH_COUNT]
     built = build_get_states_with_auth_request(
         paths,
         session_random=CAPTURE_SESSION_RANDOM,

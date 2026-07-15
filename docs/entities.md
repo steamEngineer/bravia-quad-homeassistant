@@ -74,6 +74,11 @@ gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gR
 | `sensor.bravia_quad_*_mac_wired` | Sensor | MAC address (wired) | — | |
 | `sensor.bravia_quad_*_timezone` | Sensor | Timezone | — | Disabled by default |
 | `sensor.bravia_quad_*_raee_measured` | Sensor | Room calibration measured | — | Disabled by default; gRPC-only |
+| `sensor.bravia_quad_*_battery_life_rl` | Sensor | Rear left battery | 0–100% | Disabled by default; created when `battery.life.rl` is in GetCapabilities |
+| `sensor.bravia_quad_*_battery_life_rr` | Sensor | Rear right battery | 0–100% | Disabled by default; created when `battery.life.rr` is in GetCapabilities |
+| `switch.bravia_quad_*_mix_stage` | Switch | Mix stage | on/off | Disabled by default; capability-gated |
+| `select.bravia_quad_*_stereo_playback` | Select | Stereo playback | up_mix, multi_stereo | Disabled by default; capability-gated |
+| `select.bravia_quad_*_sw_phase` | Select | Subwoofer phase | 0, 180, dual-sub pair values | Disabled by default; capability-gated |
 | `update.bravia_quad_*_firmware_update` | Update | Firmware update | — | HTTP |
 
 ### Seeds / unknown state
@@ -82,7 +87,7 @@ Paths marked **Seeds / restore** accept local gRPC writes but are not readable o
 
 ### Disabled by default
 
-Enable under **Settings → Devices & Services → Entities** if needed. Unverified app settings (auto standby, auto update, external control, HDMI standby through) stay off until confirmed on your firmware; several other entities match TCP’s disabled defaults (power/volume companions, dual mono, voice zoom, etc.).
+Enable under **Settings → Devices & Services → Entities** if needed. Unverified app settings (auto standby, auto update, external control, HDMI standby through) stay off until confirmed on your firmware; several other entities match TCP’s disabled defaults (power/volume companions, dual mono, voice zoom, etc.). Capability-gated controls such as rear battery, mix stage, stereo playback, and subwoofer phase also start disabled until confirmed on your model.
 
 ### Not in gRPC mode
 
