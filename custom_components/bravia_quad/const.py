@@ -214,8 +214,20 @@ SSM360_HEIGHT_OPTIONS: list[str] = ["high", "mid", "low"]
 CENTER_SPEAKER_MODE_OPTIONS: list[str] = ["off", "on"]
 
 # Capability-gated (e.g. HT-A8): stereo playback / subwoofer phase
+# Dual-sub phase device enums use commas; HA translation keys must be [a-z0-9-_]+.
 STEREO_PLAYBACK_OPTIONS: list[str] = ["up_mix", "multi_stereo"]
-SW_PHASE_OPTIONS: list[str] = ["0", "180", "0,0", "180,180", "0,180", "180,0"]
+SW_PHASE_DEVICE_TO_HA: dict[str, str] = {
+    "0": "0",
+    "180": "180",
+    "0,0": "0_0",
+    "180,180": "180_180",
+    "0,180": "0_180",
+    "180,0": "180_0",
+}
+SW_PHASE_HA_TO_DEVICE: dict[str, str] = {
+    ha: device for device, ha in SW_PHASE_DEVICE_TO_HA.items()
+}
+SW_PHASE_OPTIONS: list[str] = list(SW_PHASE_HA_TO_DEVICE.keys())
 
 # AV Sync limits (milliseconds)
 MAX_AV_SYNC = 300

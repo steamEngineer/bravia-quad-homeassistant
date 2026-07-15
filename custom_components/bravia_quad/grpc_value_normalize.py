@@ -50,6 +50,8 @@ from .const import (
     SOUND_FIELD_ON,
     SSM360_HEIGHT_OPTIONS,
     STEREO_PLAYBACK_OPTIONS,
+    SW_PHASE_DEVICE_TO_HA,
+    SW_PHASE_HA_TO_DEVICE,
     SW_PHASE_OPTIONS,
     VOICE_ENHANCER_OFF,
     VOICE_ENHANCER_ON,
@@ -194,7 +196,7 @@ def denormalize_input_source(ha_value: str) -> str:
     return ha_value
 
 
-def normalize_grpc_value(
+def normalize_grpc_value(  # noqa: PLR0915
     mapping: GrpcTcpMapping,
     raw_value: Any,
     *,
@@ -249,6 +251,10 @@ def normalize_grpc_value(
     if grpc_path == "sound_setting.sound_effect":
         text = str(raw_value)
         return SOUND_EFFECT_DEVICE_TO_HA.get(text, text) or None
+
+    if grpc_path == "speaker_sound_setting.sw_phase":
+        text = str(raw_value)
+        return SW_PHASE_DEVICE_TO_HA.get(text, text) or None
 
     if tcp_feature is None:
         return None
@@ -395,6 +401,12 @@ def denormalize_for_exec(
         return (
             "string_value",
             SOUND_EFFECT_HA_TO_DEVICE.get(str(ha_value), str(ha_value)),
+        )
+
+    if grpc_path == "speaker_sound_setting.sw_phase":
+        return (
+            "string_value",
+            SW_PHASE_HA_TO_DEVICE.get(str(ha_value), str(ha_value)),
         )
 
     if (

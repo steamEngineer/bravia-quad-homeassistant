@@ -317,6 +317,12 @@ def test_factories_create_a8_paths_when_in_caps(
     assert sw_phase.verified is False
     assert ha_options_for_mapping(stereo) == STEREO_PLAYBACK_OPTIONS
     assert ha_options_for_mapping(sw_phase) == SW_PHASE_OPTIONS
+    assert "0_0" in SW_PHASE_OPTIONS
+    assert "0,0" not in SW_PHASE_OPTIONS
+    kind, payload = denormalize_for_exec(sw_phase, "0_0")
+    assert kind == "string_value"
+    assert payload == "0,0"
+    assert normalize_grpc_value(sw_phase, "0,180") == "0_180"
 
     for path in (
         "battery.life.rl",
