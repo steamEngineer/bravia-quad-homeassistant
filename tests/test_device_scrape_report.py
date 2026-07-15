@@ -11,7 +11,10 @@ sys.path.insert(0, str(ROOT / "custom_components"))
 sys.path.insert(0, str(ROOT / "scripts" / "grpc"))
 
 from device_scrape_report import (  # noqa: E402
+    GETSTATES_STRATEGY_SAFE_BULK,
     REPORT_SCHEMA_VERSION,
+    battery_live_summary,
+    battery_paths_from_capabilities,
     build_capability_index,
     build_diff_sections,
     build_entity_matrix,
@@ -19,10 +22,13 @@ from device_scrape_report import (  # noqa: E402
     build_hardware_profile,
     build_local_vs_seeds,
     flatten_seeds_states,
+    identity_from_seeds_device,
     integration_version,
     redact_report,
     render_markdown,
     report_filename_stem,
+    resolve_identity_source,
+    topology_backfill_paths,
     value_type_of,
 )
 
@@ -294,6 +300,132 @@ def test_report_filename_stem() -> None:
     assert stem == "device-scrape-HT-A9M2-001.454-20260707-120000"
 
 
+def test_topology_includes_sw2_and_battery_helpers() -> None:
+    assert (
+        "speaker_connection_setting.connection_status.sw2" in topology_backfill_paths()
+    )
+    caps = {
+        "capabilities": [
+            {
+                "name": "battery.life.rl",
+                "type": "int",
+                "props": {"get": True, "notify": True, "commands": []},
+            },
+            {
+                "name": "power",
+                "type": "bool",
+                "props": {"get": True, "notify": True, "commands": ["set"]},
+            },
+        ]
+    }
+    assert battery_paths_from_capabilities(caps) == ["battery.life.rl"]
+    snap = {
+        "battery.life.rl": 80,
+        "battery.life.rl.availability": True,
+        "power": True,
+    }
+    assert battery_live_summary(snap) == {
+        "battery.life.rl": 80,
+        "battery.life.rl.availability": True,
+    }
+
+
+def test_hardware_profile_sw2_topology() -> None:
+    index = build_capability_index(_FIXTURE_CAPABILITIES)
+    snap = {
+        **_FIXTURE_SNAPSHOT,
+        "speaker_connection_setting.connection_status.sw2": "connected",
+    }
+    hw = build_hardware_profile(snap, index)
+    assert hw["speaker_topology"]["sw2"] == "connected"
+    assert hw["subwoofer2_connected"] is True
+    assert hw["has_subwoofer"] is True
+
+
+def test_identity_from_seeds_and_resolve_order() -> None:
+    identity = identity_from_seeds_device(
+        {
+            "device_id": "abc",
+            "identified_model_name": "HT-A8",
+            "firmware_version": "001.410",
+            "name": "Living Room Trio",
+        }
+    )
+    assert identity == {
+        "model_id": "HT-A8",
+        "firmware": "001.410",
+        "friendly_name": "Living Room Trio",
+    }
+    assert (
+        resolve_identity_source(
+            grpc_model_id="HT-A9M2",
+            http_ok=True,
+            http_model_id="HTTP",
+            seeds_model_id="HT-A8",
+        )
+        == "grpc"
+    )
+    assert (
+        resolve_identity_source(
+            grpc_model_id=None,
+            http_ok=True,
+            http_model_id="HT-A9M2",
+            seeds_model_id="HT-A8",
+        )
+        == "http"
+    )
+    assert (
+        resolve_identity_source(
+            grpc_model_id=None,
+            http_ok=False,
+            http_model_id=None,
+            seeds_model_id="HT-A8",
+        )
+        == "seeds_devices"
+    )
+    assert (
+        resolve_identity_source(
+            grpc_model_id=None,
+            http_ok=False,
+            http_model_id=None,
+            seeds_model_id=None,
+        )
+        == "none"
+    )
+
+
+def test_build_full_report_seeds_identity_fallback() -> None:
+    report = build_full_report(
+        host="10.0.0.1",
+        auth_gate={"auth_ok": True},
+        capabilities_raw={"ok": True, "latency_s": 0.01},
+        capabilities_json=_FIXTURE_CAPABILITIES,
+        grpc_snapshot={
+            k: v
+            for k, v in _FIXTURE_SNAPSHOT.items()
+            if k != "system_setting.model_name"
+        },
+        seeds_flat=_FIXTURE_SEEDS,
+        seeds_latency_ms=42.0,
+        scrape_meta={
+            "grpc_bulk_fields": 10,
+            "getstates_strategy": GETSTATES_STRATEGY_SAFE_BULK,
+            "getstates_path_count": 200,
+        },
+        tcp_reachable={"reachable": False, "port": 33336, "error": "refused"},
+        http_identity={"ok": False, "model_id": None, "firmware": None},
+        seeds_identity={"model_id": "HT-A8", "firmware": "001.410"},
+    )
+    assert report["hardware_profile"]["model_id"] == "HT-A8"
+    assert report["scrape_meta"]["identity_source"] == "seeds_devices"
+    assert report["report_schema_version"] == 2
+    md = render_markdown(report)
+    assert "Identity source" in md
+    assert "GetStates strategy" in md
+    assert "Battery" in md
+    assert "gRPC-only" in md
+
+
 def test_fixture_from_investigation_capabilities_json() -> None:
     """Optional: load trimmed HT-A9M2 capabilities if investigation report exists."""
     inv_report = (
@@ -311,3 +443,26 @@ def test_fixture_from_investigation_capabilities_json() -> None:
     assert len(index) > 100
     assert "power" in index
     assert "sound_setting.night_mode" in index
+
+
+def test_paths_for_safe_get_states_against_a8_contrib_scrape() -> None:
+    """Optional: A8 contrib caps → 228 safe bulk paths."""
+    from bravia_quad.grpc.get_capabilities_response import paths_for_safe_get_states
+
+    a8_report = (
+        ROOT.parent
+        / "bravia-quad-investigation"
+        / "contrib_scrapes"
+        / "HT-A8"
+        / "device-scrape-unknown-001.410-20260714-150226.json"
+    )
+    if not a8_report.is_file():
+        return
+    payload = json.loads(a8_report.read_text(encoding="utf-8"))
+    cap_json = (payload.get("capabilities") or {}).get("json")
+    paths = paths_for_safe_get_states(cap_json)
+    assert len(paths) == 228
+    assert "battery.life.rl" in paths
+    assert "speaker_connection_setting.connection_status.sw" in paths
+    assert "account_info.user_list" not in paths
+    assert "client_control.mutex.any" not in paths

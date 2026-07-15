@@ -20,6 +20,7 @@ from custom_components.bravia_quad.grpc.get_capabilities_response import (
     is_int_capability,
     parse_capability_index,
     parse_capability_paths,
+    paths_for_safe_get_states,
 )
 from custom_components.bravia_quad.grpc.get_states_request import load_field_paths
 
@@ -294,3 +295,76 @@ def test_fetch_capabilities_soft_fails(monkeypatch: pytest.MonkeyPatch) -> None:
     assert client.capability_paths is None
     assert client.capability_index is None
     assert client.field_paths_for_get_states() == load_field_paths()
+
+
+def test_paths_for_safe_get_states_excludes_command_independence() -> None:
+    """A8-shaped: get:true minus command_independence.getstates_request."""
+    caps = {
+        "capabilities": [
+            {
+                "name": "power",
+                "type": "bool",
+                "props": {"get": True, "notify": True, "commands": ["set"]},
+            },
+            {
+                "name": "sound_setting.drc",
+                "type": "enum",
+                "props": {"get": False, "notify": True, "commands": ["set"]},
+            },
+            {
+                "name": "battery.life.rl",
+                "type": "int",
+                "props": {"get": True, "notify": True, "commands": []},
+            },
+            {
+                "name": "account_info.user_list",
+                "type": "json",
+                "props": {
+                    "get": True,
+                    "notify": False,
+                    "commands": [],
+                    "command_independence": {"getstates_request": True},
+                },
+            },
+            {
+                "name": "client_control.mutex.am_i",
+                "type": "bool",
+                "props": {
+                    "get": True,
+                    "notify": True,
+                    "commands": [],
+                    "command_independence": {"getstates_request": True},
+                },
+            },
+            {
+                "name": "client_control.mutex.any",
+                "type": "bool",
+                "props": {
+                    "get": True,
+                    "notify": True,
+                    "commands": [],
+                    "command_independence": {"getstates_request": True},
+                },
+            },
+            {
+                "name": "speaker_connection_setting.connection_status.sw",
+                "type": "enum",
+                "props": {"get": True, "notify": True, "commands": []},
+            },
+        ]
+    }
+    paths = paths_for_safe_get_states(caps)
+    assert paths == [
+        "power",
+        "battery.life.rl",
+        "speaker_connection_setting.connection_status.sw",
+    ]
+    assert "sound_setting.drc" not in paths
+    assert "account_info.user_list" not in paths
+    assert "client_control.mutex.any" not in paths
+
+
+def test_paths_for_safe_get_states_empty_inputs() -> None:
+    assert paths_for_safe_get_states(None) == []
+    assert paths_for_safe_get_states({}) == []
+    assert paths_for_safe_get_states("not-json") == []

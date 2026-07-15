@@ -41,9 +41,11 @@ sys.path.insert(0, str(_SCRIPTS_GRPC))
 
 from bravia_quad.const import DEFAULT_PORT  # noqa: E402
 from bravia_quad.grpc.client import BraviaGrpcClient  # noqa: E402
-from bravia_quad.grpc.credentials import get_device_states  # noqa: E402
+from bravia_quad.grpc.credentials import get_device_states, get_devices  # noqa: E402
 from bravia_quad.grpc.get_capabilities_response import (  # noqa: E402
+    capability_path_names,
     get_capabilities_method,
+    paths_for_safe_get_states,
 )
 from bravia_quad.grpc_mapping import (  # noqa: E402
     NOTIFY_ONLY_GRPC_PATHS,
@@ -51,12 +53,16 @@ from bravia_quad.grpc_mapping import (  # noqa: E402
     mappings_with_tcp_feature,
 )
 from device_scrape_report import (  # noqa: E402
+    GETSTATES_STRATEGY_SAFE_BULK,
+    battery_paths_from_capabilities,
     build_full_report,
     decode_get_capabilities_response,
     flatten_seeds_states,
+    identity_from_seeds_device,
     redact_report,
     render_markdown,
     report_filename_stem,
+    topology_backfill_paths,
 )
 from scrape_auth_gate import DEFAULT_KEYS_PATH, gate_or_exit  # noqa: E402
 
@@ -111,54 +117,128 @@ def probe_get_capabilities(
     host: str,
     keys: dict[str, Any],
 ) -> dict[str, Any]:
-    """Fetch GetCapabilities JSON from device."""
+    """Fetch GetCapabilities JSON from device (standalone; prefer scrape_grpc_session)."""
     client = _connect_client(host, keys)
     try:
-        raw, err, latency = _unary(client, _RPC_GET_CAPABILITIES, b"")
-        decoded = decode_get_capabilities_response(raw) if raw else {}
-        cap_json: dict[str, Any] | None = None
-        if decoded.get("text"):
-            try:
-                cap_json = json.loads(decoded["text"])
-            except json.JSONDecodeError as exc:
-                decoded["json_error"] = str(exc)
+        return _fetch_capabilities_on_client(client)
+    finally:
+        client.disconnect()
+
+
+def _fetch_capabilities_on_client(client: BraviaGrpcClient) -> dict[str, Any]:
+    raw, err, latency = _unary(client, _RPC_GET_CAPABILITIES, b"")
+    decoded = decode_get_capabilities_response(raw) if raw else {}
+    cap_json: dict[str, Any] | None = None
+    if decoded.get("text"):
+        try:
+            cap_json = json.loads(decoded["text"])
+        except json.JSONDecodeError as exc:
+            decoded["json_error"] = str(exc)
+    if cap_json is not None:
+        names = capability_path_names(cap_json)
+        client._capability_paths = names
+        # Index optional; scrape uses raw JSON for safe-bulk selection.
+    return {
+        "ok": err is None,
+        "error": err,
+        "latency_s": round(latency, 4),
+        "decoded": decoded,
+        "capabilities_json": cap_json,
+    }
+
+
+def _backfill_paths(
+    client: BraviaGrpcClient,
+    paths: list[str],
+    *,
+    notify_only: set[str],
+) -> int:
+    resolved = 0
+    for path in paths:
+        if path in notify_only:
+            continue
+        if client.notify_state.get(path) is not None:
+            continue
+        result = client.get_states_single_path(path, use_signed_auth=True, quiet=True)
+        if result and result.get(path) is not None:
+            client._notify_state.update(result)
+            resolved += 1
+    return resolved
+
+
+def scrape_grpc_session(host: str, keys: dict[str, Any]) -> dict[str, Any]:
+    """
+    Same-session GetCapabilities + safe-bulk GetStates + critical backfill.
+
+    Safe bulk = ``get:true`` minus ``command_independence.getstates_request``.
+    """
+    client = _connect_client(host, keys)
+    try:
+        cap_result = _fetch_capabilities_on_client(client)
+        cap_json = cap_result.get("capabilities_json")
+        safe_paths = paths_for_safe_get_states(cap_json)
+        strategy = GETSTATES_STRATEGY_SAFE_BULK
+        bulk_error: str | None = None
+        bulk: dict[str, Any] = {}
+
+        if safe_paths:
+            bulk_result = client.get_states_app_sequence(field_paths=safe_paths)
+            if bulk_result is None:
+                bulk_error = client.last_rpc_error or "bulk GetStates failed"
+            else:
+                bulk = bulk_result
+                client._notify_state.update(bulk)
+        else:
+            # Caps missing or empty — fall back to HA soft-filter list.
+            strategy = "ha_field_paths_fallback"
+            bulk_result = client.get_states_app_sequence()
+            if bulk_result is None:
+                bulk_error = client.last_rpc_error or "bulk GetStates failed"
+            else:
+                bulk = bulk_result
+                client._notify_state.update(bulk)
+            safe_paths = client.field_paths_for_get_states()
+
+        notify_only_set = set(NOTIFY_ONLY_GRPC_PATHS)
+        entity_resolved = _backfill_paths(
+            client,
+            sorted(entity_critical_grpc_paths()),
+            notify_only=notify_only_set,
+        )
+        topology_resolved = _backfill_paths(
+            client,
+            list(topology_backfill_paths()),
+            notify_only=notify_only_set,
+        )
+        battery_resolved = _backfill_paths(
+            client,
+            battery_paths_from_capabilities(cap_json),
+            notify_only=notify_only_set,
+        )
+
         return {
-            "ok": err is None,
-            "error": err,
-            "latency_s": round(latency, 4),
-            "decoded": decoded,
-            "capabilities_json": cap_json,
+            "capabilities": cap_result,
+            "bulk_fields": len(bulk),
+            "bulk_error": bulk_error,
+            "bulk_single_path_resolved": entity_resolved,
+            "topology_backfill_resolved": topology_resolved,
+            "battery_backfill_resolved": battery_resolved,
+            "getstates_strategy": strategy,
+            "getstates_path_count": len(safe_paths),
+            "snapshot": dict(client.notify_state),
         }
     finally:
         client.disconnect()
 
 
 def scrape_grpc_snapshot(host: str, keys: dict[str, Any]) -> dict[str, Any]:
-    """Bulk GetStates + single-path backfill for entity-critical paths."""
-    client = _connect_client(host, keys)
-    try:
-        bulk = client.get_states_app_sequence() or {}
-        client._notify_state.update(bulk)
-        bulk_resolved = 0
-        notify_only_set = set(NOTIFY_ONLY_GRPC_PATHS)
-        for path in sorted(entity_critical_grpc_paths()):
-            if path in notify_only_set:
-                continue
-            if client.notify_state.get(path) is not None:
-                continue
-            result = client.get_states_single_path(
-                path, use_signed_auth=True, quiet=True
-            )
-            if result and result.get(path) is not None:
-                client._notify_state.update(result)
-                bulk_resolved += 1
-        return {
-            "bulk_fields": len(bulk),
-            "bulk_single_path_resolved": bulk_resolved,
-            "snapshot": dict(client.notify_state),
-        }
-    finally:
-        client.disconnect()
+    """Bulk GetStates + backfill (compat wrapper around :func:`scrape_grpc_session`)."""
+    session = scrape_grpc_session(host, keys)
+    return {
+        "bulk_fields": session["bulk_fields"],
+        "bulk_single_path_resolved": session["bulk_single_path_resolved"],
+        "snapshot": session["snapshot"],
+    }
 
 
 def scrape_seeds(keys: dict[str, Any]) -> dict[str, Any]:
@@ -189,6 +269,46 @@ def scrape_seeds(keys: dict[str, Any]) -> dict[str, Any]:
         "error": None,
         "flat": flat,
         "latency_ms": round(elapsed_ms, 2),
+    }
+
+
+def scrape_seeds_identity(keys: dict[str, Any]) -> dict[str, Any]:
+    """Look up model/firmware from Seeds IoT ``/devices`` for this device_id."""
+    access_token = keys.get("access_token")
+    device_id = keys.get("device_id")
+    if not access_token or not device_id:
+        return {
+            "ok": False,
+            "error": "keys file missing access_token or device_id",
+            "device": None,
+            "identity": {},
+        }
+    try:
+        response = get_devices(access_token)
+    except (OSError, RuntimeError, ValueError) as exc:
+        return {"ok": False, "error": str(exc), "device": None, "identity": {}}
+    devices = response.get("devices") if isinstance(response, dict) else None
+    if not isinstance(devices, list):
+        return {
+            "ok": False,
+            "error": "Seeds /devices response missing devices list",
+            "device": None,
+            "identity": {},
+        }
+    match: dict[str, Any] | None = None
+    for device in devices:
+        if isinstance(device, dict) and device.get("device_id") == device_id:
+            match = device
+            break
+    if match is None and devices:
+        first = devices[0]
+        match = first if isinstance(first, dict) else None
+    identity = identity_from_seeds_device(match)
+    return {
+        "ok": match is not None,
+        "error": None if match is not None else "device_id not found in Seeds /devices",
+        "device": None,  # omit raw device (may contain PII); identity fields only
+        "identity": identity,
     }
 
 
@@ -343,18 +463,30 @@ def main() -> int:
 
     print(f"Auth OK — scraping {args.host} …", file=sys.stderr)
 
-    cap_result = probe_get_capabilities(args.host, keys)
+    grpc_session = scrape_grpc_session(args.host, keys)
+    cap_result = grpc_session["capabilities"]
     if not cap_result.get("ok"):
         print(
             f"Warning: GetCapabilities failed: {cap_result.get('error')}",
             file=sys.stderr,
         )
+    if grpc_session.get("bulk_error"):
+        print(
+            f"Warning: bulk GetStates failed: {grpc_session['bulk_error']}",
+            file=sys.stderr,
+        )
 
-    grpc_result = scrape_grpc_snapshot(args.host, keys)
     seeds_result = scrape_seeds(keys)
     if not seeds_result.get("ok"):
         print(
             f"Warning: Seeds scrape failed: {seeds_result.get('error')}",
+            file=sys.stderr,
+        )
+    seeds_identity_result = scrape_seeds_identity(keys)
+    if not seeds_identity_result.get("ok"):
+        print(
+            f"Warning: Seeds identity lookup failed: "
+            f"{seeds_identity_result.get('error')}",
             file=sys.stderr,
         )
 
@@ -367,14 +499,20 @@ def main() -> int:
         auth_gate=auth_report.to_dict(),
         capabilities_raw=cap_result,
         capabilities_json=cap_result.get("capabilities_json"),
-        grpc_snapshot=grpc_result["snapshot"],
+        grpc_snapshot=grpc_session["snapshot"],
         seeds_flat=seeds_result.get("flat") or {},
         seeds_latency_ms=seeds_result.get("latency_ms"),
         scrape_meta={
-            "grpc_bulk_fields": grpc_result["bulk_fields"],
-            "grpc_backfill_resolved": grpc_result["bulk_single_path_resolved"],
+            "grpc_bulk_fields": grpc_session["bulk_fields"],
+            "grpc_bulk_error": grpc_session.get("bulk_error"),
+            "grpc_backfill_resolved": grpc_session["bulk_single_path_resolved"],
+            "topology_backfill_resolved": grpc_session["topology_backfill_resolved"],
+            "battery_backfill_resolved": grpc_session["battery_backfill_resolved"],
+            "getstates_strategy": grpc_session["getstates_strategy"],
+            "getstates_path_count": grpc_session["getstates_path_count"],
             "seeds_ok": seeds_result.get("ok"),
             "seeds_error": seeds_result.get("error"),
+            "seeds_identity_ok": seeds_identity_result.get("ok"),
             "get_capabilities_ok": cap_result.get("ok"),
             "tcp_enabled": args.tcp,
             "tcp_reachable": tcp_reachable.get("reachable"),
@@ -384,6 +522,7 @@ def main() -> int:
         tcp_parity=tcp_parity,
         tcp_reachable=tcp_reachable,
         http_identity=http_identity,
+        seeds_identity=seeds_identity_result.get("identity") or {},
     )
 
     output_report = redact_report(report, include_pii=args.include_pii)
