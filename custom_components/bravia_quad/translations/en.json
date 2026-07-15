@@ -222,6 +222,24 @@
       },
       "center_speaker_mode": {
         "name": "Center speaker mode"
+      },
+      "stereo_playback": {
+        "name": "Stereo playback",
+        "state": {
+          "up_mix": "Up mix",
+          "multi_stereo": "Multi stereo"
+        }
+      },
+      "sw_phase": {
+        "name": "Subwoofer phase",
+        "state": {
+          "0": "0°",
+          "180": "180°",
+          "0,0": "0° / 0°",
+          "180,180": "180° / 180°",
+          "0,180": "0° / 180°",
+          "180,0": "180° / 0°"
+        }
       }
     },
     "media_player": {
@@ -334,6 +352,9 @@
       },
       "audio_return_channel": {
         "name": "HDMI ARC (TV)"
+      },
+      "mix_stage": {
+        "name": "Mix stage"
       }
     },
     "sensor": {
@@ -384,6 +405,12 @@
       },
       "raee_measured": {
         "name": "Room calibration measured"
+      },
+      "battery_life_rl": {
+        "name": "Rear left battery"
+      },
+      "battery_life_rr": {
+        "name": "Rear right battery"
       }
     }
   },

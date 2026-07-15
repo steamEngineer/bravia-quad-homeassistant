@@ -22,7 +22,7 @@ Last 10:
   176. playback_control.demosong_playback.360ra.availability
   177. notification.standby_power_status
 
-Total: 177 field paths
+Total: 190 field paths
 
 Common ones to try: mute, power, error_status
 'client_control.mutex.any' NOT found in field paths
@@ -207,4 +207,17 @@ ALL_FIELD_PATHS = [
     "sound_optimization.slm.measurement_estimated_time",
     "playback_control.demosong_playback.360ra.availability",
     "notification.standby_power_status",
+    "battery.life.rl",
+    "battery.life.rl.availability",
+    "battery.life.rr",
+    "battery.life.rr.availability",
+    "sound_setting.mix_stage",
+    "sound_setting.mix_stage.availability",
+    "sound_setting.mix_stage.unavailable_reason",
+    "sound_setting.stereo_playback",
+    "sound_setting.stereo_playback.availability",
+    "sound_setting.stereo_playback.unavailable_reason",
+    "speaker_sound_setting.sw_phase",
+    "speaker_sound_setting.sw_phase.availability",
+    "speaker_sound_setting.sw_phase.unavailable_reason",
 ]

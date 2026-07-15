@@ -46,6 +46,19 @@ def test_missing_entity_paths_treats_none_as_unset() -> None:
     assert "volume" not in missing
 
 
+def test_missing_entity_paths_omits_paths_absent_from_caps() -> None:
+    """Quad-like caps: A8-only mapped paths are not counted missing."""
+    caps = frozenset({"power", "mute", "volume"})
+    missing = missing_entity_paths({}, caps)
+    assert "battery.life.rl" not in missing
+    assert "sound_setting.mix_stage" not in missing
+    assert "sound_setting.stereo_playback" not in missing
+    assert "speaker_sound_setting.sw_phase" not in missing
+    assert "power" in missing
+    # Notify-only paths stay allowed even when absent from caps.
+    assert "sound_setting.drc" in missing
+
+
 def test_coerce_bool_none_stays_none() -> None:
     assert coerce_bool(None) is None
     assert coerce_bool(True) is True

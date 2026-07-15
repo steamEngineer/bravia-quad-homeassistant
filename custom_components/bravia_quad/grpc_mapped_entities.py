@@ -7,9 +7,13 @@ from typing import TYPE_CHECKING, Any
 
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.components.select import SelectEntity
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
+)
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.const import EntityCategory, UnitOfTime
+from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.restore_state import RestoreEntity
 
@@ -443,6 +447,75 @@ class BraviaGrpcMappedSensor(BraviaGrpcPathMixin, SensorEntity):
         self.async_write_ha_state()
 
 
+_BATTERY_LIFE_PATHS = frozenset({"battery.life.rl", "battery.life.rr"})
+
+
+def _parse_battery_life(raw: Any) -> int | None:
+    """Return 0-100 battery %, or None for missing / -1 sentinel."""
+    if raw is None:
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if value < 0:
+        return None
+    return value
+
+
+class BraviaGrpcBatteryLifeSensor(BraviaGrpcMappedSensor):
+    """Rear speaker battery %; unavailable when life is -1 or availability is false."""
+
+    _attr_device_class = SensorDeviceClass.BATTERY
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = PERCENTAGE
+
+    def __init__(
+        self,
+        grpc_client: BraviaGrpcClientAsync,
+        entry: BraviaQuadConfigEntry,
+        spec: EntitySpec,
+        *,
+        enabled_default: bool | None = None,
+    ) -> None:
+        """Initialize rear battery life sensor."""
+        super().__init__(
+            grpc_client,
+            entry,
+            spec,
+            enabled_default=enabled_default,
+        )
+        self._attr_native_value = _parse_battery_life(
+            grpc_client.notify_state.get(spec.grpc_path)
+        )
+
+    def _availability_path(self) -> str:
+        return f"{self._grpc_path}.availability"
+
+    @property
+    def available(self) -> bool:
+        """Require session, device availability flag, and a non-sentinel reading."""
+        if not super().available:
+            return False
+        if self._grpc_client.notify_state.get(self._availability_path()) is False:
+            return False
+        raw = self._grpc_client.notify_state.get(self._grpc_path)
+        if raw is None:
+            return True
+        return _parse_battery_life(raw) is not None
+
+    def _grpc_state_callback(self, update: Any) -> None:
+        """Refresh on life deltas and sibling availability changes."""
+        if update.path == self._availability_path():
+            self.async_write_ha_state()
+            return
+        super()._grpc_state_callback(update)
+
+    async def _on_grpc_state(self, value: Any) -> None:
+        self._attr_native_value = _parse_battery_life(value)
+        self.async_write_ha_state()
+
+
 class BraviaGrpcBassLevelSelect(BraviaGrpcMappedSelect):
     """Bass level select (min/mid/max); unavailable while a wireless sub is linked."""
 
@@ -624,7 +697,18 @@ def mapped_sensor_entities(
         if not mapping_allowed_by_capabilities(mapping.grpc_path, caps):
             continue
         spec = entity_spec_for_mapping(mapping)
-        enabled = mapping.grpc_path != "system_setting.serial_number"
+        enabled = (
+            False
+            if mapping.grpc_path == "system_setting.serial_number"
+            else spec.enabled_default
+        )
+        if mapping.grpc_path in _BATTERY_LIFE_PATHS:
+            entities.append(
+                BraviaGrpcBatteryLifeSensor(
+                    grpc_client, entry, spec, enabled_default=enabled
+                )
+            )
+            continue
         entities.append(
             BraviaGrpcMappedSensor(grpc_client, entry, spec, enabled_default=enabled)
         )

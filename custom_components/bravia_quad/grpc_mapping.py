@@ -369,6 +369,47 @@ GRPC_TCP_MAPPINGS: tuple[GrpcTcpMapping, ...] = (
         "select",
         writable=True,
     ),
+    # Capability-gated (advertised on HT-A8; absent on HT-A9M2) — unverified live
+    GrpcTcpMapping(
+        "battery.life.rl",
+        None,
+        "sensor",
+        writable=False,
+        verified=False,
+        notes="Rear-left battery %; disabled until contributor smoke",
+    ),
+    GrpcTcpMapping(
+        "battery.life.rr",
+        None,
+        "sensor",
+        writable=False,
+        verified=False,
+        notes="Rear-right battery %; disabled until contributor smoke",
+    ),
+    GrpcTcpMapping(
+        "sound_setting.mix_stage",
+        None,
+        "switch",
+        writable=True,
+        verified=False,
+        notes="Mix stage; capability-gated; disabled until contributor smoke",
+    ),
+    GrpcTcpMapping(
+        "sound_setting.stereo_playback",
+        None,
+        "select",
+        writable=True,
+        verified=False,
+        notes="Stereo playback up_mix/multi_stereo; capability-gated",
+    ),
+    GrpcTcpMapping(
+        "speaker_sound_setting.sw_phase",
+        None,
+        "select",
+        writable=True,
+        verified=False,
+        notes="Subwoofer phase (incl. dual-sub pair enums); capability-gated",
+    ),
 )
 
 GRPC_PATH_INDEX: dict[str, GrpcTcpMapping] = {
@@ -445,10 +486,22 @@ def entity_critical_grpc_paths() -> frozenset[str]:
     return frozenset(paths)
 
 
-def missing_entity_paths(notify_state: dict[str, Any]) -> frozenset[str]:
-    """Entity paths with no usable value in *notify_state* (missing or ``None``)."""
+def missing_entity_paths(
+    notify_state: dict[str, Any],
+    capability_paths: frozenset[str] | None = None,
+) -> frozenset[str]:
+    """
+    Entity paths with no usable value in *notify_state* (missing or ``None``).
+
+    When *capability_paths* is set, omit paths the device does not advertise
+    (same gate as entity creation), so A8-only mappings are not counted missing
+    on Quad.
+    """
     return frozenset(
-        path for path in entity_critical_grpc_paths() if notify_state.get(path) is None
+        path
+        for path in entity_critical_grpc_paths()
+        if mapping_allowed_by_capabilities(path, capability_paths)
+        and notify_state.get(path) is None
     )
 
 

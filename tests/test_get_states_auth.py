@@ -92,7 +92,7 @@ def test_full_get_states_wire_matches_frida_capture() -> None:
     if not capture_path.is_file() or capture_path.stat().st_size != 6558:
         pytest.skip("177-path Frida GetStates capture not available")
     app_wire = capture_path.read_bytes()
-    paths = load_field_paths()
+    paths = load_field_paths()[:177]
     assert len(paths) == 177
     token = sign_get_states_auth_token(
         CAPTURE_HMAC_KEY,

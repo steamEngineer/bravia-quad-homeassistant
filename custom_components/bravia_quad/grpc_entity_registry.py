@@ -86,6 +86,11 @@ _BY_GRPC_PATH: dict[str, tuple[str, str]] = {
     "sound_optimization.raee.is_measured": ("raee_measured", "raee_measured"),
     "sound_setting.volume.bass": ("bass_level", "bass_level_select"),
     "sound_setting.volume.subwoofer": ("subwoofer_level", "subwoofer_level"),
+    "battery.life.rl": ("battery_life_rl", "battery_life_rl"),
+    "battery.life.rr": ("battery_life_rr", "battery_life_rr"),
+    "sound_setting.mix_stage": ("mix_stage", "mix_stage"),
+    "sound_setting.stereo_playback": ("stereo_playback", "stereo_playback"),
+    "speaker_sound_setting.sw_phase": ("sw_phase", "sw_phase"),
 }
 
 # Match TCP entity_registry_enabled_default=False where applicable
@@ -103,6 +108,11 @@ _DISABLED_BY_DEFAULT_SUFFIXES: frozenset[str] = frozenset(
         "dts_dialog_control",
         "center_speaker_mode",
         "raee_measured",
+        "battery_life_rl",
+        "battery_life_rr",
+        "mix_stage",
+        "stereo_playback",
+        "sw_phase",
     }
 )
 

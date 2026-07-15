@@ -213,6 +213,10 @@ SSM360_HEIGHT_OPTIONS: list[str] = ["high", "mid", "low"]
 # gRPC center speaker mode — extend at runtime if device reports other values
 CENTER_SPEAKER_MODE_OPTIONS: list[str] = ["off", "on"]
 
+# Capability-gated (e.g. HT-A8): stereo playback / subwoofer phase
+STEREO_PLAYBACK_OPTIONS: list[str] = ["up_mix", "multi_stereo"]
+SW_PHASE_OPTIONS: list[str] = ["0", "180", "0,0", "180,180", "0,180", "180,0"]
+
 # AV Sync limits (milliseconds)
 MAX_AV_SYNC = 300
 MIN_AV_SYNC = 0

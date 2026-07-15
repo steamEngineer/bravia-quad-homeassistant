@@ -49,6 +49,8 @@ from .const import (
     SOUND_FIELD_OFF,
     SOUND_FIELD_ON,
     SSM360_HEIGHT_OPTIONS,
+    STEREO_PLAYBACK_OPTIONS,
+    SW_PHASE_OPTIONS,
     VOICE_ENHANCER_OFF,
     VOICE_ENHANCER_ON,
     VOICE_ZOOM_OFF,
@@ -130,6 +132,7 @@ _GRPC_ONLY_BOOL_PATHS: frozenset[str] = frozenset(
     {
         "sound_setting.dsee_ultimate",
         "sound_setting.dts_dialog_control",
+        "sound_setting.mix_stage",
     }
 )
 
@@ -442,4 +445,8 @@ def ha_options_for_mapping(mapping: GrpcTcpMapping) -> list[str] | None:
         return list(SOUND_EFFECT_OPTIONS)
     if mapping.grpc_path == "system_setting.dimmer":
         return list(DIMMER_OPTIONS)
+    if mapping.grpc_path == "sound_setting.stereo_playback":
+        return list(STEREO_PLAYBACK_OPTIONS)
+    if mapping.grpc_path == "speaker_sound_setting.sw_phase":
+        return list(SW_PHASE_OPTIONS)
     return None
