@@ -14,6 +14,7 @@ from custom_components.bravia_quad.grpc.get_capabilities_response import (
     capability_index_from_json,
     capability_path_names,
     decode_capabilities_json_text,
+    enum_values_from_capability,
     filter_field_paths,
     int_range_from_capability,
     is_int_capability,
@@ -194,6 +195,66 @@ def test_capability_index_includes_type_and_range() -> None:
     assert is_int_capability("missing", index) is None
     assert int_range_from_capability("sound_setting.volume.rear", index) == (-10, 10)
     assert int_range_from_capability("volume", index) is None
+
+
+def test_capability_index_retains_enum_values() -> None:
+    data = {
+        "capabilities": [
+            {
+                "name": "playback_control.function",
+                "type": "enum",
+                "props": {
+                    "get": True,
+                    "notify": True,
+                    "commands": ["set"],
+                    "values": [
+                        "tv",
+                        "hdmi",
+                        "spotify",
+                        "360racast",
+                        "airplay",
+                        "other",
+                    ],
+                },
+            },
+            {
+                "name": "playback_control.virtualizer",
+                "type": "enum",
+                "props": {
+                    "get": True,
+                    "notify": True,
+                    "commands": [],
+                    "values": ["none", "360ssm", "multi_stereo"],
+                },
+            },
+            {
+                "name": "playback_control.function.available_values",
+                "type": "enum",
+                "props": {"get": True, "notify": True, "commands": [], "values": []},
+            },
+        ]
+    }
+    index = capability_index_from_json(data)
+    assert index["playback_control.function"].values == (
+        "tv",
+        "hdmi",
+        "spotify",
+        "360racast",
+        "airplay",
+        "other",
+    )
+    assert index["playback_control.virtualizer"].values == (
+        "none",
+        "360ssm",
+        "multi_stereo",
+    )
+    assert index["playback_control.function.available_values"].values is None
+    assert (
+        enum_values_from_capability("playback_control.function", index)
+        == index["playback_control.function"].values
+    )
+    assert enum_values_from_capability("missing", index) is None
+    assert enum_values_from_capability("playback_control.function", None) is None
 
 
 def test_parse_capability_index_from_wire() -> None:

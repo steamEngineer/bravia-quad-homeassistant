@@ -25,6 +25,7 @@ from .const import (
     MUTE_ON,
     POWER_OFF,
     POWER_ON,
+    SOUND_EFFECT_DEVICE_TO_HA,
     SOUND_EFFECT_HA_TO_DEVICE,
     SOUND_EFFECT_OPTIONS,
 )
@@ -34,6 +35,7 @@ from .entity import (
     entity_unique_id,
     get_device_info,
 )
+from .grpc.get_capabilities_response import enum_values_from_capability
 from .grpc_entity_registry import entity_spec_for_path
 from .grpc_value_normalize import (
     denormalize_for_exec,
@@ -209,8 +211,8 @@ _CORE_PATHS: frozenset[str] = frozenset(
 # Inputs that may carry streaming now-playing metadata from the device.
 _STREAMING_SOURCES: frozenset[str] = frozenset({"spotify", "bluetooth", "airplay2"})
 
-# AirPlay is detect-only — activated by casting, not ExecCommand source switch.
-_DETECT_ONLY_SOURCES: frozenset[str] = frozenset({"airplay2"})
+# Detect-only inputs — activated by the device/client, not ExecCommand source switch.
+_DETECT_ONLY_SOURCES: frozenset[str] = frozenset({"airplay2", "360racast", "other"})
 
 # Backfill on setup — bulk GetStates often omits *.availability (notify-only delta).
 _PLAYBACK_BACKFILL_PATHS: tuple[str, ...] = (
@@ -356,7 +358,7 @@ class BraviaGrpcMediaPlayer(
         self._grpc_path = _PATH_POWER
         self._attr_unique_id = entity_unique_id(entry, "media_player")
         self._attr_device_info = get_device_info(entry)
-        self._attr_source_list = _filter_source_list(list(INPUT_OPTIONS), current=None)
+        self._attr_source_list = []
         self._attr_sound_mode_list = list(SOUND_EFFECT_OPTIONS)
         self._playback_metadata: dict[str, str] = {}
         self._last_position_write = 0.0
@@ -453,14 +455,46 @@ class BraviaGrpcMediaPlayer(
         else:
             self._attr_state = MediaPlayerState.ON
 
-    def _update_source_list_from_cache(self) -> None:
+    def _sources_from_capabilities(self) -> list[str] | None:
+        values = enum_values_from_capability(
+            _PATH_INPUT, self._grpc_client.capability_index
+        )
+        if not values:
+            return None
+        normalized: list[str] = []
+        for value in values:
+            mapped = normalize_input_source(value)
+            if mapped and mapped not in normalized:
+                normalized.append(mapped)
+        return normalized or None
+
+    def _sound_modes_from_capabilities(self) -> list[str] | None:
+        values = enum_values_from_capability(
+            _PATH_SOUND_EFFECT, self._grpc_client.capability_index
+        )
+        if not values:
+            return None
+        modes: list[str] = []
+        for value in values:
+            mapped = SOUND_EFFECT_DEVICE_TO_HA.get(value, value)
+            if mapped and mapped not in modes:
+                modes.append(mapped)
+        return modes or None
+
+    def _resolve_source_list(self) -> list[str]:
+        """Prefer available_values, then capability enums, then INPUT_OPTIONS."""
         parsed = _parse_available_values(
             self._grpc_client.notify_state.get(_PATH_AVAILABLE_VALUES)
         )
         if parsed:
-            self._attr_source_list = _filter_source_list(
-                parsed, current=self._attr_source
-            )
+            return _filter_source_list(parsed, current=self._attr_source)
+        caps = self._sources_from_capabilities()
+        if caps:
+            return _filter_source_list(caps, current=self._attr_source)
+        return _filter_source_list(list(INPUT_OPTIONS), current=self._attr_source)
+
+    def _update_source_list_from_cache(self) -> None:
+        self._attr_source_list = self._resolve_source_list()
 
     def _has_playback_signal(self) -> bool:
         state = self._grpc_client.notify_state
@@ -486,12 +520,12 @@ class BraviaGrpcMediaPlayer(
         src = normalize_grpc_value(self._mapping(_PATH_INPUT), state.get(_PATH_INPUT))
         self._attr_source = str(src) if src else "tv"
         self._update_source_list_from_cache()
-        if not self._attr_source_list:
-            self._attr_source_list = _filter_source_list(
-                list(INPUT_OPTIONS), current=self._attr_source
-            )
-        if self._attr_source not in self._attr_source_list:
-            self._attr_source_list = [*self._attr_source_list, self._attr_source]
+        source_list = self._attr_source_list or []
+        if self._attr_source not in source_list:
+            self._attr_source_list = [*source_list, self._attr_source]
+        caps_modes = self._sound_modes_from_capabilities()
+        if caps_modes:
+            self._attr_sound_mode_list = caps_modes
         sound_effect = normalize_grpc_value(
             self._mapping(_PATH_SOUND_EFFECT), state.get(_PATH_SOUND_EFFECT)
         )

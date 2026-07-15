@@ -36,9 +36,9 @@ Read-only `extra_state_attributes` on the media player (filtered by active sourc
 | `playback_control.spotify.status` | `spotify_status` | Spotify |
 | `playback_control.function.unavailable_reason` | `source_unavailable_reason` | When set |
 
-Dynamic source list: when the device publishes `playback_control.function.available_values`, the media player updates `source_list` (falls back to static `INPUT_OPTIONS`).
+Dynamic source list: when the device publishes `playback_control.function.available_values`, the media player updates `source_list`. When that is empty, the list is seeded from GetCapabilities `props.values` for `playback_control.function` (so model-specific inputs such as `360racast` appear in capabilities only when advertised). If capabilities are unavailable, the static `INPUT_OPTIONS` fallback is used. Detect-only sources (`airplay2`, `360racast`, `other`) are omitted from the selectable list unless they are the active input.
 
-Sound field mode: `SELECT_SOUND_MODE` on the media player maps to `sound_setting.sound_effect` (Dolby Speaker Virtualizer, Neural:X, 360SSM).
+Sound field mode: `SELECT_SOUND_MODE` on the media player maps to `sound_setting.sound_effect` (Dolby Speaker Virtualizer, Neural:X, 360SSM). When GetCapabilities advertises `props.values` for that path, `sound_mode_list` is seeded from those values; otherwise the static `SOUND_EFFECT_OPTIONS` list is used.
 
 ## Playback transport (gRPC only)
 
@@ -56,7 +56,7 @@ Verified on HT-A9M2 (fw 001.454). Spotify and AirPlay share the same command map
 
 Transport controls are advertised only when power is on and `playback_control.function` is `spotify`, `bluetooth`, or `airplay` (HA source `airplay2`). Reads (`playback_state`, title, artist, position, etc.) use the same notify paths as now-playing metadata.
 
-AirPlay is **detect-only** in HA: `airplay2` is omitted from the selectable source list unless it is the active input.
+AirPlay, 360 Reality Audio Cast (`360racast`), and `other` are **detect-only** in HA: omitted from the selectable source list unless they are the active input. `async_select_source` is a no-op for those values when they are not already active.
 
 `playback_control.playback_command.availability` is subscribed for future gating.
 
