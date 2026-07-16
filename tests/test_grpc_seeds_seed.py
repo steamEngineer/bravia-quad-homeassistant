@@ -63,6 +63,42 @@ async def test_seed_from_seeds_fills_unset_paths() -> None:
 
 
 @pytest.mark.asyncio
+async def test_seed_from_seeds_fills_empty_wire_bools() -> None:
+    """Empty-wire GetStates bools are seeded from Seeds when unset."""
+    grpc = BraviaGrpcClientAsync("10.0.0.1", device_id="d", key_id="k")
+    grpc._client._notify_state = {
+        "sound_setting.voice_mode": None,
+        "sound_setting.night_mode": None,
+        "sound_setting.sound_field": None,
+    }
+    credentials = {"device_id": "d", "access_token": "tok"}
+    raw = {
+        "states": [
+            {"name": "sound_setting.voice_mode", "value": False},
+            {"name": "sound_setting.night_mode", "value": True},
+            {"name": "sound_setting.sound_field", "value": False},
+        ]
+    }
+
+    with (
+        patch(
+            "custom_components.bravia_quad.grpc_seeds_seed.async_get_clientsession",
+            return_value=MagicMock(),
+        ),
+        patch(
+            "custom_components.bravia_quad.grpc_seeds_seed.async_get_device_states",
+            new=AsyncMock(return_value=raw),
+        ),
+    ):
+        seeded = await async_seed_from_seeds(MagicMock(), credentials, grpc)
+
+    assert seeded == 3
+    assert grpc.notify_state["sound_setting.voice_mode"] is False
+    assert grpc.notify_state["sound_setting.night_mode"] is True
+    assert grpc.notify_state["sound_setting.sound_field"] is False
+
+
+@pytest.mark.asyncio
 async def test_seed_from_seeds_skips_without_token() -> None:
     grpc = BraviaGrpcClientAsync("10.0.0.1")
     grpc._client._notify_state = {"sound_setting.drc": None}
@@ -220,4 +256,6 @@ def test_seeds_seed_paths_cover_notify_only_and_sound_effect() -> None:
     assert "sound_setting.drc" in SEEDS_SEED_PATHS
     assert "system_setting.dimmer" in SEEDS_SEED_PATHS
     assert "sound_setting.sound_effect" in SEEDS_SEED_PATHS
-    assert len(SEEDS_SEED_PATHS) == 11
+    assert "sound_setting.voice_mode" in SEEDS_SEED_PATHS
+    assert "sound_setting.night_mode" in SEEDS_SEED_PATHS
+    assert len(SEEDS_SEED_PATHS) == 15
