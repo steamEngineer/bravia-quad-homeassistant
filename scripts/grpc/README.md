@@ -30,6 +30,8 @@ GetStates uses the device-safe path set: every capability with `get: true`, excl
 
 TCP `:33336` reachability is always recorded. Connection refused is normal on gRPC-only models that do not advertise `system_setting.external_control` (for example Theatre Trio HT-A8). Optional `--tcp` also dumps TCP feature reads when that port is open.
 
+HTTP `:54545` identity (`system.version` / `system.modelname`) is always scraped. By default the scrape also runs a read-only FCGI **feature catalog** (HA + management-UI + TCP-name candidates; skips `fw.upload` / `fw.request_update` / `fw.update`). Use `--skip-http-catalog` to omit it for a faster gRPC-only pass.
+
 When HTTP identity (`:54545`) and gRPC `system_setting.model_name` are missing, the scrape falls back to Seeds IoT `/devices` (`identified_model_name` / firmware) for the report filename and hardware profile.
 
 ```bash
@@ -41,4 +43,4 @@ uv run python scripts/grpc/scrape_device_capabilities.py <DEVICE_IP> \
   --refresh --out ./scrape-reports
 ```
 
-Attach both generated files (`.md` summary and `.json` full report) to the issue. Output is PII-redacted by default: serial/MAC/IP/device id, now-playing metadata (title/artist/album/artwork/playlist), and speaker GPS layout. Use `--include-pii` only for local debugging.
+Attach both generated files (`.md` summary and `.json` full report) to the issue. Output is PII-redacted by default: serial/MAC/IP/device id, now-playing metadata (title/artist/album/artwork/playlist), speaker GPS layout, and HTTP catalog LAN/Wi-Fi fields (device name, MAC, IP, SSID lists, AirPlay name, WPS PIN, public key). Use `--include-pii` only for local debugging.

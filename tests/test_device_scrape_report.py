@@ -240,12 +240,55 @@ def test_build_full_report_and_redact() -> None:
         scrape_meta={"grpc_bulk_fields": 10},
         tcp_reachable={"reachable": True, "port": 33336, "error": None},
         http_identity={"ok": True, "model_id": "HT-A9M2", "firmware": "001.454"},
+        http_catalog={
+            "ok": True,
+            "feature_count": 2,
+            "skipped": ["fw.upload"],
+            "server": "lighttpd/test",
+            "tcp_http_overlap": [],
+            "features": [
+                {
+                    "feature": "inet4.ipaddress",
+                    "class": "value",
+                    "value": "10.0.0.1",
+                    "source": "ha",
+                },
+                {
+                    "feature": "system.modelname",
+                    "class": "value",
+                    "value": "BRAVIA Theatre Quad",
+                    "source": "ha",
+                },
+                {
+                    "feature": "wlan.esslist",
+                    "class": "value",
+                    "value": "HomeSSID,OtherSSID",
+                    "source": "ui",
+                },
+            ],
+            "summary": {
+                "counts": {"value": 3},
+                "by_class": {
+                    "value": [
+                        "inet4.ipaddress",
+                        "system.modelname",
+                        "wlan.esslist",
+                    ]
+                },
+                "values": {
+                    "inet4.ipaddress": "10.0.0.1",
+                    "system.modelname": "BRAVIA Theatre Quad",
+                    "wlan.esslist": "HomeSSID,OtherSSID",
+                },
+            },
+        },
     )
     assert report["report_schema_version"] == REPORT_SCHEMA_VERSION
     assert report["integration_version"] == integration_version()
     assert report["hardware_profile"]["model_id"] == "HT-A9M2"
     assert report["tcp_reachable"]["reachable"] is True
     assert len(report["entity_matrix"]) > 0
+    assert report["http_catalog"]["feature_count"] == 2
 
     redacted = redact_report(report, include_pii=False)
     assert redacted["host"] == "[redacted]"
@@ -285,11 +328,23 @@ def test_build_full_report_and_redact() -> None:
     )
     assert tz_row["live_value"] == "[redacted]"
 
+    catalog = redacted["http_catalog"]
+    assert catalog["summary"]["values"]["inet4.ipaddress"] == "[redacted]"
+    assert catalog["summary"]["values"]["wlan.esslist"] == "[redacted]"
+    assert catalog["summary"]["values"]["system.modelname"] == "BRAVIA Theatre Quad"
+    ip_feat = next(
+        row for row in catalog["features"] if row["feature"] == "inet4.ipaddress"
+    )
+    assert ip_feat["value"] == "[redacted]"
+
     md = render_markdown(redacted)
     assert "HT-A9M2" in md
     assert "Entity matrix" in md
     assert "Report schema" in md
     assert "TCP :33336 reachable" in md
+    assert "HTTP :54545 catalog" in md
+    assert "10.0.0.1" not in md
+    assert "HomeSSID" not in md
 
 
 def test_report_filename_stem() -> None:
@@ -418,7 +473,7 @@ def test_build_full_report_seeds_identity_fallback() -> None:
     )
     assert report["hardware_profile"]["model_id"] == "HT-A8"
     assert report["scrape_meta"]["identity_source"] == "seeds_devices"
-    assert report["report_schema_version"] == 2
+    assert report["report_schema_version"] == REPORT_SCHEMA_VERSION
     md = render_markdown(report)
     assert "Identity source" in md
     assert "GetStates strategy" in md

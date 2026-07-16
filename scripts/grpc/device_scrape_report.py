@@ -18,7 +18,7 @@ from bravia_quad.grpc_mapping import (
 )
 from bravia_quad.transport import identity_from_grpc_snapshot
 
-REPORT_SCHEMA_VERSION = 2
+REPORT_SCHEMA_VERSION = 3
 
 _METADATA_SUFFIXES = (".availability", ".unavailable_reason", ".range")
 # Keep in sync with bravia_quad.grpc_seeds_seed.SEEDS_SEED_PATHS (avoid HA import here).
@@ -697,6 +697,7 @@ def build_full_report(
     tcp_parity: dict[str, Any] | None = None,
     tcp_reachable: dict[str, Any] | None = None,
     http_identity: dict[str, Any] | None = None,
+    http_catalog: dict[str, Any] | None = None,
     seeds_identity: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble the complete scrape report dict."""
@@ -747,6 +748,7 @@ def build_full_report(
             "flat": seeds_flat,
         },
         "http_identity": http_identity,
+        "http_catalog": http_catalog,
         "seeds_identity": seeds_identity,
         "tcp_reachable": tcp_reachable,
         "tcp_parity": tcp_parity,
@@ -810,6 +812,46 @@ def _redact_local_vs_seeds(section: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def _redact_http_catalog(catalog: dict[str, Any]) -> dict[str, Any]:
+    """Redact LAN/Wi-Fi/name values from the :54545 feature catalog."""
+    from http_54545_catalog import HTTP_PII_FEATURES
+
+    out = dict(catalog)
+    features = []
+    for row in catalog.get("features") or []:
+        item = dict(row)
+        feat = str(item.get("feature") or "")
+        if feat in HTTP_PII_FEATURES and item.get("value") is not None:
+            item["value"] = _REDACTED
+        features.append(item)
+    out["features"] = features
+    summary = dict(catalog.get("summary") or {})
+    values = dict(summary.get("values") or {})
+    for feat in list(values):
+        if feat in HTTP_PII_FEATURES:
+            values[feat] = _REDACTED
+    summary["values"] = values
+    out["summary"] = summary
+    return out
+
+
+def _redact_http_identity(identity: dict[str, Any]) -> dict[str, Any]:
+    """Redact raw identity envelopes; keep model/firmware labels."""
+    from http_54545_catalog import HTTP_PII_FEATURES
+
+    out = dict(identity)
+    raw_values = out.get("raw_values")
+    if isinstance(raw_values, dict):
+        out["raw_values"] = {
+            k: (_REDACTED if k in HTTP_PII_FEATURES else v)
+            for k, v in raw_values.items()
+        }
+    # Raw packet may echo MAC/IP-bearing features on soft-fail diagnostics.
+    if "raw" in out:
+        out["raw"] = _REDACTED
+    return out
+
+
 def redact_report(
     report: dict[str, Any], *, include_pii: bool = False
 ) -> dict[str, Any]:
@@ -846,6 +888,10 @@ def redact_report(
             if key in ag:
                 ag[key] = _REDACTED
         redacted["auth_gate"] = ag
+    if "http_identity" in redacted and isinstance(redacted["http_identity"], dict):
+        redacted["http_identity"] = _redact_http_identity(redacted["http_identity"])
+    if "http_catalog" in redacted and isinstance(redacted["http_catalog"], dict):
+        redacted["http_catalog"] = _redact_http_catalog(redacted["http_catalog"])
     return redacted
 
 
@@ -874,6 +920,7 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- **Has subwoofer:** {hw.get('has_subwoofer')}",
         f"- **Has rear speakers:** {hw.get('has_rear_speakers')}",
         f"- **TCP :33336 reachable:** {tcp.get('reachable', 'unknown')}",
+        f"- **HTTP :54545 identity:** {(report.get('http_identity') or {}).get('ok', 'n/a')}",
         "",
         "## Coverage",
         "",
@@ -910,6 +957,31 @@ def render_markdown(report: dict[str, Any]) -> str:
                 "is expected on gRPC-only models (e.g. Theatre Trio HT-A8)._ ",
             ]
         )
+
+    catalog = report.get("http_catalog")
+    lines.extend(["", "## HTTP :54545 catalog", ""])
+    if isinstance(catalog, dict) and catalog.get("ok"):
+        counts = (catalog.get("summary") or {}).get("counts") or {}
+        lines.extend(
+            [
+                f"- Features probed: {catalog.get('feature_count', 0)}",
+                f"- Classes: {counts}",
+                f"- TCP↔HTTP overlap (value/nak): "
+                f"{catalog.get('tcp_http_overlap') or []}",
+                f"- Skipped (write-adjacent): {catalog.get('skipped') or []}",
+                f"- Server: `{catalog.get('server') or 'unknown'}`",
+            ]
+        )
+        value_feats = (catalog.get("summary") or {}).get("by_class", {}).get(
+            "value"
+        ) or []
+        if value_feats:
+            lines.append("- Value features:")
+            lines.extend(f"  - `{feat}`" for feat in value_feats)
+    elif catalog is None:
+        lines.append("- (skipped)")
+    else:
+        lines.append("- (unavailable)")
 
     battery = battery_live_summary(report.get("grpc_snapshot") or {})
     lines.extend(["", "## Battery", ""])
