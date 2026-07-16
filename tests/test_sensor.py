@@ -10,6 +10,9 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_component import async_update_entity
 
 from custom_components.bravia_quad.bravia_http_client import DeviceDetails
+from custom_components.bravia_quad.const import TRANSPORT_GRPC, TRANSPORT_TCP
+from custom_components.bravia_quad.sensor import http_sensor_descriptions
+from custom_components.bravia_quad.transport import GRPC_PATH_MAC_WIRED
 
 from .conftest import get_entity_id_by_unique_id_suffix
 
@@ -23,6 +26,61 @@ if TYPE_CHECKING:
 def platforms() -> list[Platform]:
     """Override platforms to only load sensors."""
     return [Platform.SENSOR]
+
+
+def test_http_mac_wired_omitted_when_grpc_caps_lack_wired_path() -> None:
+    """A8-shaped caps: no HTTP wired MAC when GetCapabilities omits the path."""
+    keys = {
+        d.key
+        for d in http_sensor_descriptions(
+            transport=TRANSPORT_GRPC,
+            capability_paths=frozenset(
+                {
+                    "system_setting.ipv4_address",
+                    "system_setting.wifi_mac_address_wireless",
+                }
+            ),
+        )
+    }
+    assert "mac_wired" not in keys
+    assert "mac_wireless" in keys
+    assert "internet" in keys
+
+
+def test_http_mac_wired_kept_when_grpc_caps_include_wired_path() -> None:
+    """Quad-shaped caps: HTTP wired MAC remains when the gRPC path is advertised."""
+    keys = {
+        d.key
+        for d in http_sensor_descriptions(
+            transport=TRANSPORT_GRPC,
+            capability_paths=frozenset({GRPC_PATH_MAC_WIRED}),
+        )
+    }
+    assert "mac_wired" in keys
+
+
+def test_http_mac_wired_kept_on_caps_soft_fallback() -> None:
+    """Soft-fallback (caps None): keep HTTP wired MAC like gRPC mapped soft-allow."""
+    keys = {
+        d.key
+        for d in http_sensor_descriptions(
+            transport=TRANSPORT_GRPC,
+            capability_paths=None,
+        )
+    }
+    assert "mac_wired" in keys
+
+
+def test_http_mac_wired_kept_on_tcp_transport() -> None:
+    """TCP transport always registers HTTP wired MAC (no gRPC caps gate)."""
+    keys = {
+        d.key
+        for d in http_sensor_descriptions(
+            transport=TRANSPORT_TCP,
+            capability_paths=frozenset(),
+        )
+    }
+    assert "mac_wired" in keys
 
 
 @pytest.mark.usefixtures("init_integration")

@@ -71,7 +71,7 @@ gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gR
 | `sensor.bravia_quad_*_device_name` | Sensor | Device name | — | |
 | `sensor.bravia_quad_*_serial_number` | Sensor | Serial number | — | Disabled by default |
 | `sensor.bravia_quad_*_ip_address` | Sensor | IP address | — | |
-| `sensor.bravia_quad_*_mac_wired` | Sensor | MAC address (wired) | — | |
+| `sensor.bravia_quad_*_mac_wired` | Sensor | MAC address (wired) | — | gRPC when `system_setting.wifi_mac_address_wired` is in GetCapabilities; otherwise HTTP on devices that expose it. Not created when capabilities omit the wired path |
 | `sensor.bravia_quad_*_timezone` | Sensor | Timezone | — | Disabled by default |
 | `sensor.bravia_quad_*_raee_measured` | Sensor | Room calibration measured | — | Disabled by default; gRPC-only |
 | `sensor.bravia_quad_*_battery_life_rl` | Sensor | Rear left battery | 0–100% | Disabled by default; created when `battery.life.rl` is in GetCapabilities |
