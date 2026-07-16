@@ -16,6 +16,9 @@ Contributor runbook
        uv run python scripts/grpc/scrape_device_capabilities.py <DEVICE_IP> \\
          --refresh --out ./scrape-reports
 
+   Optional: ``--skip-http-catalog`` to omit the :54545 FCGI feature sweep;
+   ``--include-pii`` keeps LAN/Wi-Fi values (default is redacted for sharing).
+
 4. Attach the generated ``.md`` and ``.json`` files to a GitHub issue.
 
 Prerequisites: device on LAN, Sony account linked in BRAVIA Connect, ``uv sync``.
@@ -64,6 +67,7 @@ from device_scrape_report import (  # noqa: E402
     report_filename_stem,
     topology_backfill_paths,
 )
+from http_54545_catalog import scrape_http_catalog  # noqa: E402
 from scrape_auth_gate import DEFAULT_KEYS_PATH, gate_or_exit  # noqa: E402
 
 _RPC_GET_CAPABILITIES = get_capabilities_method()
@@ -336,21 +340,100 @@ def scrape_tcp_reachable(host: str, *, port: int = DEFAULT_PORT) -> dict[str, An
 
 
 def scrape_http_identity(host: str) -> dict[str, Any]:
-    """Fetch model/firmware from HTTP management API (port 54545)."""
+    """Fetch model/firmware from HTTP management API (port 54545).
+
+    On empty identity, classify the raw FCGI response so cross-model
+    failures are not opaque ``error: null`` (HT-A8 residual).
+    """
     import aiohttp
-    from bravia_quad.bravia_http_client import BraviaHttpClient
+    from bravia_quad.bravia_http_client import (
+        HTTP_API_ENDPOINT,
+        HTTP_API_PORT,
+        BraviaHttpClient,
+    )
+
+    def _classify_empty(response: dict[str, Any] | None) -> str:
+        if response is None:
+            return "empty_response"
+        if response.get("type") != "http_get_result":
+            return f"unexpected_type:{response.get('type')!r}"
+        packet = response.get("packet")
+        if not packet or packet == [None] or packet[0] is None:
+            return "empty_packet"
+        values: dict[str, str] = {}
+        malformed = False
+        try:
+            for group in packet:
+                if not group:
+                    continue
+                for item in group:
+                    feature = item.get("feature")
+                    value = item.get("value")
+                    if feature is not None and value is not None:
+                        values[feature] = value
+        except (AttributeError, TypeError):
+            malformed = True
+        if malformed:
+            label = "malformed_packet"
+        elif not values:
+            label = "no_feature_values"
+        else:
+            sentinels = {v for v in values.values() if v in ("ERR", "NAK", "")}
+            if sentinels and len(sentinels) == len(values):
+                label = f"all_sentinel:{','.join(sorted(sentinels))}"
+            else:
+                label = "parsed_empty_fields"
+        return label
 
     async def _run() -> dict[str, Any]:
         timeout = aiohttp.ClientTimeout(total=10)
+        url = f"http://{host}:{HTTP_API_PORT}{HTTP_API_ENDPOINT}"
+        payload = {
+            "type": "http_get",
+            "packet": [["system.version", "system.modelname"]],
+        }
         async with aiohttp.ClientSession(timeout=timeout) as session:
+            http_status: int | None = None
+            raw: dict[str, Any] | None = None
+            try:
+                async with session.post(url, json=payload, timeout=timeout) as resp:
+                    http_status = resp.status
+                    resp.raise_for_status()
+                    parsed = await resp.json(content_type=None)
+                    raw = parsed if isinstance(parsed, dict) else None
+            except (aiohttp.ClientError, TimeoutError) as exc:
+                return {
+                    "ok": False,
+                    "model_id": None,
+                    "firmware": None,
+                    "error": str(exc),
+                    "http_status": http_status,
+                    "failure_class": "transport_error",
+                    "raw": None,
+                }
+
+            # Reuse client parsing for the happy path / value extraction.
             client = BraviaHttpClient(host, session)
-            info = await client.async_get_system_info()
-            return {
-                "ok": bool(info.model_name or info.version),
-                "model_id": info.model_name,
-                "firmware": info.version,
-                "error": None,
+            values = client._extract_get_values(raw or {})
+            model_name = client._filter_error_value(values.get("system.modelname"))
+            version = client._filter_error_value(values.get("system.version"))
+            ok = bool(model_name or version)
+            result: dict[str, Any] = {
+                "ok": ok,
+                "model_id": model_name,
+                "firmware": version,
+                "error": None if ok else _classify_empty(raw),
+                "http_status": http_status,
+                "raw_values": values,
             }
+            if not ok:
+                result["failure_class"] = result["error"]
+                # Keep raw envelope small for scrapes (no publickey blobs).
+                result["raw"] = {
+                    "type": (raw or {}).get("type"),
+                    "packet": (raw or {}).get("packet"),
+                }
+            return result
 
     try:
         return asyncio.run(_run())
@@ -360,6 +443,9 @@ def scrape_http_identity(host: str) -> dict[str, Any]:
             "model_id": None,
             "firmware": None,
             "error": str(exc),
+            "http_status": None,
+            "failure_class": "transport_error",
+            "raw": None,
         }
 
 
@@ -438,6 +524,11 @@ def main() -> int:
         help="Also poll TCP features (port 33336)",
     )
     parser.add_argument(
+        "--skip-http-catalog",
+        action="store_true",
+        help="Skip :54545 FCGI feature catalog (faster; identity still scraped)",
+    )
+    parser.add_argument(
         "--out",
         type=Path,
         default=Path("scrape-reports"),
@@ -446,7 +537,7 @@ def main() -> int:
     parser.add_argument(
         "--include-pii",
         action="store_true",
-        help="Keep serial/MAC/IP in output (default: redact for sharing)",
+        help="Keep serial/MAC/IP/SSID and HTTP catalog PII (default: redact)",
     )
     parser.add_argument("--debug", action="store_true")
     args = parser.parse_args()
@@ -493,6 +584,21 @@ def main() -> int:
     tcp_reachable = scrape_tcp_reachable(args.host)
     http_identity = scrape_http_identity(args.host)
     tcp_parity = scrape_tcp_parity(args.host) if args.tcp else None
+    http_catalog: dict[str, Any] | None = None
+    if not args.skip_http_catalog:
+        print("Scraping HTTP :54545 feature catalog …", file=sys.stderr)
+        http_catalog = scrape_http_catalog(
+            args.host,
+            progress=args.debug,
+        )
+        counts = (http_catalog.get("summary") or {}).get("counts") or {}
+        print(
+            f"HTTP catalog: {http_catalog.get('feature_count')} features "
+            f"(value={counts.get('value', 0)} "
+            f"nak={counts.get('nak', 0)} "
+            f"err={counts.get('err', 0)})",
+            file=sys.stderr,
+        )
 
     report = build_full_report(
         host=args.host,
@@ -518,10 +624,15 @@ def main() -> int:
             "tcp_reachable": tcp_reachable.get("reachable"),
             "http_identity_ok": http_identity.get("ok"),
             "http_identity_error": http_identity.get("error"),
+            "http_catalog_ok": None if http_catalog is None else http_catalog.get("ok"),
+            "http_catalog_feature_count": (
+                None if http_catalog is None else http_catalog.get("feature_count")
+            ),
         },
         tcp_parity=tcp_parity,
         tcp_reachable=tcp_reachable,
         http_identity=http_identity,
+        http_catalog=http_catalog,
         seeds_identity=seeds_identity_result.get("identity") or {},
     )
 
