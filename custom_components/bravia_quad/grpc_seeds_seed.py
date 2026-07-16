@@ -93,15 +93,28 @@ async def async_seed_from_seeds(
     grpc_client: BraviaGrpcClientAsync,
     *,
     paths: frozenset[str] | None = None,
+    force: bool = False,
 ) -> int:
-    """Fetch Seeds /states and merge unset allowlisted paths into notify cache."""
+    """
+    Fetch Seeds /states and merge allowlisted paths into notify cache.
+
+    When *force* is False (default), only paths currently unset (``None``) in
+    the notify cache are filled. When *force* is True, overwrite all
+    allowlisted paths present in the Seeds response (post-exec / no_audio
+    refresh).
+    """
     access_token = credentials.get("access_token")
     device_id = credentials.get("device_id")
     if not access_token or not device_id:
         return 0
 
     allowlist = paths or SEEDS_SEED_PATHS
-    pending = {path for path in allowlist if grpc_client.notify_state.get(path) is None}
+    if force:
+        pending = set(allowlist)
+    else:
+        pending = {
+            path for path in allowlist if grpc_client.notify_state.get(path) is None
+        }
     if not pending:
         return 0
 
@@ -121,14 +134,28 @@ async def async_seed_from_seeds(
         return 0
 
     flat = parse_seeds_device_states(raw)
-    updates = {path: flat[path] for path in pending if path in flat}
+    if force:
+        updates = {
+            path: flat[path]
+            for path in pending
+            if path in flat and grpc_client.notify_state.get(path) != flat[path]
+        }
+    else:
+        updates = {path: flat[path] for path in pending if path in flat}
     if not updates:
         return 0
 
     grpc_client.merge_notify_cache(updates)
-    _LOGGER.info(
-        "Seeds seeded %d unset gRPC entity path(s) on %s",
-        len(updates),
-        grpc_client.host,
-    )
+    if force:
+        _LOGGER.debug(
+            "Seeds refreshed %d gRPC entity path(s) on %s",
+            len(updates),
+            grpc_client.host,
+        )
+    else:
+        _LOGGER.info(
+            "Seeds seeded %d unset gRPC entity path(s) on %s",
+            len(updates),
+            grpc_client.host,
+        )
     return len(updates)

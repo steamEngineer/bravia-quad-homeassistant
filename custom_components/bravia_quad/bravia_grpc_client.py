@@ -39,6 +39,12 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 _DOMAIN_LOGGER = logging.getLogger("custom_components.bravia_quad")
 
+# Coalesce NoAudio/Normal bursts and give Seeds time to settle after app writes.
+_SEEDS_NO_AUDIO_DEBOUNCE_S = 2.0
+# Skip force-overwrite of paths HA just wrote (Seeds lags ~seconds behind exec).
+_SEEDS_WRITE_GUARD_S = 5.0
+_PATH_NO_AUDIO = "playback_control.no_audio"
+
 
 def _session_lost_reason(last_rpc_error: str | None) -> str:
     """Human-readable reason when the notify stream drops."""
@@ -99,6 +105,11 @@ class BraviaGrpcClientAsync:
         # None = ensure never ran (try TCP seed); False skips redundant connect.
         self._tcp_reachable: bool | None = None
         self._tcp_seed_skip_hint_logged: bool = False
+        self._seeds_refresh_task: asyncio.Task[None] | None = None
+        self._seeds_refresh_inflight: bool = False
+        self._seeds_refresh_pending: bool = False
+        # path → monotonic deadline; force Seeds must not overwrite until then.
+        self._seeds_write_guard: dict[str, float] = {}
 
     def note_external_control_ensure(self, result: ExternalControlEnsureResult) -> None:
         """Record TCP reachability from the external-control ensure probe."""
@@ -326,9 +337,84 @@ class BraviaGrpcClientAsync:
             _LOGGER.error("gRPC authentication failed for %s:%s", self.host, self.port)
         return ok
 
+    def _cancel_seeds_refresh(self) -> None:
+        """Cancel a pending debounced Seeds refresh."""
+        self._seeds_refresh_pending = False
+        task = self._seeds_refresh_task
+        self._seeds_refresh_task = None
+        if task is not None and not task.done():
+            task.cancel()
+
+    def _seeds_guarded_paths(self) -> frozenset[str]:
+        """Paths HA wrote recently; exclude from force Seeds overwrite."""
+        now = time.monotonic()
+        expired = [p for p, until in self._seeds_write_guard.items() if now >= until]
+        for path in expired:
+            del self._seeds_write_guard[path]
+        return frozenset(self._seeds_write_guard)
+
+    def schedule_seeds_refresh(self) -> None:
+        """Debounce a force Seeds refresh (no_audio / pipeline-reset signal)."""
+        if (
+            not self.seeds_poll
+            or self._hass is None
+            or not self._credentials.get("access_token")
+        ):
+            return
+        if self._seeds_refresh_inflight:
+            self._seeds_refresh_pending = True
+            return
+        self._cancel_seeds_refresh()
+        self._seeds_refresh_task = asyncio.create_task(
+            self._async_debounced_seeds_refresh()
+        )
+
+    async def _async_debounced_seeds_refresh(self) -> None:
+        """Wait for debounce, then force-refresh Seeds into notify cache."""
+        try:
+            await asyncio.sleep(_SEEDS_NO_AUDIO_DEBOUNCE_S)
+        except asyncio.CancelledError:
+            return
+        if (
+            self._notify_stop.is_set()
+            or not self.seeds_poll
+            or self._hass is None
+            or not self._credentials.get("access_token")
+        ):
+            return
+        self._seeds_refresh_inflight = True
+        self._seeds_refresh_pending = False
+        try:
+            self._debug("Seeds force-refresh after no_audio on %s", self.host)
+            guarded = self._seeds_guarded_paths()
+            paths = (
+                None
+                if not guarded
+                else frozenset(p for p in SEEDS_SEED_PATHS if p not in guarded)
+            )
+            if paths is not None and not paths:
+                updated = 0
+            else:
+                updated = await async_seed_from_seeds(
+                    self._hass,
+                    self._credentials,
+                    self,
+                    paths=paths,
+                    force=True,
+                )
+            if updated:
+                self._dispatch_snapshot_callbacks()
+        finally:
+            self._seeds_refresh_inflight = False
+            self._seeds_refresh_task = None
+            if self._seeds_refresh_pending and not self._notify_stop.is_set():
+                self._seeds_refresh_pending = False
+                self.schedule_seeds_refresh()
+
     async def async_disconnect(self) -> None:
         """Stop notify task and close channel."""
         self._notify_stop.set()
+        self._cancel_seeds_refresh()
         if self._notify_task and not self._notify_task.done():
             # Close channel first so the blocking notify iterator unblocks.
             await asyncio.to_thread(self._client.disconnect)
@@ -598,16 +684,14 @@ class BraviaGrpcClientAsync:
         ok = await asyncio.to_thread(_run)
         if ok:
             self._debug("ExecCommand %s -> True", command_path)
-            if (
-                self.seeds_poll
-                and self._hass is not None
-                and command_path in SEEDS_SEED_PATHS
-            ):
-                await async_seed_from_seeds(
-                    self._hass,
-                    self._credentials,
-                    self,
-                    paths=frozenset({command_path}),
+            # Trust exec cache for HA writes. Immediate Seeds force-refresh was
+            # reverting entities: cloud lags (~seconds) and _sync_from_notify
+            # after turn_on/off read the stale value. no_audio refresh picks up
+            # app-side changes; guard the written path so that refresh cannot
+            # stomp this write while Seeds catches up.
+            if command_path in SEEDS_SEED_PATHS:
+                self._seeds_write_guard[command_path] = (
+                    time.monotonic() + _SEEDS_WRITE_GUARD_S
                 )
         else:
             context = self._exec_failure_context(command_path)
@@ -669,6 +753,7 @@ class BraviaGrpcClientAsync:
     async def async_stop_notify(self) -> None:
         """Stop notify background task."""
         self._notify_stop.set()
+        self._cancel_seeds_refresh()
         if self._notify_task:
             self._notify_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -807,6 +892,8 @@ class BraviaGrpcClientAsync:
                     break
                 self._last_notify_at = time.monotonic()
                 self._debug("Notify delta %s=%r", states.path, states.value)
+                if states.path == _PATH_NO_AUDIO:
+                    self.schedule_seeds_refresh()
                 for callback in self._state_callbacks:
                     try:
                         callback(states)

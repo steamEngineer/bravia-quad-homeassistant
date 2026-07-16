@@ -59,9 +59,10 @@ Enum strings match gRPC exec values (`"auto"`, `"mid"`, `"Neural:X"`, etc.). Dis
 
 | Topic | Behavior |
 |-------|----------|
-| **When fetched** | Startup/reconnect backfill; optional single-path refresh after successful exec on a seeded path (converges within ~3 s on A9M2) |
+| **When fetched** | Startup/reconnect backfill (unset-only); debounced force refresh (~2 s) after a local gRPC `playback_control.no_audio` notify when `grpc_seeds_poll` is on (pipeline-reset signal when audio settings change — value is ignored). HA-initiated writes trust the local exec cache and are not immediately re-read from Seeds (cloud lags; a write guard skips force-overwrite of that path for a few seconds) |
 | **Offline / Seeds error** | Log at debug; fall back to HA state restore + last successful exec write — **no TCP fallback in gRPC mode** |
-| **Polling frequency** | One GET at backfill; post-exec refresh is debounced per path (not periodic polling) |
+| **Polling frequency** | Event-driven only: one GET at backfill and debounced `no_audio`-triggered refresh (not periodic polling) |
+| **Caveat** | With nothing playing, a second app-side change may not emit another `no_audio` until playback resumes — HA may lag until the next pipeline reset |
 | **Privacy** | Device settings sent to Sony cloud (same as BRAVIA Connect); opt-in via integration option `grpc_seeds_poll` |
 
 ## Decision (implement)
