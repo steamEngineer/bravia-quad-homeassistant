@@ -51,6 +51,7 @@ Seeds values are stored in the gRPC notify cache **as returned** (gRPC-native ty
 | `system_setting.earc` | Yes | switch | Bool in Seeds; gRPC switch on/off (not tri-state) |
 | `sound_setting.sound_effect` | Yes | select | Not in notify-only list; unreadable via GetStates |
 | `system_setting.dimmer` | Yes | select | Notify-only; Seeds seed when `grpc_seeds_poll` enabled |
+| Empty-wire GetStates bools (`mute`, `sound_setting.night_mode`, `sound_setting.sound_field`, `sound_setting.voice_mode`) | Yes | switch / media mute | Local GetStates returns key with `None` on fw 001.454; Seeds supplies the real bool when `grpc_seeds_poll` is on (TCP seed when Seeds is off) |
 
 Enum strings match gRPC exec values (`"auto"`, `"mid"`, `"Neural:X"`, etc.). Display brightness uses `"bright"`, `"dark"`, and `"off"`. Booleans are JSON `true`/`false` (e.g. DSEE, eARC enabled).
 
@@ -70,7 +71,7 @@ Enum strings match gRPC exec values (`"auto"`, `"mid"`, `"Neural:X"`, etc.). Dis
 | API stable + maps cleanly | **Pass** — `{name,value}` array matches gRPC paths |
 | Post-exec convergence | **Pass** — DRC toggle visible in Seeds within 3 s |
 | HT-A8 / TCP-blocked models | **Pass** — universal read path without `:33336` |
-| Partial coverage | All 11 probed paths present |
+| Partial coverage | Allowlisted Seeds seed paths present (notify-only + `sound_effect` + empty-wire bools) |
 
 **Recommendation:** Enable Seeds cloud reads in gRPC transport (opt-in default `false` until users validate; target default-on once stable). Replace TCP seed in [`async_backfill_entity_paths()`](../custom_components/bravia_quad/bravia_grpc_client.py) when enabled. Do **not** replace local gRPC writes.
 

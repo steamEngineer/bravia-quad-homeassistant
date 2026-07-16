@@ -71,7 +71,7 @@ Bulk GetStates (static HA path list, app-sequence with HMAC signing; filtered to
 | Category | Example paths | Bulk GetStates | Single-path GetStates | Notify at startup |
 |----------|---------------|----------------|----------------------|-------------------|
 | Core media | `power`, `volume`, `playback_control.function` | Real values | Same as bulk | Optional |
-| Bulk bools (empty wire) | `mute`, `sound_setting.night_mode`, `sound_setting.sound_field` | Key present, value `None` | Still `None` on fw 001.454 | First delta after change |
+| Bulk bools (empty wire) | `mute`, `sound_setting.night_mode`, `sound_setting.sound_field`, `sound_setting.voice_mode` | Key present, value `None` | Still `None` on fw 001.454 | First delta after change; Seeds seed when `grpc_seeds_poll` is on (TCP seed when Seeds is off) |
 | NOTIFY-only app settings | `sound_setting.drc`, `speaker_sound_setting.360ssm_height`, `system_setting.earc` | Absent from bulk | Fails (`UNKNOWN`) | **Not emitted** on fw 001.454 |
 | Metadata | `*.availability`, `*.unavailable_reason` | Present | N/A | N/A |
 
@@ -79,11 +79,11 @@ Startup sequence in [`__init__.py`](../custom_components/bravia_quad/__init__.py
 
 1. Bulk GetStates app-sequence → seed `notify_state`
 2. Per-path backfill for entity-critical paths still unset ([`async_backfill_entity_paths`](../custom_components/bravia_quad/bravia_grpc_client.py))
-3. **Seeds seed** when `grpc_seeds_poll` enabled ([`grpc_seeds_seed.py`](../custom_components/bravia_quad/grpc_seeds_seed.py)) — preferred in gRPC mode (works on HT-A8 where TCP is blocked). Otherwise TCP seed ([`grpc_tcp_seed.py`](../custom_components/bravia_quad/grpc_tcp_seed.py)) for paths with `tcp_feature` mappings still unset, **only if** the external-control probe found `:33336` reachable
+3. **Seeds seed** when `grpc_seeds_poll` enabled ([`grpc_seeds_seed.py`](../custom_components/bravia_quad/grpc_seeds_seed.py)) — preferred in gRPC mode (works on HT-A8 where TCP is blocked). Seeds fills unset **NOTIFY-only** paths and **empty-wire GetStates bools** (Voice Enhancer, Night Mode, Sound Field, Mute). Otherwise TCP seed ([`grpc_tcp_seed.py`](../custom_components/bravia_quad/grpc_tcp_seed.py)) for paths with `tcp_feature` mappings still unset, **only if** the external-control probe found `:33336` reachable
 4. Start notify stream + path-aware warmup (up to 3s for missing entity paths)
 5. Platform setup reads `notify_state`; HA restore fills gaps where device sends no initial value
 
-NOTIFY-only paths may remain `unknown` until Seeds/TCP seed succeeds, the device pushes a notify delta, or HA restores the last persisted state — enable Seeds cloud reads on gRPC transport when possible ([seeds-cloud-states.md](seeds-cloud-states.md)).
+NOTIFY-only paths and empty-wire bools may remain `unknown` until Seeds/TCP seed succeeds, the device pushes a notify delta, or HA restores the last persisted state — enable Seeds cloud reads on gRPC transport when possible ([seeds-cloud-states.md](seeds-cloud-states.md)).
 
 ## Corrected mappings (Phase 0)
 
