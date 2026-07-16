@@ -18,9 +18,19 @@ _LOGGER = logging.getLogger(__name__)
 _SOUND_EFFECT_PATH = "sound_setting.sound_effect"
 
 # Paths filled from Seeds when unset in notify cache (see docs/seeds-cloud-states.md).
-SEEDS_SEED_PATHS: frozenset[str] = frozenset(NOTIFY_ONLY_GRPC_PATHS) | {
-    _SOUND_EFFECT_PATH,
-}
+# Empty-wire GetStates bools (key present, value None on fw 001.454) are included
+# because Seeds returns real bools and TCP seed is skipped when seeds_poll is on.
+_EMPTY_WIRE_BOOL_PATHS: frozenset[str] = frozenset(
+    {
+        "sound_setting.voice_mode",
+        "sound_setting.night_mode",
+        "sound_setting.sound_field",
+        "mute",
+    }
+)
+SEEDS_SEED_PATHS: frozenset[str] = (
+    frozenset(NOTIFY_ONLY_GRPC_PATHS) | {_SOUND_EFFECT_PATH} | _EMPTY_WIRE_BOOL_PATHS
+)
 
 
 def parse_seeds_device_states(raw: dict[str, Any]) -> dict[str, Any]:
