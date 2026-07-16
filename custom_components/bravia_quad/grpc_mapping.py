@@ -55,8 +55,8 @@ MEDIA_PLAYER_GRPC_PATHS: frozenset[str] = frozenset(
 
 # App-setting paths: writable via ExecCommand; not readable via GetStates or
 # StartNotifyStates on fw 001.454 (live investigation 2026-07-03). Initial HA
-# state comes from restore; seeded via grpc_tcp_seed during gRPC backfill when
-# a tcp_feature mapping exists (notify-only paths and GetStates gaps).
+# state: Seeds seed when grpc_seeds_poll, else TCP seed when :33336 reachable,
+# else HA restore / last write (restore must not clobber a live Seeds/TCP seed).
 NOTIFY_ONLY_GRPC_PATHS: tuple[str, ...] = (
     "sound_setting.drc",
     "sound_setting.auto_volume",
