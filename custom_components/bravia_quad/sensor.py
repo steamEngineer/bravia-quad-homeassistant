@@ -34,6 +34,7 @@ from .entity import (
     get_device_info,
 )
 from .grpc_mapped_entities import mapped_sensor_entities
+from .transport import GRPC_PATH_MAC_WIRED
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -100,6 +101,27 @@ HTTP_SENSOR_DESCRIPTIONS: tuple[BraviaHttpSensorDescription, ...] = (
 )
 
 
+def http_sensor_descriptions(
+    *,
+    transport: str,
+    capability_paths: frozenset[str] | None,
+) -> tuple[BraviaHttpSensorDescription, ...]:
+    """
+    HTTP diagnostic sensors for this device.
+
+    When GetCapabilities is known and omits the wired-MAC gRPC path, skip the
+    HTTP mac_wired sensor so models without a wired interface do not expose it.
+    Soft-fallback (capability_paths is None) keeps HTTP wired MAC.
+    """
+    if (
+        transport == TRANSPORT_GRPC
+        and capability_paths is not None
+        and GRPC_PATH_MAC_WIRED not in capability_paths
+    ):
+        return tuple(d for d in HTTP_SENSOR_DESCRIPTIONS if d.key != "mac_wired")
+    return HTTP_SENSOR_DESCRIPTIONS
+
+
 async def async_setup_entry(
     _hass: HomeAssistant,
     entry: BraviaQuadConfigEntry,
@@ -109,10 +131,12 @@ async def async_setup_entry(
     data = entry.runtime_data
 
     entities: list[SensorEntity] = []
+    capability_paths: frozenset[str] | None = None
 
     if data.transport == TRANSPORT_GRPC:
         if data.grpc_client is None:
             return
+        capability_paths = data.grpc_client.capability_paths
         entities.extend(mapped_sensor_entities(data.grpc_client, entry))
     else:
         if data.tcp_client is None:
@@ -135,7 +159,10 @@ async def async_setup_entry(
 
     entities.extend(
         BraviaHttpSensor(data.http_client, entry, desc)
-        for desc in HTTP_SENSOR_DESCRIPTIONS
+        for desc in http_sensor_descriptions(
+            transport=data.transport,
+            capability_paths=capability_paths,
+        )
     )
 
     async_add_entities(entities, update_before_add=True)
