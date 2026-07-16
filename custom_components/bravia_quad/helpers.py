@@ -396,24 +396,35 @@ async def restore_last_switch_state(entity: SwitchEntity) -> bool:
     return True
 
 
+def _coerce_notify_bool(value: Any) -> bool | None:
+    """Map a notify/Seeds/TCP cache value to on/off."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        return value != 0
+    return None
+
+
 async def restore_notify_only_switch(
     entity: SwitchEntity,
     grpc_client: BraviaGrpcClientAsync,
     grpc_path: str,
 ) -> bool:
-    """Restore last HA on/off for unreadable gRPC paths and seed notify cache."""
+    """
+    Apply Seeds/TCP notify cache, else last HA on/off, for unreadable paths.
+
+    Prefer a live seed already in ``notify_state`` over HA restore so a prior
+    session cannot clobber Seeds/TCP backfill on reload.
+    """
+    cached = _coerce_notify_bool(grpc_client.notify_state.get(grpc_path))
+    if cached is not None:
+        entity._attr_is_on = cached
+        return True
+
     last = await _async_get_entity_last_state(entity)
-    is_on: bool | None = None
-    if last is not None and last.state in ("on", "off"):
-        is_on = last.state == "on"
-    if is_on is None:
-        cached = grpc_client.notify_state.get(grpc_path)
-        if isinstance(cached, bool):
-            is_on = cached
-        elif isinstance(cached, int):
-            is_on = cached != 0
-    if is_on is None:
+    if last is None or last.state not in ("on", "off"):
         return False
+    is_on = last.state == "on"
     entity._attr_is_on = is_on
     grpc_client.merge_notify_cache({grpc_path: is_on})
     return True
@@ -427,19 +438,26 @@ async def restore_notify_only_select(
     *,
     mapping: GrpcTcpMapping | None = None,
 ) -> bool:
-    """Restore last HA option for unreadable gRPC paths and seed notify cache."""
-    last = await _async_get_entity_last_state(entity)
-    option: str | None = None
-    if last is not None and last.state not in ("unknown", "unavailable", ""):
-        option = last.state
+    """
+    Apply Seeds/TCP notify cache, else last HA option, for unreadable paths.
+
+    Prefer a live seed already in ``notify_state`` over HA restore so a prior
+    session cannot clobber Seeds/TCP backfill on reload.
+    """
+    option = _coerce_select_option(grpc_client.notify_state.get(grpc_path), options)
+    from_cache = option is not None
     if option is None:
-        option = _coerce_select_option(grpc_client.notify_state.get(grpc_path), options)
+        last = await _async_get_entity_last_state(entity)
+        if last is not None and last.state not in ("unknown", "unavailable", ""):
+            option = last.state
     if option is None:
         return False
     if option not in options:
         options.append(option)
         entity._attr_options = options
     entity._attr_current_option = option
+    if from_cache:
+        return True
     if mapping is not None:
         from .grpc_value_normalize import denormalize_for_exec
 

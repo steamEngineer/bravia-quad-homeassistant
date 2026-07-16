@@ -25,6 +25,8 @@ from custom_components.bravia_quad.helpers import (
 
 GRPC_PATH_DSEE = "sound_setting.dsee_ultimate"
 GRPC_PATH_DIMMER = "system_setting.dimmer"
+GRPC_PATH_DRC = "sound_setting.drc"
+GRPC_PATH_AUTO_VOLUME = "sound_setting.auto_volume"
 GRPC_PATH_DTS_DIALOG = "sound_setting.dts_dialog_control"
 GRPC_PATH_SSM360_HEIGHT = "speaker_sound_setting.360ssm_height"
 GRPC_PATH_EARC = "system_setting.earc"
@@ -271,6 +273,87 @@ async def test_restore_notify_only_select_falls_back_to_notify_cache(
 
     assert restored is True
     assert entity._attr_current_option == "high"
-    grpc_client.merge_notify_cache.assert_called_once_with(
-        {GRPC_PATH_SSM360_HEIGHT: "high"}
+    grpc_client.merge_notify_cache.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_restore_notify_only_select_prefers_notify_cache_over_ha(
+    hass: HomeAssistant, grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    """Seeds/TCP seed must win over stale HA restore (Locutus8 #122 DRC case)."""
+    spec = entity_spec_for_path(GRPC_PATH_DRC)
+    assert spec is not None
+    entity = BraviaGrpcMappedSelect(grpc_client, grpc_entry, spec)
+    entity.entity_id = f"select.{DOMAIN}_serial123_drc"
+    entity.hass = hass
+    grpc_client.merge_notify_cache = MagicMock()
+    grpc_client.notify_state = {GRPC_PATH_DRC: "on"}
+
+    async_get(hass).last_states[entity.entity_id] = StoredState(
+        State(entity.entity_id, "auto"),
+        None,
+        datetime.now(tz=UTC),
     )
+
+    restored = await restore_notify_only_select(
+        entity, grpc_client, GRPC_PATH_DRC, entity._attr_options
+    )
+
+    assert restored is True
+    assert entity._attr_current_option == "on"
+    grpc_client.merge_notify_cache.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_restore_notify_only_dimmer_prefers_notify_cache_over_ha(
+    hass: HomeAssistant, grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    spec = entity_spec_for_path(GRPC_PATH_DIMMER)
+    assert spec is not None
+    entity = BraviaGrpcMappedSelect(grpc_client, grpc_entry, spec)
+    entity.entity_id = f"select.{DOMAIN}_serial123_display_brightness"
+    entity.hass = hass
+    grpc_client.merge_notify_cache = MagicMock()
+    grpc_client.notify_state = {GRPC_PATH_DIMMER: "dark"}
+
+    async_get(hass).last_states[entity.entity_id] = StoredState(
+        State(entity.entity_id, "bright"),
+        None,
+        datetime.now(tz=UTC),
+    )
+
+    restored = await restore_notify_only_select(
+        entity, grpc_client, GRPC_PATH_DIMMER, entity._attr_options
+    )
+
+    assert restored is True
+    assert entity._attr_current_option == "dark"
+    grpc_client.merge_notify_cache.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_restore_notify_only_switch_prefers_notify_cache_over_ha(
+    hass: HomeAssistant, grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    """Auto Volume Seeds seed must win over stale HA restore."""
+    spec = entity_spec_for_path(GRPC_PATH_AUTO_VOLUME)
+    assert spec is not None
+    entity = BraviaGrpcMappedSwitch(grpc_client, grpc_entry, spec)
+    entity.entity_id = f"switch.{DOMAIN}_serial123_advanced_auto_volume"
+    entity.hass = hass
+    grpc_client.merge_notify_cache = MagicMock()
+    grpc_client.notify_state = {GRPC_PATH_AUTO_VOLUME: False}
+
+    async_get(hass).last_states[entity.entity_id] = StoredState(
+        State(entity.entity_id, "on"),
+        None,
+        datetime.now(tz=UTC),
+    )
+
+    restored = await restore_notify_only_switch(
+        entity, grpc_client, GRPC_PATH_AUTO_VOLUME
+    )
+
+    assert restored is True
+    assert entity._attr_is_on is False
+    grpc_client.merge_notify_cache.assert_not_called()
