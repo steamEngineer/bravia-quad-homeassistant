@@ -34,6 +34,12 @@ from .entity import (
     get_device_info,
 )
 from .grpc_mapped_entities import mapped_sensor_entities
+from .helpers import (
+    GATED_CAPABILITY_SENSOR_SUFFIXES,
+    GATED_HTTP_SENSOR_SUFFIXES,
+    prune_gated_unique_id_suffixes,
+    unique_id_suffixes_for_entities,
+)
 from .transport import GRPC_PATH_MAC_WIRED
 
 if TYPE_CHECKING:
@@ -123,7 +129,7 @@ def http_sensor_descriptions(
 
 
 async def async_setup_entry(
-    _hass: HomeAssistant,
+    hass: HomeAssistant,
     entry: BraviaQuadConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
@@ -166,6 +172,13 @@ async def async_setup_entry(
             )
         )
 
+    prune_gated_unique_id_suffixes(
+        hass,
+        entry,
+        "sensor",
+        gated_suffixes=GATED_HTTP_SENSOR_SUFFIXES | GATED_CAPABILITY_SENSOR_SUFFIXES,
+        created_suffixes=unique_id_suffixes_for_entities(entry, entities),
+    )
     async_add_entities(entities, update_before_add=True)
 
 

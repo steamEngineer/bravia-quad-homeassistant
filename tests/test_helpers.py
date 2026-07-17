@@ -20,7 +20,10 @@ from custom_components.bravia_quad.const import (
 )
 from custom_components.bravia_quad.entity import get_device_info
 from custom_components.bravia_quad.helpers import (
+    GATED_HTTP_SENSOR_SUFFIXES,
     migrate_legacy_identifiers,
+    prune_gated_unique_id_suffixes,
+    remove_entities_by_unique_id_suffixes,
     verify_feature_value,
 )
 
@@ -898,3 +901,92 @@ def test_verify_feature_value_invalid_actual_raises() -> None:
             feature_label="IMAX mode",
             valid_values={"auto", "on", "off"},
         )
+
+
+# =============================================================================
+# Gated entity registry prune
+# =============================================================================
+
+
+async def test_remove_entities_by_unique_id_suffixes(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Helper removes matching registry rows by unique_id suffix."""
+    mock_config_entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{mock_config_entry.unique_id}_mac_wireless",
+        config_entry=mock_config_entry,
+        suggested_object_id="bravia_theatre_mac_wireless",
+    )
+    registry.async_get_or_create(
+        "sensor",
+        DOMAIN,
+        f"{mock_config_entry.unique_id}_internet",
+        config_entry=mock_config_entry,
+        suggested_object_id="bravia_theatre_internet",
+    )
+
+    remove_entities_by_unique_id_suffixes(
+        registry, mock_config_entry, "sensor", ("mac_wireless",)
+    )
+
+    assert (
+        registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{mock_config_entry.unique_id}_mac_wireless"
+        )
+        is None
+    )
+    assert (
+        registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{mock_config_entry.unique_id}_internet"
+        )
+        is not None
+    )
+
+
+async def test_prune_gated_unique_id_suffixes_keeps_created(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+) -> None:
+    """Prune drops gated suffixes that are not in the created set."""
+    mock_config_entry.add_to_hass(hass)
+    registry = er.async_get(hass)
+    for suffix in ("internet", "mac_wireless", "mac_wired"):
+        registry.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{mock_config_entry.unique_id}_{suffix}",
+            config_entry=mock_config_entry,
+            suggested_object_id=f"bravia_theatre_{suffix}",
+        )
+
+    prune_gated_unique_id_suffixes(
+        hass,
+        mock_config_entry,
+        "sensor",
+        gated_suffixes=GATED_HTTP_SENSOR_SUFFIXES,
+        created_suffixes={"internet"},
+    )
+
+    assert (
+        registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{mock_config_entry.unique_id}_internet"
+        )
+        is not None
+    )
+    assert (
+        registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{mock_config_entry.unique_id}_mac_wireless"
+        )
+        is None
+    )
+    assert (
+        registry.async_get_entity_id(
+            "sensor", DOMAIN, f"{mock_config_entry.unique_id}_mac_wired"
+        )
+        is None
+    )

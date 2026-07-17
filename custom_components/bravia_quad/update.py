@@ -22,7 +22,12 @@ from .bravia_http_client import (
 )
 from .const import DOMAIN
 from .entity import entity_unique_id, get_device_info
-from .helpers import require_unique_id
+from .helpers import (
+    GATED_HTTP_UPDATE_SUFFIXES,
+    prune_gated_unique_id_suffixes,
+    require_unique_id,
+    unique_id_suffixes_for_entities,
+)
 
 if TYPE_CHECKING:
     from homeassistant.core import HomeAssistant
@@ -41,19 +46,27 @@ DEFAULT_FW_UPDATE_ESTIMATE_SEC = 600
 
 
 async def async_setup_entry(
-    _hass: HomeAssistant,
+    hass: HomeAssistant,
     entry: BraviaQuadConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
     """Set up Bravia Theatre firmware update entity."""
     data = entry.runtime_data
-    if not data.http_client.reachable:
-        return
+    entities: list[UpdateEntity] = []
+    if data.http_client.reachable:
+        entities.append(
+            BraviaQuadFirmwareUpdate(data.http_client, data.tcp_client, entry)
+        )
 
-    async_add_entities(
-        [BraviaQuadFirmwareUpdate(data.http_client, data.tcp_client, entry)],
-        update_before_add=True,
+    prune_gated_unique_id_suffixes(
+        hass,
+        entry,
+        "update",
+        gated_suffixes=GATED_HTTP_UPDATE_SUFFIXES,
+        created_suffixes=unique_id_suffixes_for_entities(entry, entities),
     )
+    if entities:
+        async_add_entities(entities, update_before_add=True)
 
 
 class BraviaQuadFirmwareUpdate(UpdateEntity):

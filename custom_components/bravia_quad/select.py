@@ -40,7 +40,10 @@ from .entity import (
 )
 from .grpc_mapped_entities import mapped_select_entities
 from .helpers import (
+    GATED_CAPABILITY_SELECT_SUFFIXES,
+    prune_gated_unique_id_suffixes,
     raise_set_rejected,
+    unique_id_suffixes_for_entities,
     verify_feature_value,
 )
 
@@ -69,10 +72,15 @@ async def async_setup_entry(
     if data.transport == TRANSPORT_GRPC:
         if data.grpc_client is None:
             return
-        async_add_entities(
-            mapped_select_entities(data.grpc_client, entry),
-            update_before_add=True,
+        entities = mapped_select_entities(data.grpc_client, entry)
+        prune_gated_unique_id_suffixes(
+            hass,
+            entry,
+            "select",
+            gated_suffixes=GATED_CAPABILITY_SELECT_SUFFIXES,
+            created_suffixes=unique_id_suffixes_for_entities(entry, entities),
         )
+        async_add_entities(entities, update_before_add=True)
         return
 
     if data.tcp_client is None:

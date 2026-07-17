@@ -6,7 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any, cast
 
 from homeassistant.const import CONF_HOST, CONF_MAC
-from homeassistant.core import State
+from homeassistant.core import State, callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
@@ -21,6 +21,8 @@ from homeassistant.util import dt as dt_util
 from .const import CONF_HAS_SUBWOOFER, DOMAIN
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
+
     from homeassistant.components.select import SelectEntity
     from homeassistant.components.switch import SwitchEntity
     from homeassistant.config_entries import ConfigEntry
@@ -31,6 +33,34 @@ if TYPE_CHECKING:
     from .grpc_mapping import GrpcTcpMapping
 
 _LOGGER = logging.getLogger(__name__)
+
+# Entity unique_id suffixes that may be omitted by HTTP reachability or
+# GetCapabilities gating. Used to prune stale registry rows on setup.
+GATED_HTTP_SENSOR_SUFFIXES: frozenset[str] = frozenset(
+    {
+        "internet",
+        "ipv6_address",
+        "wifi_signal",
+        "mac_wired",
+        "mac_wireless",
+    }
+)
+GATED_HTTP_UPDATE_SUFFIXES: frozenset[str] = frozenset({"firmware_update"})
+GATED_CAPABILITY_SENSOR_SUFFIXES: frozenset[str] = frozenset(
+    {
+        "mac_wired",
+        "battery_life_rl",
+        "battery_life_rr",
+    }
+)
+GATED_CAPABILITY_SELECT_SUFFIXES: frozenset[str] = frozenset(
+    {
+        "center_speaker_mode",
+        "stereo_playback",
+        "sw_phase",
+    }
+)
+GATED_CAPABILITY_SWITCH_SUFFIXES: frozenset[str] = frozenset({"mix_stage"})
 
 
 async def async_apply_has_subwoofer(
@@ -334,6 +364,57 @@ def remove_legacy_input_select(
                 "select", DOMAIN, unique_id
             ):
                 entity_registry.async_remove(entity_id)
+
+
+@callback
+def remove_entities_by_unique_id_suffixes(
+    entity_registry: er.EntityRegistry,
+    entry: ConfigEntry,
+    domain: str,
+    suffixes: Iterable[str],
+) -> None:
+    """Remove registry rows for ``{entry_unique_id}_{suffix}`` on *domain*."""
+    uid = require_unique_id(entry)
+    for suffix in suffixes:
+        if entity_id := entity_registry.async_get_entity_id(
+            domain, DOMAIN, f"{uid}_{suffix}"
+        ):
+            entity_registry.async_remove(entity_id)
+
+
+@callback
+def prune_gated_unique_id_suffixes(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    domain: str,
+    *,
+    gated_suffixes: frozenset[str],
+    created_suffixes: set[str],
+) -> None:
+    """
+    Drop gated registry entities that this setup will not recreate.
+
+    Home Assistant keeps entity-registry rows across reload when platforms omit
+    them from ``async_add_entities``. Call after building the entity list and
+    before adding, with the suffixes that may be intentionally absent.
+    """
+    stale = gated_suffixes - created_suffixes
+    if not stale:
+        return
+    remove_entities_by_unique_id_suffixes(er.async_get(hass), entry, domain, stale)
+
+
+def unique_id_suffixes_for_entities(
+    entry: ConfigEntry, entities: Iterable[Entity]
+) -> set[str]:
+    """Return unique_id suffixes for constructed entities on this entry."""
+    prefix = f"{require_unique_id(entry)}_"
+    suffixes: set[str] = set()
+    for entity in entities:
+        unique_id = getattr(entity, "unique_id", None)
+        if isinstance(unique_id, str) and unique_id.startswith(prefix):
+            suffixes.add(unique_id.removeprefix(prefix))
+    return suffixes
 
 
 async def _async_get_entity_last_state(entity: Entity) -> State | None:

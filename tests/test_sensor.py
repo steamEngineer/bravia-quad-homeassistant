@@ -11,7 +11,7 @@ from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.entity_component import async_update_entity
 
 from custom_components.bravia_quad.bravia_http_client import DeviceDetails
-from custom_components.bravia_quad.const import TRANSPORT_GRPC, TRANSPORT_TCP
+from custom_components.bravia_quad.const import DOMAIN, TRANSPORT_GRPC, TRANSPORT_TCP
 from custom_components.bravia_quad.sensor import http_sensor_descriptions
 from custom_components.bravia_quad.transport import GRPC_PATH_MAC_WIRED
 
@@ -178,6 +178,41 @@ async def test_http_sensors_skipped_when_management_port_unreachable(
         await hass.async_block_till_done()
 
     assert hass.states.get("sensor.bravia_theatre_internet") is None
+
+
+@pytest.mark.usefixtures("mock_bravia_quad_client")
+async def test_stale_http_sensors_pruned_when_management_port_unreachable(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_bravia_http_client: MagicMock,
+    entity_registry: er.EntityRegistry,
+) -> None:
+    """Setup removes registry rows for HTTP sensors when :54545 is down."""
+    mock_config_entry.add_to_hass(hass)
+    for suffix in ("internet", "mac_wireless", "mac_wired"):
+        entity_registry.async_get_or_create(
+            "sensor",
+            DOMAIN,
+            f"{mock_config_entry.unique_id}_{suffix}",
+            config_entry=mock_config_entry,
+            suggested_object_id=f"bravia_theatre_{suffix}",
+        )
+
+    mock_bravia_http_client.reachable = False
+    mock_bravia_http_client.async_probe_reachable = AsyncMock(return_value=False)
+    with patch("custom_components.bravia_quad.PLATFORMS", [Platform.SENSOR]):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    for suffix in ("internet", "mac_wireless", "mac_wired"):
+        assert (
+            entity_registry.async_get_entity_id(
+                "sensor",
+                DOMAIN,
+                f"{mock_config_entry.unique_id}_{suffix}",
+            )
+            is None
+        )
 
 
 @pytest.mark.usefixtures("init_integration_all")
