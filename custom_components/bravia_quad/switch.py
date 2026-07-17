@@ -54,7 +54,12 @@ from .entity import (
     get_device_info,
 )
 from .grpc_mapped_entities import mapped_switch_entities
-from .helpers import verify_feature_value
+from .helpers import (
+    GATED_CAPABILITY_SWITCH_SUFFIXES,
+    prune_gated_unique_id_suffixes,
+    unique_id_suffixes_for_entities,
+    verify_feature_value,
+)
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
@@ -91,10 +96,15 @@ async def async_setup_entry(
             ):
                 registry.async_remove(entity_entry.entity_id)
                 break
-        async_add_entities(
-            mapped_switch_entities(data.grpc_client, entry),
-            update_before_add=True,
+        entities = mapped_switch_entities(data.grpc_client, entry)
+        prune_gated_unique_id_suffixes(
+            hass,
+            entry,
+            "switch",
+            gated_suffixes=GATED_CAPABILITY_SWITCH_SUFFIXES,
+            created_suffixes=unique_id_suffixes_for_entities(entry, entities),
         )
+        async_add_entities(entities, update_before_add=True)
         return
 
     if data.tcp_client is None:
