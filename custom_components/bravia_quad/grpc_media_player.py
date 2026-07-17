@@ -53,6 +53,9 @@ if TYPE_CHECKING:
 
 _LOGGER = logging.getLogger(__name__)
 
+# Shared cooldown for power on/off — blocks spam during device transitions.
+_POWER_COMMAND_MIN_INTERVAL_S = 5.0
+
 _PATH_POWER = "power"
 _PATH_MUTE = "mute"
 _PATH_VOLUME = "volume"
@@ -363,6 +366,7 @@ class BraviaGrpcMediaPlayer(
         self._playback_metadata: dict[str, str] = {}
         self._last_position_write = 0.0
         self._position_write_task: asyncio.Task[None] | None = None
+        self._last_power_command_at = 0.0
         self._init_volume_transition()
         self._seed_from_cache()
 
@@ -373,6 +377,14 @@ class BraviaGrpcMediaPlayer(
 
     async def _async_volume_step(self, volume: int) -> bool:
         return await self._async_exec_path(_PATH_VOLUME, volume)
+
+    def _power_command_allowed(self) -> bool:
+        """Accept at most one power on/off every ``_POWER_COMMAND_MIN_INTERVAL_S``."""
+        now = time.monotonic()
+        if now - self._last_power_command_at < _POWER_COMMAND_MIN_INTERVAL_S:
+            return False
+        self._last_power_command_at = now
+        return True
 
     @property
     def supported_features(self) -> MediaPlayerEntityFeature:
@@ -858,12 +870,16 @@ class BraviaGrpcMediaPlayer(
 
     async def async_turn_on(self) -> None:
         """Turn the soundbar on."""
+        if not self._power_command_allowed():
+            return
         if await self._async_exec_path(_PATH_POWER, POWER_ON):
             self._update_media_player_state()
             self.async_write_ha_state()
 
     async def async_turn_off(self) -> None:
         """Turn the soundbar off."""
+        if not self._power_command_allowed():
+            return
         if await self._async_exec_path(_PATH_POWER, POWER_OFF):
             self._update_media_player_state()
             self.async_write_ha_state()
