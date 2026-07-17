@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiohttp
 import pytest
@@ -86,6 +86,31 @@ async def test_get_system_info_connection_error(
     info = await http_client.async_get_system_info()
 
     assert info == SystemInfo()
+
+
+async def test_probe_reachable_success(http_client: BraviaHttpClient) -> None:
+    """Probe sets reachable when the management port accepts a connection."""
+    writer = MagicMock()
+    writer.wait_closed = AsyncMock()
+    with patch(
+        "custom_components.bravia_quad.bravia_http_client.asyncio.open_connection",
+        new=AsyncMock(return_value=(MagicMock(), writer)),
+    ):
+        assert await http_client.async_probe_reachable() is True
+    assert http_client.reachable is True
+    writer.close.assert_called_once()
+
+
+async def test_probe_reachable_connection_refused(
+    http_client: BraviaHttpClient,
+) -> None:
+    """Probe clears reachable when nothing listens on :54545."""
+    with patch(
+        "custom_components.bravia_quad.bravia_http_client.asyncio.open_connection",
+        new=AsyncMock(side_effect=ConnectionRefusedError()),
+    ):
+        assert await http_client.async_probe_reachable() is False
+    assert http_client.reachable is False
 
 
 async def test_get_device_details(

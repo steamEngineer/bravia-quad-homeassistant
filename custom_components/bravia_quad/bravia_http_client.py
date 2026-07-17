@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
+from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -16,6 +18,7 @@ _LOGGER = logging.getLogger(__name__)
 HTTP_API_PORT = 54545
 HTTP_API_ENDPOINT = "/fcgi-bin/request.fcgi"
 HTTP_API_TIMEOUT = 15
+HTTP_PROBE_TIMEOUT = 2.0
 
 # Sony update info server. The path components (am_cid/am_sid) are
 # model-level identifiers sourced from the device's
@@ -105,6 +108,40 @@ class BraviaHttpClient:
         self._timeout = aiohttp.ClientTimeout(total=HTTP_API_TIMEOUT)
         self._device_details_cache: DeviceDetails | None = None
         self._device_details_cache_time: float = 0
+        self._reachable = False
+
+    @property
+    def reachable(self) -> bool:
+        """Return whether the last probe found a listener on :54545."""
+        return self._reachable
+
+    async def async_probe_reachable(self) -> bool:
+        """
+        Probe whether the HTTP management port accepts TCP connections.
+
+        Uses a short connect timeout so gRPC-only models (no :54545 listener)
+        fail fast instead of waiting for the full API timeout on every call.
+        """
+        try:
+            _reader, writer = await asyncio.wait_for(
+                asyncio.open_connection(self._host, HTTP_API_PORT),
+                timeout=HTTP_PROBE_TIMEOUT,
+            )
+        except (OSError, TimeoutError) as err:
+            _LOGGER.debug(
+                "HTTP management API unreachable on %s:%s: %s",
+                self._host,
+                HTTP_API_PORT,
+                err,
+            )
+            self._reachable = False
+            return False
+
+        writer.close()
+        with suppress(OSError):
+            await writer.wait_closed()
+        self._reachable = True
+        return True
 
     async def async_get_latest_firmware_info(
         self, model_name: str | None

@@ -71,7 +71,7 @@ gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gR
 | `sensor.bravia_quad_*_device_name` | Sensor | Device name | — | |
 | `sensor.bravia_quad_*_serial_number` | Sensor | Serial number | — | Disabled by default |
 | `sensor.bravia_quad_*_ip_address` | Sensor | IP address | — | |
-| `sensor.bravia_quad_*_mac_wired` | Sensor | MAC address (wired) | — | gRPC when `system_setting.wifi_mac_address_wired` is in GetCapabilities; otherwise HTTP on devices that expose it. Not created when capabilities omit the wired path |
+| `sensor.bravia_quad_*_mac_wired` | Sensor | MAC address (wired) | — | gRPC only when GetCapabilities advertises `system_setting.wifi_mac_address_wired`; otherwise HTTP when `:54545` is reachable and the device exposes it. Not created when capabilities omit the path or GetCapabilities was unavailable |
 | `sensor.bravia_quad_*_timezone` | Sensor | Timezone | — | Disabled by default |
 | `sensor.bravia_quad_*_raee_measured` | Sensor | Room calibration measured | — | Disabled by default; gRPC-only |
 | `sensor.bravia_quad_*_battery_life_rl` | Sensor | Rear left battery | 0–100% | Disabled by default; created when `battery.life.rl` is in GetCapabilities |
@@ -79,7 +79,7 @@ gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gR
 | `switch.bravia_quad_*_mix_stage` | Switch | Mix stage | on/off | Disabled by default; capability-gated |
 | `select.bravia_quad_*_stereo_playback` | Select | Stereo playback | up_mix, multi_stereo | Disabled by default; capability-gated |
 | `select.bravia_quad_*_sw_phase` | Select | Subwoofer phase | 0, 180, dual-sub pair values | Disabled by default; capability-gated |
-| `update.bravia_quad_*_firmware_update` | Update | Firmware update | — | HTTP |
+| `update.bravia_quad_*_firmware_update` | Update | Firmware update | — | HTTP when `:54545` is reachable |
 
 ### Seeds / unknown state
 

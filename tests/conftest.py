@@ -324,6 +324,8 @@ def mock_bravia_http_client() -> Generator[MagicMock]:
     ) as client_mock:
         client = client_mock.return_value
 
+        client.reachable = True
+        client.async_probe_reachable = AsyncMock(return_value=True)
         client.async_get_system_info = AsyncMock(
             return_value=SystemInfo(version="001.100", model_name="BRAVIA Theatre Quad")
         )
