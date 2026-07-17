@@ -515,23 +515,25 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
         self._host = self._discovered_host
 
         for entry in self._async_current_entries():
-            if entry.unique_id in (
-                self._discovered_host,
-                self._discovered_mac,
-            ):
-                await self.async_set_unique_id(entry.unique_id)
-                self._abort_if_unique_id_configured(
-                    updates={CONF_HOST: self._discovered_host}
+            same_device = (
+                entry.unique_id
+                in (
+                    self._discovered_host,
+                    self._discovered_mac,
                 )
-                return self.async_abort(reason="already_configured")
-            if entry.data.get(CONF_SERIAL) and entry.unique_id == entry.data.get(
-                CONF_SERIAL
-            ):
-                await self.async_set_unique_id(entry.unique_id)
-                self._abort_if_unique_id_configured(
-                    updates={CONF_HOST: self._discovered_host}
+                or (
+                    self._discovered_mac is not None
+                    and entry.data.get(CONF_MAC) == self._discovered_mac
                 )
-                return self.async_abort(reason="already_configured")
+                or entry.data.get(CONF_HOST) == self._discovered_host
+            )
+            if not same_device:
+                continue
+            await self.async_set_unique_id(entry.unique_id)
+            self._abort_if_unique_id_configured(
+                updates={CONF_HOST: self._discovered_host}
+            )
+            return self.async_abort(reason="already_configured")
 
         unique_id = self._discovered_mac or self._discovered_host
         await self.async_set_unique_id(unique_id)
