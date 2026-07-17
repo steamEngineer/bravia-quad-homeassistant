@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -64,4 +65,20 @@ async def test_async_exec_command_skips_restore_on_success(
         ok = await grpc_async.async_exec_command("volume", int_value=10)
 
     assert ok is True
+    restore.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_async_exec_command_skips_restore_when_session_alive(
+    grpc_async: BraviaGrpcClientAsync,
+) -> None:
+    """Empty power response during transition must not tear down a live notify."""
+    grpc_async._client.exec_command.return_value = False
+    grpc_async._last_notify_at = time.monotonic()
+
+    with patch.object(grpc_async, "_async_restore_session", new=AsyncMock()) as restore:
+        ok = await grpc_async.async_exec_command("power", bool_value=True)
+
+    assert ok is False
+    grpc_async._client.exec_command.assert_called_once()
     restore.assert_not_awaited()

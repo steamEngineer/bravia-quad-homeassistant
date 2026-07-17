@@ -43,6 +43,8 @@ _DOMAIN_LOGGER = logging.getLogger("custom_components.bravia_quad")
 _SEEDS_NO_AUDIO_DEBOUNCE_S = 2.0
 # Skip force-overwrite of paths HA just wrote (Seeds lags ~seconds behind exec).
 _SEEDS_WRITE_GUARD_S = 5.0
+# Recent notify ⇒ stream alive; empty ExecCommand is device-side, not session death.
+_SESSION_ALIVE_NOTIFY_S = 30.0
 _PATH_NO_AUDIO = "playback_control.no_audio"
 
 
@@ -224,6 +226,14 @@ class BraviaGrpcClientAsync:
                 time.monotonic() - self._last_notify_at, 1
             )
         return context
+
+    def _session_looks_alive(self) -> bool:
+        """Return True when notify is recent and no RPC error (do not tear down)."""
+        if not self._connected or self._last_notify_at is None:
+            return False
+        if self.last_rpc_error:
+            return False
+        return (time.monotonic() - self._last_notify_at) < _SESSION_ALIVE_NOTIFY_S
 
     def _trace_enabled(self) -> bool:
         """Integration option or HA logger DEBUG for bravia_quad."""
@@ -695,6 +705,16 @@ class BraviaGrpcClientAsync:
                 )
         else:
             context = self._exec_failure_context(command_path)
+            # Power during transition often returns empty (rx=0) while notify is
+            # still healthy — restoring tears down the session and can trigger a
+            # Seeds key refresh → full config-entry reload.
+            if self._session_looks_alive():
+                _LOGGER.warning(
+                    "ExecCommand %s failed (session healthy; not restoring): %s",
+                    command_path,
+                    context,
+                )
+                return False
             _LOGGER.warning(
                 "ExecCommand %s failed (session may be stale): %s",
                 command_path,

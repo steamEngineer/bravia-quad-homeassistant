@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_MAC, CONF_NAME, EVENT_HOMEASSISTANT_STOP, Platform
@@ -46,6 +46,9 @@ if TYPE_CHECKING:
     from homeassistant.core import Event, HomeAssistant
 
     from .bravia_grpc_client import BraviaGrpcClientAsync
+
+# Last options per entry so data-only updates (Seeds key refresh) skip reload.
+_ENTRY_OPTIONS_SNAPSHOT: dict[str, dict[str, Any]] = {}
 
 
 @dataclass
@@ -114,6 +117,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: BraviaQuadConfigEntry) -
     if grpc_client is not None:
         grpc_client.dispatch_snapshot_callbacks()
 
+    _ENTRY_OPTIONS_SNAPSHOT[entry.entry_id] = dict(entry.options)
+
+    def _clear_options_snapshot() -> None:
+        _ENTRY_OPTIONS_SNAPSHOT.pop(entry.entry_id, None)
+
+    entry.async_on_unload(_clear_options_snapshot)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
     if grpc_client is not None:
@@ -142,7 +151,12 @@ async def _async_recompute_grpc_subwoofer(
 async def _async_options_updated(
     hass: HomeAssistant, entry: BraviaQuadConfigEntry
 ) -> None:
-    """Reload when integration options change."""
+    """Reload when integration options change (not data-only key refreshes)."""
+    previous = _ENTRY_OPTIONS_SNAPSHOT.get(entry.entry_id)
+    current = dict(entry.options)
+    _ENTRY_OPTIONS_SNAPSHOT[entry.entry_id] = current
+    if previous == current:
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 
