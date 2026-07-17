@@ -32,6 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 GRPC_PATH_SERIAL = "system_setting.serial_number"
 GRPC_PATH_FRIENDLY_NAME = "system_setting.friendly_name"
 GRPC_PATH_MAC_WIRED = "system_setting.wifi_mac_address_wired"
+GRPC_PATH_MAC_WIRELESS = "system_setting.wifi_mac_address_wireless"
 GRPC_PATH_SUBWOOFER = "sound_setting.volume.subwoofer"
 GRPC_PATH_SW_STATUS = "speaker_connection_setting.connection_status.sw"
 GRPC_PATH_SW_HISTORY = "speaker_connection_setting.connection_history.sw"
@@ -124,7 +125,7 @@ def identity_from_grpc_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
     if name:
         result[CONF_NAME] = str(name)
 
-    mac = snapshot.get(GRPC_PATH_MAC_WIRED)
+    mac = snapshot.get(GRPC_PATH_MAC_WIRED) or snapshot.get(GRPC_PATH_MAC_WIRELESS)
     if mac:
         result[CONF_MAC] = format_mac(str(mac))
 

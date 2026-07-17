@@ -5,6 +5,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+from homeassistant.const import CONF_MAC
 
 from custom_components.bravia_quad.const import (
     CONF_GRPC_KEYS,
@@ -14,6 +15,8 @@ from custom_components.bravia_quad.const import (
     TRANSPORT_GRPC,
 )
 from custom_components.bravia_quad.transport import (
+    GRPC_PATH_MAC_WIRED,
+    GRPC_PATH_MAC_WIRELESS,
     GRPC_PATH_SUBWOOFER,
     GRPC_PATH_SW_HISTORY,
     GRPC_PATH_SW_STATUS,
@@ -59,7 +62,7 @@ def test_identity_from_grpc_snapshot() -> None:
         {
             "system_setting.serial_number": "8804927",
             "system_setting.friendly_name": "Office Quads",
-            "system_setting.wifi_mac_address_wired": "f8:4e:17:22:ce:25",
+            GRPC_PATH_MAC_WIRED: "f8:4e:17:22:ce:25",
             "system_setting.model_name": "HT-A9M2",
             "system_setting.manufacturer": "SONY",
             GRPC_PATH_SW_STATUS: "connected",
@@ -68,6 +71,29 @@ def test_identity_from_grpc_snapshot() -> None:
     )
     assert info[CONF_SERIAL] == "8804927"
     assert info[CONF_HAS_SUBWOOFER] is True
+    assert info[CONF_MAC] == "f8:4e:17:22:ce:25"
+
+
+@pytest.mark.parametrize(
+    ("snapshot", "expected_mac"),
+    [
+        ({GRPC_PATH_MAC_WIRED: "AA:BB:CC:DD:EE:01"}, "aa:bb:cc:dd:ee:01"),
+        ({GRPC_PATH_MAC_WIRELESS: "AA:BB:CC:DD:EE:02"}, "aa:bb:cc:dd:ee:02"),
+        (
+            {
+                GRPC_PATH_MAC_WIRED: "AA:BB:CC:DD:EE:01",
+                GRPC_PATH_MAC_WIRELESS: "AA:BB:CC:DD:EE:02",
+            },
+            "aa:bb:cc:dd:ee:01",
+        ),
+        ({}, None),
+    ],
+)
+def test_identity_from_grpc_snapshot_mac_preference(
+    snapshot: dict[str, object], expected_mac: str | None
+) -> None:
+    info = identity_from_grpc_snapshot(snapshot)
+    assert info.get(CONF_MAC) == expected_mac
 
 
 @pytest.mark.parametrize(
