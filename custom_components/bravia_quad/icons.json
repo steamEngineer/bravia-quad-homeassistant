@@ -65,6 +65,9 @@
       "cec_power_off_sync": {
         "default": "mdi:hdmi-port"
       },
+      "hdmi_signal_format": {
+        "default": "mdi:hdmi-port"
+      },
       "audio_return_channel": {
         "default": "mdi:audio-video"
       }

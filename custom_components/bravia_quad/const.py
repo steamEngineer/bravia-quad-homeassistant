@@ -193,6 +193,13 @@ CEC_POWER_OFF_SYNC_OPTIONS: list[str] = ["auto", "on", "off"]
 # Display brightness options (API translation keys; live HT-A9M2 2026-07-08)
 DIMMER_OPTIONS: list[str] = ["bright", "dark", "off"]
 
+# HDMI Signal Format options (API values used as translation keys)
+HDMI_SIGNAL_FORMAT_OPTIONS: list[str] = [
+    "standard",
+    "enhanced",
+    "enhanced_4k120_8k",
+]
+
 # Audio Return Channel options (API values used as translation keys)
 AUDIO_RETURN_CHANNEL_OPTIONS: list[str] = ["off", "arc", "earc"]
 

@@ -196,6 +196,14 @@
           "off": "Off"
         }
       },
+      "hdmi_signal_format": {
+        "name": "HDMI Signal Format",
+        "state": {
+          "standard": "Standard format",
+          "enhanced": "Enhanced format",
+          "enhanced_4k120_8k": "Enhanced format (4K120, 8K)"
+        }
+      },
       "audio_return_channel": {
         "name": "Audio Return Channel",
         "state": {

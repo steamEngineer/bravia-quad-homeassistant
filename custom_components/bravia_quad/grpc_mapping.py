@@ -68,6 +68,7 @@ NOTIFY_ONLY_GRPC_PATHS: tuple[str, ...] = (
     "system_setting.auto_update",
     "system_setting.external_control",
     "system_setting.dimmer",
+    "system_setting.hdmi_signal_format",
 )
 
 NOTIFY_ONLY_GRPC_PATHS_SET: frozenset[str] = frozenset(NOTIFY_ONLY_GRPC_PATHS)
@@ -372,6 +373,13 @@ GRPC_TCP_MAPPINGS: tuple[GrpcTcpMapping, ...] = (
         None,
         "select",
         writable=True,
+    ),
+    GrpcTcpMapping(
+        "system_setting.hdmi_signal_format",
+        None,
+        "select",
+        writable=True,
+        notes="Seeds/notify-only; Exec string live-validated on HT-A9M2",
     ),
     # Capability-gated (advertised on HT-A8; absent on HT-A9M2) — unverified live
     GrpcTcpMapping(

@@ -51,9 +51,10 @@ Seeds values are stored in the gRPC notify cache **as returned** (gRPC-native ty
 | `system_setting.earc` | Yes | switch | Bool in Seeds; gRPC switch on/off (not tri-state) |
 | `sound_setting.sound_effect` | Yes | select | Not in notify-only list; unreadable via GetStates |
 | `system_setting.dimmer` | Yes | select | Notify-only; Seeds seed when `grpc_seeds_poll` enabled |
+| `system_setting.hdmi_signal_format` | Yes | select | Notify-only; Seeds seed when `grpc_seeds_poll` enabled |
 | Empty-wire GetStates bools (`mute`, `sound_setting.night_mode`, `sound_setting.sound_field`, `sound_setting.voice_mode`) | Yes | switch / media mute | Local GetStates returns key with `None` on fw 001.454; Seeds supplies the real bool when `grpc_seeds_poll` is on (TCP seed when Seeds is off) |
 
-Enum strings match gRPC exec values (`"auto"`, `"mid"`, `"Neural:X"`, etc.). Display brightness uses `"bright"`, `"dark"`, and `"off"`. Booleans are JSON `true`/`false` (e.g. DSEE, eARC enabled).
+Enum strings match gRPC exec values (`"auto"`, `"mid"`, `"Neural:X"`, etc.). Display brightness uses `"bright"`, `"dark"`, and `"off"`. HDMI Signal Format uses `"standard"`, `"enhanced"`, and `"enhanced_4k120_8k"`. Booleans are JSON `true`/`false` (e.g. DSEE, eARC enabled).
 
 ## Operational behavior
 

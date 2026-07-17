@@ -109,6 +109,39 @@ def test_dimmer_mapping_options_and_exec() -> None:
     assert payload == "off"
 
 
+def test_hdmi_signal_format_mapping_options_and_exec() -> None:
+    from custom_components.bravia_quad.grpc_value_normalize import (
+        ha_options_for_mapping,
+    )
+
+    mapping = mapping_for_grpc_path("system_setting.hdmi_signal_format")
+    assert mapping is not None
+    assert mapping.ha_platform == "select"
+    assert mapping.verified is True
+    spec = entity_spec_for_mapping(mapping)
+    assert spec.translation_key == "hdmi_signal_format"
+    assert spec.unique_id_suffix == "hdmi_signal_format"
+    assert spec.enabled_default is True
+    assert ha_options_for_mapping(mapping) == [
+        "standard",
+        "enhanced",
+        "enhanced_4k120_8k",
+    ]
+    kind, payload = denormalize_for_exec(mapping, "enhanced_4k120_8k")
+    assert kind == "string_value"
+    assert payload == "enhanced_4k120_8k"
+    assert normalize_grpc_value(mapping, payload) == "enhanced_4k120_8k"
+
+
+def test_hdmi_signal_format_in_mapped_select_entities(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    select_paths = {
+        e._grpc_path for e in mapped_select_entities(grpc_client, grpc_entry)
+    }
+    assert "system_setting.hdmi_signal_format" in select_paths
+
+
 def test_auto_volume_bool_exec() -> None:
     mapping = mapping_for_grpc_path("sound_setting.auto_volume")
     assert mapping is not None
@@ -257,6 +290,7 @@ def test_factories_omit_quad_only_when_absent_from_caps(
     assert "system_setting.wifi_mac_address_wired" not in sensor_paths
     assert "sound_setting.drc" in select_paths
     assert "system_setting.cec_power_off_sync" in select_paths
+    assert "system_setting.hdmi_signal_format" in select_paths
     assert "system_setting.ipv4_address" in sensor_paths
     assert "battery.life.rl" not in sensor_paths
     assert "battery.life.rr" not in sensor_paths

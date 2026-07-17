@@ -98,6 +98,7 @@ NOTIFY-only paths and empty-wire bools may remain `unknown` until Seeds/TCP seed
 | BT connection quality | `bluetooth.connectionquality` | `bluetooth_setting.connection_quality` | select |
 | HDMI standby through | `hdmi.standbylink` | `system_setting.hdmi_standby_through` | select |
 | HDMI CEC power-off sync | — | `system_setting.cec_power_off_sync` | select |
+| HDMI Signal Format | — | `system_setting.hdmi_signal_format` | select (`standard`, `enhanced`, `enhanced_4k120_8k`) |
 | IP address | `network.ipaddress` | `system_setting.ipv4_address` | sensor |
 
 gRPC always exposes both the −10…10 subwoofer number and the bass min/mid/max select. Availability flips with live link status (`speaker_connection_setting.connection_status.sw`): linked → subwoofer available / bass unavailable; unlinked → the reverse. Not from Seeds and not from a TCP `:33336` probe.
@@ -112,7 +113,7 @@ Features with no confirmed gRPC path or known semantic mismatch:
 
 | TCP feature | Reason |
 |-------------|--------|
-| `hdmi.passthrough` | No confirmed path (`hdmi_signal_format` candidate) |
+| `hdmi.passthrough` | No confirmed gRPC path (distinct from `system_setting.hdmi_signal_format`) |
 | `audio.360ssm` | Not in field list (distinct from 360SSM height) |
 | `system.temperature` | Not in field list |
 | Network mode / DHCP / region / language | Not in field list |
