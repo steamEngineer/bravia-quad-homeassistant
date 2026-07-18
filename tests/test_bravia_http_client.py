@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
@@ -88,28 +88,49 @@ async def test_get_system_info_connection_error(
     assert info == SystemInfo()
 
 
-async def test_probe_reachable_success(http_client: BraviaHttpClient) -> None:
-    """Probe sets reachable when the management port accepts a connection."""
-    writer = MagicMock()
-    writer.wait_closed = AsyncMock()
-    with patch(
-        "custom_components.bravia_quad.bravia_http_client.asyncio.open_connection",
-        new=AsyncMock(return_value=(MagicMock(), writer)),
-    ):
-        assert await http_client.async_probe_reachable() is True
-    assert http_client.reachable is True
-    writer.close.assert_called_once()
-
-
-async def test_probe_reachable_connection_refused(
+async def test_probe_reachable_success(
     http_client: BraviaHttpClient,
+    mock_session: MagicMock,
 ) -> None:
-    """Probe clears reachable when nothing listens on :54545."""
-    with patch(
-        "custom_components.bravia_quad.bravia_http_client.asyncio.open_connection",
-        new=AsyncMock(side_effect=ConnectionRefusedError()),
-    ):
-        assert await http_client.async_probe_reachable() is False
+    """Probe sets reachable when FCGI returns http_get_result."""
+    mock_session.post.return_value = _mock_post_response(
+        {
+            "type": "http_get_result",
+            "packet": [
+                [
+                    {"feature": "system.version", "value": "001.100"},
+                    {"feature": "system.modelname", "value": "BRAVIA Theatre Quad"},
+                ]
+            ],
+        }
+    )
+
+    assert await http_client.async_probe_reachable() is True
+    assert http_client.reachable is True
+    mock_session.post.assert_called_once()
+
+
+async def test_probe_reachable_connection_error(
+    http_client: BraviaHttpClient,
+    mock_session: MagicMock,
+) -> None:
+    """Probe clears reachable when the management FCGI endpoint is unreachable."""
+    mock_session.post.side_effect = aiohttp.ClientConnectionError()
+
+    assert await http_client.async_probe_reachable() is False
+    assert http_client.reachable is False
+
+
+async def test_probe_reachable_non_fcgi_response(
+    http_client: BraviaHttpClient,
+    mock_session: MagicMock,
+) -> None:
+    """Probe clears reachable when the path does not serve the FCGI dialect."""
+    mock_session.post.return_value = _mock_post_response(
+        {"type": "html", "body": "not the management API"}
+    )
+
+    assert await http_client.async_probe_reachable() is False
     assert http_client.reachable is False
 
 

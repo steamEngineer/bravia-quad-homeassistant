@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 import time
-from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum
 from typing import Any
@@ -112,22 +110,26 @@ class BraviaHttpClient:
 
     @property
     def reachable(self) -> bool:
-        """Return whether the last probe found a listener on :54545."""
+        """Return whether the last probe got a management FCGI response."""
         return self._reachable
 
     async def async_probe_reachable(self) -> bool:
         """
-        Probe whether the HTTP management port accepts TCP connections.
+        Probe whether the HTTP management FCGI endpoint responds.
 
-        Uses a short connect timeout so gRPC-only models (no :54545 listener)
-        fail fast instead of waiting for the full API timeout on every call.
+        POSTs a short-timeout identity get to ``/fcgi-bin/request.fcgi`` so a
+        listener that only serves other paths on :54545 is not treated as
+        reachable. gRPC-only models without that endpoint fail fast instead of
+        waiting for the full API timeout on every call.
         """
+        payload: dict[str, Any] = {
+            "type": "http_get",
+            "packet": [["system.version", "system.modelname"]],
+        }
+        probe_timeout = aiohttp.ClientTimeout(total=HTTP_PROBE_TIMEOUT)
         try:
-            _reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(self._host, HTTP_API_PORT),
-                timeout=HTTP_PROBE_TIMEOUT,
-            )
-        except (OSError, TimeoutError) as err:
+            response = await self._async_post(payload, client_timeout=probe_timeout)
+        except (aiohttp.ClientError, TimeoutError, ValueError) as err:
             _LOGGER.debug(
                 "HTTP management API unreachable on %s:%s: %s",
                 self._host,
@@ -137,11 +139,15 @@ class BraviaHttpClient:
             self._reachable = False
             return False
 
-        writer.close()
-        with suppress(OSError):
-            await writer.wait_closed()
-        self._reachable = True
-        return True
+        ok = isinstance(response, dict) and response.get("type") == "http_get_result"
+        if not ok:
+            _LOGGER.debug(
+                "HTTP management API on %s:%s did not return http_get_result",
+                self._host,
+                HTTP_API_PORT,
+            )
+        self._reachable = ok
+        return ok
 
     async def async_get_latest_firmware_info(
         self, model_name: str | None
@@ -336,10 +342,15 @@ class BraviaHttpClient:
         _LOGGER.warning("Firmware update request rejected by %s: %s", self._host, value)
         return False
 
-    async def _async_post(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _async_post(
+        self,
+        payload: dict[str, Any],
+        *,
+        client_timeout: aiohttp.ClientTimeout | None = None,
+    ) -> dict[str, Any]:
         """Send a POST request and return parsed JSON response."""
         async with self._session.post(
-            self._url, json=payload, timeout=self._timeout
+            self._url, json=payload, timeout=client_timeout or self._timeout
         ) as resp:
             resp.raise_for_status()
             return await resp.json(content_type=None)
