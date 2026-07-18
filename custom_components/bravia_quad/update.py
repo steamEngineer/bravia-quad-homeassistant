@@ -47,6 +47,8 @@ async def async_setup_entry(
 ) -> None:
     """Set up Bravia Theatre firmware update entity."""
     data = entry.runtime_data
+    if not data.http_client.reachable:
+        return
 
     async_add_entities(
         [BraviaQuadFirmwareUpdate(data.http_client, data.tcp_client, entry)],

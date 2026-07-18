@@ -16,6 +16,7 @@ _LOGGER = logging.getLogger(__name__)
 HTTP_API_PORT = 54545
 HTTP_API_ENDPOINT = "/fcgi-bin/request.fcgi"
 HTTP_API_TIMEOUT = 15
+HTTP_PROBE_TIMEOUT = 2.0
 
 # Sony update info server. The path components (am_cid/am_sid) are
 # model-level identifiers sourced from the device's
@@ -105,6 +106,48 @@ class BraviaHttpClient:
         self._timeout = aiohttp.ClientTimeout(total=HTTP_API_TIMEOUT)
         self._device_details_cache: DeviceDetails | None = None
         self._device_details_cache_time: float = 0
+        self._reachable = False
+
+    @property
+    def reachable(self) -> bool:
+        """Return whether the last probe got a management FCGI response."""
+        return self._reachable
+
+    async def async_probe_reachable(self) -> bool:
+        """
+        Probe whether the HTTP management FCGI endpoint responds.
+
+        POSTs a short-timeout identity get to ``/fcgi-bin/request.fcgi`` so a
+        listener that only serves other paths on :54545 is not treated as
+        reachable. gRPC-only models without that endpoint fail fast instead of
+        waiting for the full API timeout on every call.
+        """
+        payload: dict[str, Any] = {
+            "type": "http_get",
+            "packet": [["system.version", "system.modelname"]],
+        }
+        probe_timeout = aiohttp.ClientTimeout(total=HTTP_PROBE_TIMEOUT)
+        try:
+            response = await self._async_post(payload, client_timeout=probe_timeout)
+        except (aiohttp.ClientError, TimeoutError, ValueError) as err:
+            _LOGGER.debug(
+                "HTTP management API unreachable on %s:%s: %s",
+                self._host,
+                HTTP_API_PORT,
+                err,
+            )
+            self._reachable = False
+            return False
+
+        ok = isinstance(response, dict) and response.get("type") == "http_get_result"
+        if not ok:
+            _LOGGER.debug(
+                "HTTP management API on %s:%s did not return http_get_result",
+                self._host,
+                HTTP_API_PORT,
+            )
+        self._reachable = ok
+        return ok
 
     async def async_get_latest_firmware_info(
         self, model_name: str | None
@@ -299,10 +342,15 @@ class BraviaHttpClient:
         _LOGGER.warning("Firmware update request rejected by %s: %s", self._host, value)
         return False
 
-    async def _async_post(self, payload: dict[str, Any]) -> dict[str, Any]:
+    async def _async_post(
+        self,
+        payload: dict[str, Any],
+        *,
+        client_timeout: aiohttp.ClientTimeout | None = None,
+    ) -> dict[str, Any]:
         """Send a POST request and return parsed JSON response."""
         async with self._session.post(
-            self._url, json=payload, timeout=self._timeout
+            self._url, json=payload, timeout=client_timeout or self._timeout
         ) as resp:
             resp.raise_for_status()
             return await resp.json(content_type=None)

@@ -92,10 +92,14 @@ def mapping_allowed_by_capabilities(
     """
     Return whether a mapped entity should be created for this device.
 
-    Soft-fallback when capabilities were not fetched (None). Notify-only
+    Soft-fallback when capabilities were not fetched (None), except wired MAC
+    which requires a positive GetCapabilities advertisement (models without a
+    wired interface must not get a soft-allowed diagnostic). Notify-only
     Seeds/restore paths are never advertised in GetCapabilities, so they
     remain allowed even when absent from the capability set.
     """
+    if grpc_path == "system_setting.wifi_mac_address_wired":
+        return capability_paths is not None and grpc_path in capability_paths
     if capability_paths is None:
         return True
     return grpc_path in capability_paths or grpc_path in NOTIFY_ONLY_GRPC_PATHS_SET

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from homeassistant.components.update import DOMAIN as UPDATE_DOMAIN
@@ -38,6 +38,23 @@ async def test_update_entity_created(
     """Test that the firmware update entity is created."""
     state = hass.states.get(ENTITY_ID)
     assert state is not None
+
+
+@pytest.mark.usefixtures("mock_bravia_quad_client")
+async def test_update_entity_skipped_when_management_port_unreachable(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_bravia_http_client: MagicMock,
+) -> None:
+    """No firmware update entity when the :54545 probe fails."""
+    mock_bravia_http_client.reachable = False
+    mock_bravia_http_client.async_probe_reachable = AsyncMock(return_value=False)
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.bravia_quad.PLATFORMS", [Platform.UPDATE]):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert hass.states.get(ENTITY_ID) is None
 
 
 @pytest.mark.usefixtures("init_integration")
