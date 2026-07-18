@@ -6,7 +6,7 @@ The integration creates entities under your Bravia Theatre device. The entity se
 
 ## TCP transport
 
-Core entities (gRPC mode covers most of these with matching unique-ID suffixes where features are bridged). TCP also adds diagnostic extras not available over gRPC (Bluetooth pairing, HDMI passthrough, temperature, network sensors).
+Core entities (gRPC mode covers most of these with matching unique-ID suffixes where features are bridged). TCP also adds diagnostic extras not available over gRPC (Bluetooth pairing, HDMI passthrough, temperature, and TCP network sensors). Shared HTTP diagnostics and firmware update are listed under [HTTP management](#http-management-both-transports).
 
 | Entity | Type | Description | Range/Options |
 |--------|------|-------------|---------------|
@@ -71,7 +71,7 @@ gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gR
 | `sensor.bravia_quad_*_device_name` | Sensor | Device name | — | |
 | `sensor.bravia_quad_*_serial_number` | Sensor | Serial number | — | Disabled by default |
 | `sensor.bravia_quad_*_ip_address` | Sensor | IP address | — | |
-| `sensor.bravia_quad_*_mac_wired` | Sensor | MAC address (wired) | — | gRPC when `system_setting.wifi_mac_address_wired` is in GetCapabilities; otherwise HTTP on devices that expose it. Not created when capabilities omit the wired path |
+| `sensor.bravia_quad_*_mac_wired` | Sensor | MAC address (wired) | — | gRPC when GetCapabilities advertises `system_setting.wifi_mac_address_wired`; otherwise HTTP and probe-gated (see [HTTP management](#http-management-both-transports)). Omitted when capabilities are known and lack the wired path |
 | `sensor.bravia_quad_*_timezone` | Sensor | Timezone | — | Disabled by default |
 | `sensor.bravia_quad_*_raee_measured` | Sensor | Room calibration measured | — | Disabled by default; gRPC-only |
 | `sensor.bravia_quad_*_battery_life_rl` | Sensor | Rear left battery | 0–100% | Disabled by default; created when `battery.life.rl` is in GetCapabilities |
@@ -79,7 +79,7 @@ gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gR
 | `switch.bravia_quad_*_mix_stage` | Switch | Mix stage | on/off | Disabled by default; capability-gated |
 | `select.bravia_quad_*_stereo_playback` | Select | Stereo playback | up_mix, multi_stereo | Disabled by default; capability-gated |
 | `select.bravia_quad_*_sw_phase` | Select | Subwoofer phase | 0, 180, dual-sub pair values | Disabled by default; capability-gated |
-| `update.bravia_quad_*_firmware_update` | Update | Firmware update | — | HTTP |
+| `update.bravia_quad_*_firmware_update` | Update | Firmware update | — | HTTP; probe-gated — see [HTTP management](#http-management-both-transports) |
 
 ### Seeds / unknown state
 
@@ -92,3 +92,16 @@ Enable under **Settings → Devices & Services → Entities** if needed. Unverif
 ### Not in gRPC mode
 
 Bluetooth pairing button, HDMI passthrough, temperature, and some network diagnostics remain TCP-only — see [grpc-tcp-mapping.md](grpc-tcp-mapping.md#parity-gaps).
+
+## HTTP management (both transports)
+
+These entities use the web management API on `:54545`. They are created only when the management FCGI probe succeeds at setup (see [configuration.md](configuration.md)).
+
+| Entity | Type | Description | Range/Options | Notes |
+|--------|------|-------------|---------------|-------|
+| `sensor.bravia_quad_*_internet` | Sensor | Internet connectivity | — | HTTP; probe-gated |
+| `sensor.bravia_quad_*_ipv6_address` | Sensor | IPv6 address | — | HTTP; probe-gated; disabled by default |
+| `sensor.bravia_quad_*_wifi_signal` | Sensor | WiFi signal | — | HTTP; probe-gated; disabled by default |
+| `sensor.bravia_quad_*_mac_wired` | Sensor | MAC address (wired) | — | HTTP; probe-gated when not provided via gRPC; disabled by default |
+| `sensor.bravia_quad_*_mac_wireless` | Sensor | MAC address (wireless) | — | HTTP; probe-gated; disabled by default |
+| `update.bravia_quad_*_firmware_update` | Update | Firmware update | — | HTTP; probe-gated |
