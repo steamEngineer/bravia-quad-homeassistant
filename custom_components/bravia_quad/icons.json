@@ -66,7 +66,7 @@
         "default": "mdi:hdmi-port"
       },
       "hdmi_signal_format": {
-        "default": "mdi:hdmi-port"
+        "default": "mdi:ultra-high-definition"
       },
       "audio_return_channel": {
         "default": "mdi:audio-video"
