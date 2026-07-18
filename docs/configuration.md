@@ -2,7 +2,9 @@
 
 ## Auto-discovery
 
-The integration supports automatic discovery of Bravia Theatre devices on your local network using mDNS/zeroconf. When you add the integration, Home Assistant will automatically detect any Bravia Theatre devices and prompt you to configure them.
+The integration supports automatic discovery of Bravia Theatre devices on your local network using mDNS/zeroconf. When you add the integration, Home Assistant will automatically detect any Bravia Theatre devices and prompt you to configure them. Rediscovery updates an existing config entry only when the host or MAC matches — multiple Theatres on the same network each get their own entry.
+
+Wi‑Fi-only models (no wired MAC in capabilities) use the wireless MAC for device identity and network connections.
 
 **If your device is not automatically discovered**, you can add it manually by:
 
