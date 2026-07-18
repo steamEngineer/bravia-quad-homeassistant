@@ -81,6 +81,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: BraviaQuadConfigEntry) -
 
     session = async_get_clientsession(hass)
     http_client = BraviaHttpClient(entry.data["host"], session)
+    await http_client.async_probe_reachable()
 
     tcp_client: BraviaQuadClient | None = None
     grpc_client: BraviaGrpcClientAsync | None = None
@@ -249,12 +250,13 @@ async def _register_device(
     serial = entry.data.get(CONF_SERIAL)
 
     firmware_version: str | None = None
-    try:
-        system_info = await http_client.async_get_system_info()
-        if system_info:
-            firmware_version = system_info.version
-    except OSError:
-        _LOGGER.debug("Failed to fetch firmware version from HTTP")
+    if http_client.reachable:
+        try:
+            system_info = await http_client.async_get_system_info()
+            if system_info:
+                firmware_version = system_info.version
+        except OSError:
+            _LOGGER.debug("Failed to fetch firmware version from HTTP")
 
     if firmware_version is None and tcp_client is not None:
         try:
@@ -274,6 +276,11 @@ async def _register_device(
         except (OSError, TimeoutError):
             _LOGGER.debug("Failed to fetch active MAC from TCP")
 
+    configuration_url = (
+        f"http://{entry.data['host']}:{HTTP_API_PORT}"
+        if http_client.reachable
+        else None
+    )
     dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id,
         identifiers={(DOMAIN, require_unique_id(entry))},
@@ -284,7 +291,7 @@ async def _register_device(
         model_id=model_id,
         serial_number=serial,
         sw_version=firmware_version,
-        configuration_url=f"http://{entry.data['host']}:{HTTP_API_PORT}",
+        configuration_url=configuration_url,
     )
     remove_legacy_group_subdevices(dr.async_get(hass), entry)
     remove_legacy_input_select(er.async_get(hass), entry)

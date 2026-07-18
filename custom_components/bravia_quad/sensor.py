@@ -157,13 +157,14 @@ async def async_setup_entry(
             ]
         )
 
-    entities.extend(
-        BraviaHttpSensor(data.http_client, entry, desc)
-        for desc in http_sensor_descriptions(
-            transport=data.transport,
-            capability_paths=capability_paths,
+    if data.http_client.reachable:
+        entities.extend(
+            BraviaHttpSensor(data.http_client, entry, desc)
+            for desc in http_sensor_descriptions(
+                transport=data.transport,
+                capability_paths=capability_paths,
+            )
         )
-    )
 
     async_add_entities(entities, update_before_add=True)
 

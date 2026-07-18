@@ -88,6 +88,52 @@ async def test_get_system_info_connection_error(
     assert info == SystemInfo()
 
 
+async def test_probe_reachable_success(
+    http_client: BraviaHttpClient,
+    mock_session: MagicMock,
+) -> None:
+    """Probe sets reachable when FCGI returns http_get_result."""
+    mock_session.post.return_value = _mock_post_response(
+        {
+            "type": "http_get_result",
+            "packet": [
+                [
+                    {"feature": "system.version", "value": "001.100"},
+                    {"feature": "system.modelname", "value": "BRAVIA Theatre Quad"},
+                ]
+            ],
+        }
+    )
+
+    assert await http_client.async_probe_reachable() is True
+    assert http_client.reachable is True
+    mock_session.post.assert_called_once()
+
+
+async def test_probe_reachable_connection_error(
+    http_client: BraviaHttpClient,
+    mock_session: MagicMock,
+) -> None:
+    """Probe clears reachable when the management FCGI endpoint is unreachable."""
+    mock_session.post.side_effect = aiohttp.ClientConnectionError()
+
+    assert await http_client.async_probe_reachable() is False
+    assert http_client.reachable is False
+
+
+async def test_probe_reachable_non_fcgi_response(
+    http_client: BraviaHttpClient,
+    mock_session: MagicMock,
+) -> None:
+    """Probe clears reachable when the path does not serve the FCGI dialect."""
+    mock_session.post.return_value = _mock_post_response(
+        {"type": "html", "body": "not the management API"}
+    )
+
+    assert await http_client.async_probe_reachable() is False
+    assert http_client.reachable is False
+
+
 async def test_get_device_details(
     http_client: BraviaHttpClient,
     mock_session: MagicMock,

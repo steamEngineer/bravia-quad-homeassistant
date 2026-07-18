@@ -381,7 +381,8 @@ def test_factories_soft_fallback_includes_quad_only_when_caps_none(
         e._grpc_path for e in mapped_switch_entities(grpc_client, grpc_entry)
     }
     assert "speaker_sound_setting.center_speaker_mode" in select_paths
-    assert "system_setting.wifi_mac_address_wired" in sensor_paths
+    # Wired MAC requires a positive GetCapabilities hit (no soft-allow).
+    assert "system_setting.wifi_mac_address_wired" not in sensor_paths
     assert "battery.life.rl" in sensor_paths
     assert "sound_setting.stereo_playback" in select_paths
     assert "sound_setting.mix_stage" in switch_paths

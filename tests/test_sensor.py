@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from homeassistant.const import Platform
@@ -20,6 +21,7 @@ if TYPE_CHECKING:
     from unittest.mock import MagicMock
 
     from homeassistant.core import HomeAssistant
+    from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 
 @pytest.fixture
@@ -159,6 +161,23 @@ async def test_http_sensor_internet(
     state = hass.states.get("sensor.bravia_theatre_internet")
     assert state is not None
     assert state.state == "connected"
+
+
+@pytest.mark.usefixtures("mock_bravia_quad_client")
+async def test_http_sensors_skipped_when_management_port_unreachable(
+    hass: HomeAssistant,
+    mock_config_entry: MockConfigEntry,
+    mock_bravia_http_client: MagicMock,
+) -> None:
+    """No HTTP diagnostic sensors when the :54545 probe fails."""
+    mock_bravia_http_client.reachable = False
+    mock_bravia_http_client.async_probe_reachable = AsyncMock(return_value=False)
+    mock_config_entry.add_to_hass(hass)
+    with patch("custom_components.bravia_quad.PLATFORMS", [Platform.SENSOR]):
+        assert await hass.config_entries.async_setup(mock_config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    assert hass.states.get("sensor.bravia_theatre_internet") is None
 
 
 @pytest.mark.usefixtures("init_integration_all")
