@@ -33,7 +33,7 @@ During setup, you will be prompted to provide:
 
 See [grpc-tcp-mapping.md](grpc-tcp-mapping.md#parity-gaps) for the full parity gap list and entity mapping table.
 
-HTTP (`:54545`) is used for firmware update and network diagnostic sensors when the management FCGI endpoint on that port responds. Devices without that endpoint (for example some gRPC-only models) skip those entities. Changing transport requires removing and re-adding the integration (entity set differs per mode).
+HTTP is always used for firmware update and network diagnostic sensors regardless of transport. Changing transport requires removing and re-adding the integration (entity set differs per mode).
 
 Legacy entries with **Enable gRPC state sync** in options are migrated automatically to gRPC transport on reload.
 
