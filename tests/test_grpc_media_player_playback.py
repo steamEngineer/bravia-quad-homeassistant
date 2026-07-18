@@ -38,6 +38,7 @@ from custom_components.bravia_quad.grpc_media_player import (
     _PATH_TITLE,
     _PATH_VIRTUALIZER,
     _POSITION_WRITE_INTERVAL,
+    _POWER_COMMAND_MIN_INTERVAL_S,
     _TRANSPORT_FEATURE_BY_ACTION,
     BraviaGrpcMediaPlayer,
     _parse_available_values,
@@ -844,3 +845,30 @@ async def test_async_select_sound_mode_exec(
         string_value="Neural:X",
     )
     assert entity._attr_sound_mode == "neural_x"
+
+
+@pytest.mark.asyncio
+async def test_power_commands_rate_limited_to_once_per_interval(
+    grpc_client: MagicMock, entry: MagicMock
+) -> None:
+    entity = BraviaGrpcMediaPlayer(grpc_client, entry)
+    entity.hass = MagicMock()
+    entity.async_write_ha_state = MagicMock()
+
+    await entity.async_turn_off()
+    await entity.async_turn_on()
+    await entity.async_turn_off()
+
+    assert grpc_client.async_exec_denormalized.await_count == 1
+
+    with patch(
+        "custom_components.bravia_quad.grpc_media_player._POWER_COMMAND_MIN_INTERVAL_S",
+        0.05,
+    ):
+        entity._last_power_command_at = 0.0
+        await entity.async_turn_off()
+        await asyncio.sleep(0.08)
+        await entity.async_turn_on()
+
+    assert grpc_client.async_exec_denormalized.await_count == 3
+    assert _POWER_COMMAND_MIN_INTERVAL_S == 5.0
