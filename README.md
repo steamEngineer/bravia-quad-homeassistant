@@ -35,7 +35,7 @@ A Home Assistant custom integration for Sony Bravia Theatre home theater systems
 - **Audio settings** — voice enhancer, sound field, night mode, DRC, auto volume, HDMI CEC, auto standby
 - **Real-time updates** from the device where the transport supports notify/push
 - **gRPC extras** — now-playing metadata, sound field mode select, play/pause/next on Spotify/Bluetooth/AirPlay, DSEE Ultimate, 360SSM height, and more (see [docs/entities.md](docs/entities.md))
-- **Single device** — all entities nested under one Bravia Theatre device in Home Assistant
+- **Multiple Theatres** — zeroconf rediscovery matches by host or MAC so each device gets its own config entry; entities nest under one HA device per Theatre
 
 Full entity list: [docs/entities.md](docs/entities.md)
 
@@ -95,7 +95,7 @@ Compatibility depends on whether a device exposes the same control planes as the
 | BRAVIA Theatre Quad     | HT-A9M2      | WiFi/Ethernet  | gRPC ✓ · TCP ✓ (fw 001.454) |
 | BRAVIA Theatre A9       | HT-A9        | WiFi/Ethernet  | gRPC — · TCP ✓              |
 | BRAVIA Theatre Trio     | HT-A8        | WiFi/Ethernet  | gRPC * · TCP ✗              |
-| BRAVIA Theatre Bar 8    | HT-A8000     | WiFi/Ethernet  | gRPC — · TCP — (untested)   |
+| BRAVIA Theatre Bar 8    | HT-A8000     | WiFi/Ethernet  | gRPC * · TCP ✓              |
 | BRAVIA Theatre Bar 9    | HT-A9000     | WiFi/Ethernet  | gRPC — · TCP ✓              |
 | BRAVIA Theatre Bar 6    | HT-B600/BD60 | Bluetooth only | Incompatible                |
 | BRAVIA Theatre System 6 | HT-S60       | Bluetooth only | Incompatible                |
@@ -103,7 +103,7 @@ Compatibility depends on whether a device exposes the same control planes as the
 | HT-S2000                | HT-S2000     | Bluetooth only | Incompatible                |
 
 
-✓ = verified working · ✗ = not working · — = untested · \* = in progress ([#122](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/122) — path identified, further work required). Theatre Bar 9 TCP: [community report](https://community.home-assistant.io/t/custom-integration-sony-bravia-theatre-quad-bar-8-bar-9-control-testers-needed/972831/2). Quad gRPC/TCP detail: [transport verification](#transport-verification-ht-a9m2) below.
+✓ = verified working · ✗ = not working · — = untested · \* = in progress / partial ([#122](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/122) — Trio gRPC works with capability-gated entities; HT-A8-oriented controls ship disabled by default pending live confirmation — see [docs/entities.md](docs/entities.md); [#176](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/176) — Bar 8 gRPC setup reported working, feature parity not fully mapped). Theatre Bar 9 TCP: [community report](https://community.home-assistant.io/t/custom-integration-sony-bravia-theatre-quad-bar-8-bar-9-control-testers-needed/972831/2). Quad gRPC/TCP detail: [transport verification](#transport-verification-ht-a9m2) below.
 
 **Feedback from owners of untested models is welcome**. For Sony's full product list, see the [Sony support article](https://www.sony.com/electronics/support/articles/00305900).
 
@@ -114,7 +114,7 @@ Compatibility depends on whether a device exposes the same control planes as the
 | -------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
 | Power, volume, mute, input source                                    | Read/write + push          | Read/write + live notify                                                                                                          |
 | Rear level; bass level (no sub)                                      | Read/write + push          | Read/write + notify                                                                                                               |
-| Voice enhancer, night mode, sound field on/off                       | Read/write + push          | Read/write + notify                                                                                                               |
+| Voice enhancer, night mode, sound field on/off                       | Read/write + push          | Read/write + notify; empty GetStates bools can be seeded via Seeds when `grpc_seeds_poll` is on                                    |
 | HDMI CEC, dual mono, BT connection quality                           | Read/write + push          | Read/write                                                                                                                        |
 | IMAX Enhanced, AV sync (HDMI / TV)                                   | Read/write + push          | Read/write                                                                                                                        |
 | DRC, auto volume                                                     | Read/write + push          | Write verified; **not readable** over gRPC on fw 001.454 — HA seeds from TCP, restore, or last write                              |
@@ -122,14 +122,16 @@ Compatibility depends on whether a device exposes the same control planes as the
 | HDMI standby through, auto standby, auto update, external control | Read/write + push          | Write verified; **not readable** over gRPC — same seeding; entities ship **disabled by default** until confirmed on your firmware |
 | Subwoofer level (with sub)                                           | Read/write + push (number) | Read/write (gRPC-only entity)                                                                                                     |
 | Detect subwoofer (diagnostic)                                        | TCP probe                  | gRPC GetStates probe                                                                                                              |
-| Firmware update                                                      | HTTP sensor                | HTTP sensor                                                                                                                       |
+| Firmware update                                                      | HTTP (probe-gated)         | HTTP (probe-gated) — created only when management FCGI on `:54545` responds                                                       |
 
+
+Mapped gRPC switch/select/number/sensor entities are created when `GetCapabilities` advertises the path (notify-only / Seeds paths are exempt). Models without a path omit that entity — see [docs/entities.md](docs/entities.md).
 
 **TCP only** (no confirmed gRPC path): Bluetooth pairing button, HDMI passthrough, temperature, 360SSM sensor, network mode / DHCP / region / language diagnostics.
 
-**gRPC only** (not on legacy TCP plane): sound field **mode** select (`Dolby Speaker Virtualizer`, `Neural:X`, `360SSM`), now-playing metadata and playback attributes, play/pause/next on Spotify / Bluetooth / AirPlay, DSEE Ultimate, 360SSM height, center speaker mode, DTS Dialog Control, voice zoom on/off and level, room calibration (RAEE) sensor.
+**gRPC only** (not on legacy TCP plane): sound field **mode** select (`Dolby Speaker Virtualizer`, `Neural:X`, `360SSM`), now-playing metadata and playback attributes, play/pause/next on Spotify / Bluetooth / AirPlay, DSEE Ultimate, 360SSM height, HDMI Signal Format (Seeds / restore), center speaker mode, DTS Dialog Control, voice zoom on/off and level, room calibration (RAEE) sensor.
 
-On gRPC, AirPlay is **detect-only** — it appears when a client casts; it cannot be selected via command. DSEE Ultimate and 360SSM height have no TCP read fallback — gRPC write only, with HA restore or last-write cache for display. Other notify-only settings may show `unknown` until changed, restored, or seeded — see [notify-only paths](docs/sony-grpc-reference.md#notify-only-paths).
+On gRPC, AirPlay is **detect-only** — it appears when a client casts; it cannot be selected via command. DSEE Ultimate, 360SSM height, and HDMI Signal Format have no TCP read fallback — gRPC write only, with Seeds (when enabled), HA restore, or last-write cache for display. Other notify-only settings may show `unknown` until changed, restored, or seeded — see [notify-only paths](docs/sony-grpc-reference.md#notify-only-paths).
 
 Full entity mapping and parity gaps: [docs/grpc-tcp-mapping.md](docs/grpc-tcp-mapping.md)
 

@@ -118,7 +118,7 @@ GitHub Actions on every pull request:
 
 CI installs Python from [`.python-version`](../.python-version). `requires-python` in `pyproject.toml` is the install floor (aligned with Home Assistant Core) and is bumped manually when HA raises its minimum.
 
-Release workflow validates version format, updates `pyproject.toml` and `manifest.json`, tags, and publishes GitHub releases.
+Releases: Release Drafter drafts notes on `main`; publishing a GitHub release runs the archive workflow (stamps `manifest.json` in the zip asset). See [RELEASES.md](../RELEASES.md).
 
 Dependencies are kept up to date via [Renovate](https://docs.renovatebot.com/) (GitHub Actions, Python packages).
 

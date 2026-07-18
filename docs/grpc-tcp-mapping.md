@@ -81,7 +81,7 @@ Startup sequence in [`__init__.py`](../custom_components/bravia_quad/__init__.py
 2. Per-path backfill for entity-critical paths still unset ([`async_backfill_entity_paths`](../custom_components/bravia_quad/bravia_grpc_client.py))
 3. **Seeds seed** when `grpc_seeds_poll` enabled ([`grpc_seeds_seed.py`](../custom_components/bravia_quad/grpc_seeds_seed.py)) — preferred in gRPC mode (works on HT-A8 where TCP is blocked). Seeds fills unset **NOTIFY-only** paths and **empty-wire GetStates bools** (Voice Enhancer, Night Mode, Sound Field, Mute). Otherwise TCP seed ([`grpc_tcp_seed.py`](../custom_components/bravia_quad/grpc_tcp_seed.py)) for paths with `tcp_feature` mappings still unset, **only if** the external-control probe found `:33336` reachable
 4. Start notify stream + path-aware warmup (up to 3s for missing entity paths)
-5. Platform setup reads `notify_state`; HA restore fills gaps where device sends no initial value
+5. Platform setup reads `notify_state`; HA restore fills remaining gaps where device and Seeds/TCP seed sent no value. **Seeds/TCP seed wins over restore** for notify-only and empty-wire paths when a seed value is present (avoids stale restored state after an app-side change)
 
 NOTIFY-only paths and empty-wire bools may remain `unknown` until Seeds/TCP seed succeeds, the device pushes a notify delta, or HA restores the last persisted state — enable Seeds cloud reads on gRPC transport when possible ([seeds-cloud-states.md](seeds-cloud-states.md)).
 
@@ -100,6 +100,18 @@ NOTIFY-only paths and empty-wire bools may remain `unknown` until Seeds/TCP seed
 | HDMI CEC power-off sync | — | `system_setting.cec_power_off_sync` | select |
 | HDMI Signal Format | — | `system_setting.hdmi_signal_format` | select (`standard`, `enhanced`, `enhanced_4k120_8k`) |
 | IP address | `network.ipaddress` | `system_setting.ipv4_address` | sensor |
+
+### Capability-gated (model-specific)
+
+Created only when `GetCapabilities` advertises the path. Advertised on HT-A8-class firmware; typically absent on HT-A9M2. Ship **disabled by default** until confirmed on your model — see [entities.md](entities.md).
+
+| HA entity | TCP feature | gRPC path | Platform |
+|-----------|-------------|-----------|----------|
+| Rear left battery | — | `battery.life.rl` | sensor (0–100%) |
+| Rear right battery | — | `battery.life.rr` | sensor (0–100%) |
+| Mix stage | — | `sound_setting.mix_stage` | switch |
+| Stereo playback | — | `sound_setting.stereo_playback` | select (`up_mix`, `multi_stereo`) |
+| Subwoofer phase | — | `speaker_sound_setting.sw_phase` | select (`0`, `180`, dual-sub pair values) |
 
 gRPC always exposes both the −10…10 subwoofer number and the bass min/mid/max select. Availability flips with live link status (`speaker_connection_setting.connection_status.sw`): linked → subwoofer available / bass unavailable; unlinked → the reverse. Not from Seeds and not from a TCP `:33336` probe.
 

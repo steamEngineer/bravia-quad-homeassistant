@@ -34,6 +34,7 @@ Quick reference for the BRAVIA Connect gRPC transport used in gRPC mode. See als
 - Only advertised `name` values are used for filtering (props are ignored for path allowlists).
 - Order follows the HA path list; capability-only paths are never added.
 - If the RPC fails or the intersection is empty, GetStates keeps the full static list (soft fallback) so known-good Quad behavior is preserved.
+- **Mapped HA entities** (switch/select/number/sensor from [grpc-tcp-mapping.md](grpc-tcp-mapping.md)) are created only when the path is advertised. Notify-only / Seeds paths are exempt and still created. Soft-fallback when capabilities were not fetched (same as GetStates), except wired MAC — that diagnostic requires a positive advertisement. Stale registry rows for gated entities omitted this run are pruned on setup — see [entities.md](entities.md).
 - Notify-only settings (for example DRC, DSEE Ultimate, eARC) are often omitted from capabilities on current firmware — they stay off the GetStates batch; Seeds cloud reads / HA restore still supply initial state ([seeds-cloud-states.md](seeds-cloud-states.md)).
 - `StartNotifyStates` is session-scoped and does not take a path list; notify is unchanged.
 
