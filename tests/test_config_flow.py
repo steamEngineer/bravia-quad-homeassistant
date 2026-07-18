@@ -340,11 +340,13 @@ async def test_user_flow_grpc_success(
     assert result["data"][CONF_GRPC_KEYS] == TEST_GRPC_KEYS
 
 
-def _zeroconf_discovery_info(**properties: str) -> ZeroconfServiceInfo:
+def _zeroconf_discovery_info(
+    host: str = TEST_HOST, **properties: str
+) -> ZeroconfServiceInfo:
     """Build zeroconf discovery info for tests."""
     return ZeroconfServiceInfo(
-        ip_address=make_ip_address(TEST_HOST),
-        ip_addresses=[make_ip_address(TEST_HOST)],
+        ip_address=make_ip_address(host),
+        ip_addresses=[make_ip_address(host)],
         port=7000,
         hostname="bravia-quad.local",
         type="_airplay._tcp.local.",
@@ -460,6 +462,69 @@ async def test_zeroconf_discovery_already_configured_by_mac(
             CONF_HAS_SUBWOOFER: True,
         },
         unique_id=TEST_MAC_FORMATTED,
+    )
+    existing_entry.add_to_hass(hass)
+
+    discovery_info = _zeroconf_discovery_info(
+        model="Bravia Theatre Quad",
+        deviceid="60:FF:9E:12:34:56",
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
+    )
+
+    assert result["type"] is FlowResultType.ABORT
+    assert result["reason"] == "already_configured"
+    assert existing_entry.data[CONF_HOST] == TEST_HOST
+
+
+async def test_zeroconf_second_device_not_aborted_when_serial_entry_exists(
+    hass: HomeAssistant,
+) -> None:
+    """Test a second Theatre is not treated as the first serial-based entry."""
+    existing_entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bravia Quad",
+        data={
+            CONF_HOST: TEST_HOST,
+            CONF_MAC: TEST_MAC_FORMATTED,
+            CONF_SERIAL: TEST_SERIAL,
+            CONF_HAS_SUBWOOFER: True,
+        },
+        unique_id=TEST_SERIAL,
+    )
+    existing_entry.add_to_hass(hass)
+
+    discovery_info = _zeroconf_discovery_info(
+        host="192.168.1.200",
+        model="Bravia Theatre A8",
+        deviceid="AA:BB:CC:DD:EE:FF",
+    )
+
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": SOURCE_ZEROCONF}, data=discovery_info
+    )
+
+    assert result["type"] is FlowResultType.FORM
+    assert result["step_id"] == "zeroconf_confirm"
+    assert existing_entry.data[CONF_HOST] == TEST_HOST
+
+
+async def test_zeroconf_rediscovery_matches_serial_entry_by_mac(
+    hass: HomeAssistant,
+) -> None:
+    """Test rediscovery updates host for a serial unique_id entry matched by MAC."""
+    existing_entry = MockConfigEntry(
+        domain=DOMAIN,
+        title="Bravia Quad",
+        data={
+            CONF_HOST: "192.168.1.50",
+            CONF_MAC: TEST_MAC_FORMATTED,
+            CONF_SERIAL: TEST_SERIAL,
+            CONF_HAS_SUBWOOFER: True,
+        },
+        unique_id=TEST_SERIAL,
     )
     existing_entry.add_to_hass(hass)
 
