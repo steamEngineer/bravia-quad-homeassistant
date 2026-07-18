@@ -32,6 +32,7 @@ from .const import (
     FEATURE_VOLUME,
     HDMI_CEC_OFF,
     HDMI_CEC_ON,
+    HDMI_SIGNAL_FORMAT_OPTIONS,
     HDMI_STANDBY_LINK_OPTIONS,
     IMAX_MODE_OPTIONS,
     INPUT_OPTIONS,
@@ -242,6 +243,7 @@ def normalize_grpc_value(  # noqa: PLR0915
     if grpc_path in (
         "system_setting.cec_power_off_sync",
         "system_setting.dimmer",
+        "system_setting.hdmi_signal_format",
     ):
         return str(raw_value)
 
@@ -457,6 +459,8 @@ def ha_options_for_mapping(mapping: GrpcTcpMapping) -> list[str] | None:
         return list(SOUND_EFFECT_OPTIONS)
     if mapping.grpc_path == "system_setting.dimmer":
         return list(DIMMER_OPTIONS)
+    if mapping.grpc_path == "system_setting.hdmi_signal_format":
+        return list(HDMI_SIGNAL_FORMAT_OPTIONS)
     if mapping.grpc_path == "sound_setting.stereo_playback":
         return list(STEREO_PLAYBACK_OPTIONS)
     if mapping.grpc_path == "speaker_sound_setting.sw_phase":

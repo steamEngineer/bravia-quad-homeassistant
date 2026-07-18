@@ -58,6 +58,7 @@ gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gR
 | `switch.bravia_quad_*_audio_return_channel` | Switch | HDMI ARC (TV) / audio return | on/off | Seeds / restore; TCP keeps tri-state select |
 | `select.bravia_quad_*_cec_power_off_sync` | Select | HDMI CEC power-off sync | auto, on, off | gRPC-only |
 | `select.bravia_quad_*_display_brightness` | Select | Display brightness | bright, dark, off | Seeds / restore; gRPC-only |
+| `select.bravia_quad_*_hdmi_signal_format` | Select | HDMI Signal Format | standard, enhanced, enhanced_4k120_8k | Seeds / restore; gRPC-only |
 | `switch.bravia_quad_*_dsee_ultimate` | Switch | DSEE Ultimate | on/off | Seeds / restore; gRPC-only |
 | `select.bravia_quad_*_ssm_360_height` | Select | 360SSM height | high, mid, low | Seeds / restore; gRPC-only |
 | `select.bravia_quad_*_center_speaker_mode` | Select | Center speaker mode | off, on | Disabled by default; gRPC-only |

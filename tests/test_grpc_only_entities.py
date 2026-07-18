@@ -25,6 +25,7 @@ from custom_components.bravia_quad.helpers import (
 
 GRPC_PATH_DSEE = "sound_setting.dsee_ultimate"
 GRPC_PATH_DIMMER = "system_setting.dimmer"
+GRPC_PATH_HDMI_SIGNAL_FORMAT = "system_setting.hdmi_signal_format"
 GRPC_PATH_DRC = "sound_setting.drc"
 GRPC_PATH_AUTO_VOLUME = "sound_setting.auto_volume"
 GRPC_PATH_DTS_DIALOG = "sound_setting.dts_dialog_control"
@@ -201,6 +202,33 @@ async def test_dimmer_restores_on_added_to_hass(
 
     assert entity._attr_current_option == "dark"
     grpc_client.merge_notify_cache.assert_called_once_with({GRPC_PATH_DIMMER: "dark"})
+
+
+@pytest.mark.asyncio
+async def test_hdmi_signal_format_restores_on_added_to_hass(
+    hass: HomeAssistant, grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    spec = entity_spec_for_path(GRPC_PATH_HDMI_SIGNAL_FORMAT)
+    assert spec is not None
+    entity = BraviaGrpcMappedSelect(grpc_client, grpc_entry, spec)
+    entity.entity_id = f"select.{DOMAIN}_serial123_hdmi_signal_format"
+    entity.hass = hass
+    entity.async_write_ha_state = MagicMock()
+    grpc_client.merge_notify_cache = MagicMock()
+    grpc_client.notify_state = {}
+
+    async_get(hass).last_states[entity.entity_id] = StoredState(
+        State(entity.entity_id, "enhanced_4k120_8k"),
+        None,
+        datetime.now(tz=UTC),
+    )
+
+    await entity.async_added_to_hass()
+
+    assert entity._attr_current_option == "enhanced_4k120_8k"
+    grpc_client.merge_notify_cache.assert_called_once_with(
+        {GRPC_PATH_HDMI_SIGNAL_FORMAT: "enhanced_4k120_8k"}
+    )
 
 
 @pytest.mark.asyncio

@@ -256,10 +256,11 @@ def test_note_external_control_ensure_sets_tcp_reachable() -> None:
 def test_seeds_seed_paths_cover_notify_only_and_sound_effect() -> None:
     assert "sound_setting.drc" in SEEDS_SEED_PATHS
     assert "system_setting.dimmer" in SEEDS_SEED_PATHS
+    assert "system_setting.hdmi_signal_format" in SEEDS_SEED_PATHS
     assert "sound_setting.sound_effect" in SEEDS_SEED_PATHS
     assert "sound_setting.voice_mode" in SEEDS_SEED_PATHS
     assert "sound_setting.night_mode" in SEEDS_SEED_PATHS
-    assert len(SEEDS_SEED_PATHS) == 15
+    assert len(SEEDS_SEED_PATHS) == 16
 
 
 @pytest.mark.asyncio
