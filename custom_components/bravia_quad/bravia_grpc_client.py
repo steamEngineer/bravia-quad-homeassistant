@@ -521,17 +521,11 @@ class BraviaGrpcClientAsync:
         return len(snapshot)
 
     def _sync_feature_unavailable_reasons_from_cache(self) -> None:
-        """Merge real reasons from notify_state into persist map; write later."""
+        """Persist export of real reasons from notify_state (debounced)."""
         exported = self._client.export_feature_unavailable_reasons()
-        merged = dict(self._feature_unavailable_reasons)
-        merged.update(exported)
-        # Drop only when a real→none clear stuck (not immediately re-restored).
-        for path in getattr(self._client, "last_cleared_unavailable_reasons", ()):
-            if path not in exported:
-                merged.pop(path, None)
-        if merged == self._feature_unavailable_reasons:
+        if exported == self._feature_unavailable_reasons:
             return
-        self._feature_unavailable_reasons = merged
+        self._feature_unavailable_reasons = exported
         persist = self._persist_feature_reasons
         if persist is None or self._hass is None:
             return
@@ -546,19 +540,6 @@ class BraviaGrpcClientAsync:
             await persist(reasons)
 
         self._persist_feature_reasons_task = self._hass.async_create_task(_persist())
-
-    def reapply_persisted_feature_unavailable_reasons(self) -> int:
-        """Re-apply sticky persist map into notify_state (post-seed / post-wipe)."""
-        restored = self._client.apply_persisted_feature_unavailable_reasons(
-            self._feature_unavailable_reasons
-        )
-        if restored:
-            self._debug(
-                "Re-applied %d persisted feature unavailable_reason values on %s",
-                restored,
-                self.host,
-            )
-        return restored
 
     async def async_backfill_entity_paths(self) -> tuple[int, int, int]:
         """
@@ -967,8 +948,6 @@ class BraviaGrpcClientAsync:
                     self.schedule_seeds_refresh()
                 if states.path.endswith((".unavailable_reason", ".availability")):
                     self._sync_feature_unavailable_reasons_from_cache()
-                    # Restore persist if a none-clear slipped past sticky.
-                    self.reapply_persisted_feature_unavailable_reasons()
                 for callback in self._state_callbacks:
                     try:
                         callback(states)

@@ -13,11 +13,6 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import Entity
 
 from .const import DOMAIN, MAX_VOLUME_STEP_INTERVAL
-from .grpc_value_normalize import (
-    feature_availability_path,
-    feature_unavailable_reason_path,
-    grpc_exec_unavailable_reason,
-)
 from .helpers import require_unique_id
 
 if TYPE_CHECKING:
@@ -191,35 +186,6 @@ class BraviaGrpcPathMixin(BraviaGrpcAvailabilityMixin):
         cached = self._grpc_client.notify_state.get(self._grpc_path)
         if cached is not None:
             await self._on_grpc_state(cached)
-
-
-class BraviaGrpcFeatureAvailabilityMixin(BraviaGrpcPathMixin):
-    """
-    Path mixin that greys out when the device reports feature unavailability.
-
-    Media player stays on BraviaGrpcPathMixin — greying the whole player for
-    source/command metadata is intentionally out of scope.
-    """
-
-    @property
-    def available(self) -> bool:
-        """Require gRPC session and no device feature unavailability reason."""
-        if not super().available:
-            return False
-        reason = grpc_exec_unavailable_reason(
-            self._grpc_client.notify_state, self._grpc_path
-        )
-        return reason is None
-
-    def _grpc_state_callback(self, update: Any) -> None:
-        """Refresh on value path and sibling availability metadata."""
-        if update.path in (
-            feature_availability_path(self._grpc_path),
-            feature_unavailable_reason_path(self._grpc_path),
-        ):
-            self.async_write_ha_state()
-            return
-        super()._grpc_state_callback(update)
 
 
 class VolumeStepClient(Protocol):

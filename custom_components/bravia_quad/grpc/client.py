@@ -121,7 +121,6 @@ class BraviaGrpcClient:
         self._capability_index: dict[str, CapabilityMeta] | None = None
         self.last_rpc_error: str | None = None
         self.last_error_is_transport = False
-        self.last_cleared_unavailable_reasons: tuple[str, ...] = ()
 
     @property
     def notify_state(self) -> dict[str, Any]:
@@ -172,15 +171,7 @@ class BraviaGrpcClient:
     def _should_retain_unavailable_reason(
         self, path: str, new_value: Any, pending: dict[str, Any]
     ) -> bool:
-        """
-        Keep a real unavailable_reason when notify/GetStates sends ``none``.
-
-        Device streams often emit ``unavailable_reason=none`` without
-        ``availability=True`` while the feature is still blocked (Voice Zoom
-        transitions). Only honor a clear when availability is True (pending
-        wins over cache so a same-batch GetStates True+none can clear; notify
-        delivers the two fields as separate deltas, so cache True still counts).
-        """
+        """Keep a real reason over ``none`` unless availability is True."""
         if not path.endswith(".unavailable_reason"):
             return False
         if not self._is_clearing_unavailable_reason(new_value):
@@ -207,13 +198,7 @@ class BraviaGrpcClient:
     def apply_persisted_feature_unavailable_reasons(
         self, persisted: dict[str, Any] | None
     ) -> int:
-        """
-        Re-apply last-known real reasons after GetStates seed.
-
-        Bulk GetStates / reload often lands ``unavailable_reason=none`` with
-        ``availability`` null; notify may not re-emit until an input change.
-        Single-path GetStates for metadata fails with UNKNOWN on this firmware.
-        """
+        """Re-apply last-known real reasons after GetStates seed; scrub stale True."""
         if not persisted:
             return 0
         applied = 0
@@ -229,22 +214,17 @@ class BraviaGrpcClient:
                 continue
             base = path[: -len(".unavailable_reason")]
             avail_path = f"{base}.availability"
-            # Restore over GetStates ``True``+``none`` lies; scrub stale True so a
-            # later notify ``none`` delta cannot clear via cached availability.
             self._notify_state[path] = str(reason)
             self._notify_state.pop(avail_path, None)
             applied += 1
         return applied
 
     def update_notify_cache(self, updates: dict[str, Any]) -> None:
-        """Merge path values into the notify cache."""
-        self.last_cleared_unavailable_reasons = ()
+        """Merge path values into the notify cache (sticky unavailable_reason)."""
         if not updates:
             return
         pending = dict(updates)
-        # Bulk GetStates often pairs availability=True with reason=none while the
-        # feature is still blocked. Scrub that True so sticky/persist can hold.
-        # Single-path notify deltas (len==1) are left alone for True-then-none.
+        # Bulk GetStates True+none scrub; single-path notify left alone for True-then-none.
         if len(pending) > 1:
             for path, value in list(pending.items()):
                 if not path.endswith(".unavailable_reason"):
@@ -254,21 +234,11 @@ class BraviaGrpcClient:
                 avail_path = f"{path[: -len('.unavailable_reason')]}.availability"
                 if pending.get(avail_path) is True:
                     pending[avail_path] = None
-        filtered: dict[str, Any] = {}
-        cleared: list[str] = []
-        for path, value in pending.items():
-            if self._should_retain_unavailable_reason(path, value, pending):
-                continue
-            old = self._notify_state.get(path)
-            if (
-                path.endswith(".unavailable_reason")
-                and self._is_clearing_unavailable_reason(value)
-                and old is not None
-                and not self._is_clearing_unavailable_reason(old)
-            ):
-                cleared.append(path)
-            filtered[path] = value
-        self.last_cleared_unavailable_reasons = tuple(cleared)
+        filtered = {
+            path: value
+            for path, value in pending.items()
+            if not self._should_retain_unavailable_reason(path, value, pending)
+        }
         if filtered:
             self._notify_state.update(filtered)
 

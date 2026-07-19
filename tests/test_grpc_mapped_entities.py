@@ -330,12 +330,6 @@ def test_apply_persisted_feature_unavailable_reasons_over_none_seed() -> None:
         == "unsupported_tv"
     )
     assert client.notify_state.get("sound_setting.voice_zoom.availability") is not True
-    # Later none-only notify must not clear without a fresh availability=True.
-    client.update_notify_cache({"sound_setting.voice_zoom.unavailable_reason": "none"})
-    assert (
-        client.notify_state["sound_setting.voice_zoom.unavailable_reason"]
-        == "unsupported_tv"
-    )
     assert client.export_feature_unavailable_reasons() == {
         "sound_setting.voice_zoom.unavailable_reason": "unsupported_tv"
     }
@@ -481,15 +475,6 @@ def test_battery_life_unavailable_for_sentinel_or_flag(
     grpc_client.notify_state = {
         "battery.life.rl": 40,
         "battery.life.rl.availability": False,
-    }
-    assert sensor.available is False
-
-    # False+none is unavailable for mapped features (AirPlay quirk is
-    # playback_command-only).
-    grpc_client.notify_state = {
-        "battery.life.rl": 40,
-        "battery.life.rl.availability": False,
-        "battery.life.rl.unavailable_reason": "none",
     }
     assert sensor.available is False
 

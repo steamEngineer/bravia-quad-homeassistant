@@ -237,8 +237,6 @@ async def async_setup_grpc_client(
         await grpc_client.async_backfill_entity_paths()
         await grpc_client.async_start_notify()
         await grpc_client.async_warmup_notify()
-        # Notify warmup / brief stream can land ``none`` after seed restore.
-        grpc_client.reapply_persisted_feature_unavailable_reasons()
         _LOGGER.info("gRPC notify stream started for %s", entry.data["host"])
     except ConfigEntryAuthFailed:
         await grpc_client.async_disconnect()
