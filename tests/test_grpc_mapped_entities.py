@@ -22,12 +22,15 @@ from custom_components.bravia_quad.grpc_entity_registry import (
 )
 from custom_components.bravia_quad.grpc_mapped_entities import (
     BraviaGrpcBassLevelSelect,
+    BraviaGrpcFeatureAvailabilitySensor,
     BraviaGrpcMappedSelect,
     BraviaGrpcMappedSwitch,
+    mapped_feature_unavailable_reason,
     mapped_number_entities,
     mapped_select_entities,
     mapped_sensor_entities,
     mapped_switch_entities,
+    tracked_feature_specs,
 )
 from custom_components.bravia_quad.grpc_mapping import (
     mapping_for_grpc_path,
@@ -245,6 +248,18 @@ def test_voice_zoom_none_reason_is_available() -> None:
     )
 
 
+def test_voice_zoom_false_availability_none_reason_is_unavailable() -> None:
+    """Mapped features: False+none blocks (playback Spotify quirk is scoped)."""
+    notify_state = {
+        "sound_setting.voice_zoom.availability": False,
+        "sound_setting.voice_zoom.unavailable_reason": "none",
+    }
+    assert (
+        grpc_exec_unavailable_reason(notify_state, "sound_setting.voice_zoom.on_off")
+        == "unavailable"
+    )
+
+
 def test_playback_command_false_availability_none_reason_is_available() -> None:
     notify_state = {
         "playback_control.playback_command.availability": False,
@@ -259,6 +274,11 @@ def test_playback_command_false_availability_none_reason_is_available() -> None:
 def _entity_suffixes(entities: list, grpc_entry: MagicMock) -> set[str]:
     prefix = f"{grpc_entry.unique_id}_"
     return {e._attr_unique_id.removeprefix(prefix) for e in entities}
+
+
+def _mapped_grpc_paths(entities: list) -> set[str]:
+    """Collect value paths from path-mapped entities (skip diagnostic aggregates)."""
+    return {e._grpc_path for e in entities if hasattr(e, "_grpc_path")}
 
 
 def test_factories_omit_quad_only_when_absent_from_caps(
@@ -277,15 +297,9 @@ def test_factories_omit_quad_only_when_absent_from_caps(
             "system_setting.cec_power_off_sync",
         }
     )
-    select_paths = {
-        e._grpc_path for e in mapped_select_entities(grpc_client, grpc_entry)
-    }
-    sensor_paths = {
-        e._grpc_path for e in mapped_sensor_entities(grpc_client, grpc_entry)
-    }
-    switch_paths = {
-        e._grpc_path for e in mapped_switch_entities(grpc_client, grpc_entry)
-    }
+    select_paths = _mapped_grpc_paths(mapped_select_entities(grpc_client, grpc_entry))
+    sensor_paths = _mapped_grpc_paths(mapped_sensor_entities(grpc_client, grpc_entry))
+    switch_paths = _mapped_grpc_paths(mapped_switch_entities(grpc_client, grpc_entry))
     assert "speaker_sound_setting.center_speaker_mode" not in select_paths
     assert "system_setting.wifi_mac_address_wired" not in sensor_paths
     assert "sound_setting.drc" in select_paths
@@ -327,9 +341,9 @@ def test_factories_create_a8_paths_when_in_caps(
     sensors = mapped_sensor_entities(grpc_client, grpc_entry)
     selects = mapped_select_entities(grpc_client, grpc_entry)
     switches = mapped_switch_entities(grpc_client, grpc_entry)
-    sensor_paths = {e._grpc_path for e in sensors}
-    select_paths = {e._grpc_path for e in selects}
-    switch_paths = {e._grpc_path for e in switches}
+    sensor_paths = _mapped_grpc_paths(sensors)
+    select_paths = _mapped_grpc_paths(selects)
+    switch_paths = _mapped_grpc_paths(switches)
 
     assert sensor_paths >= {"battery.life.rl", "battery.life.rr"}
     assert select_paths >= {
@@ -340,7 +354,7 @@ def test_factories_create_a8_paths_when_in_caps(
     assert all(
         isinstance(e, BraviaGrpcBatteryLifeSensor)
         for e in sensors
-        if e._grpc_path.startswith("battery.life.")
+        if getattr(e, "_grpc_path", "").startswith("battery.life.")
     )
 
     stereo = mapping_for_grpc_path("sound_setting.stereo_playback")
@@ -400,20 +414,23 @@ def test_battery_life_unavailable_for_sentinel_or_flag(
     }
     assert sensor.available is False
 
+    # False+none is unavailable for mapped features (AirPlay quirk is
+    # playback_command-only).
+    grpc_client.notify_state = {
+        "battery.life.rl": 40,
+        "battery.life.rl.availability": False,
+        "battery.life.rl.unavailable_reason": "none",
+    }
+    assert sensor.available is False
+
 
 def test_factories_soft_fallback_includes_quad_only_when_caps_none(
     grpc_client: MagicMock, grpc_entry: MagicMock
 ) -> None:
     grpc_client.capability_paths = None
-    select_paths = {
-        e._grpc_path for e in mapped_select_entities(grpc_client, grpc_entry)
-    }
-    sensor_paths = {
-        e._grpc_path for e in mapped_sensor_entities(grpc_client, grpc_entry)
-    }
-    switch_paths = {
-        e._grpc_path for e in mapped_switch_entities(grpc_client, grpc_entry)
-    }
+    select_paths = _mapped_grpc_paths(mapped_select_entities(grpc_client, grpc_entry))
+    sensor_paths = _mapped_grpc_paths(mapped_sensor_entities(grpc_client, grpc_entry))
+    switch_paths = _mapped_grpc_paths(mapped_switch_entities(grpc_client, grpc_entry))
     assert "speaker_sound_setting.center_speaker_mode" in select_paths
     # Wired MAC requires a positive GetCapabilities hit (no soft-allow).
     assert "system_setting.wifi_mac_address_wired" not in sensor_paths
@@ -614,4 +631,144 @@ async def test_notify_only_mapped_select_restores_on_added(
     assert entity._attr_current_option == "auto"
     grpc_client.merge_notify_cache.assert_called_once_with(
         {"sound_setting.drc": "auto"}
+    )
+
+
+def test_mapped_switch_unavailable_when_feature_blocked(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    mapping = mapping_for_grpc_path("sound_setting.sound_field")
+    assert mapping is not None
+    spec = entity_spec_for_mapping(mapping)
+    entity = BraviaGrpcMappedSwitch(grpc_client, grpc_entry, spec)
+    entity.async_write_ha_state = MagicMock()
+
+    assert entity.available is True
+
+    grpc_client.notify_state = {
+        "sound_setting.sound_field.availability": False,
+        "sound_setting.sound_field.unavailable_reason": "unsupported_tv",
+    }
+    assert entity.available is False
+
+    grpc_client.notify_state = {
+        "sound_setting.sound_field.availability": False,
+        "sound_setting.sound_field.unavailable_reason": "none",
+    }
+    assert entity.available is False
+
+
+def test_mapped_switch_sibling_availability_notify_refreshes(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    mapping = mapping_for_grpc_path("sound_setting.sound_field")
+    assert mapping is not None
+    entity = BraviaGrpcMappedSwitch(
+        grpc_client, grpc_entry, entity_spec_for_mapping(mapping)
+    )
+    entity.async_write_ha_state = MagicMock()
+    update = MagicMock()
+    update.path = "sound_setting.sound_field.availability"
+    update.value = False
+    entity._grpc_state_callback(update)
+    entity.async_write_ha_state.assert_called_once()
+
+
+def test_mapped_switch_session_disconnect_wins(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    mapping = mapping_for_grpc_path("sound_setting.sound_field")
+    assert mapping is not None
+    entity = BraviaGrpcMappedSwitch(
+        grpc_client, grpc_entry, entity_spec_for_mapping(mapping)
+    )
+    grpc_client.is_connected = False
+    grpc_client.notify_state = {}
+    assert entity.available is False
+
+
+def test_bass_unavailable_on_broadcast_even_when_unlinked(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    """Link rule ANDs with device broadcast availability."""
+    grpc_client.notify_state = {
+        "speaker_connection_setting.connection_status.sw": "disconnected",
+        "sound_setting.volume.bass.availability": False,
+        "sound_setting.volume.bass.unavailable_reason": "unavailable",
+    }
+    bass = next(
+        e
+        for e in mapped_select_entities(grpc_client, grpc_entry)
+        if e._attr_unique_id.endswith("_bass_level_select")
+    )
+    assert bass.available is False
+
+
+def test_feature_availability_sensor_counts_and_attrs(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    grpc_client.capability_paths = frozenset(
+        {
+            "power",
+            "sound_setting.sound_field",
+            "sound_setting.voice_zoom.on_off",
+            "sound_setting.volume.bass",
+            "sound_setting.volume.subwoofer",
+        }
+    )
+    grpc_client.notify_state = {
+        "sound_setting.sound_field.unavailable_reason": "unsupported_tv",
+        "sound_setting.voice_zoom.unavailable_reason": "unsupported_tv",
+        "speaker_connection_setting.connection_status.sw": "disconnected",
+    }
+    sensors = mapped_sensor_entities(grpc_client, grpc_entry)
+    diag = next(
+        e for e in sensors if isinstance(e, BraviaGrpcFeatureAvailabilitySensor)
+    )
+    assert diag.available is True
+    assert diag.native_value == 3
+    attrs = diag.extra_state_attributes
+    assert attrs["sound_field"] == "unsupported_tv"
+    assert attrs["voice_zoom"] == "unsupported_tv"
+    assert attrs["subwoofer_level"] == "subwoofer_unlinked"
+    assert "bass_level_select" not in attrs
+
+    grpc_client.notify_state = {
+        "speaker_connection_setting.connection_status.sw": "connected",
+    }
+    diag._refresh_from_notify()
+    assert diag.native_value == 1
+    assert diag.extra_state_attributes == {
+        "bass_level_select": "subwoofer_linked",
+    }
+
+    grpc_client.is_connected = False
+    assert diag.available is False
+
+
+def test_feature_availability_watch_set_respects_capabilities(
+    grpc_client: MagicMock,
+) -> None:
+    grpc_client.capability_paths = frozenset({"power", "volume"})
+    tracked = dict(tracked_feature_specs(grpc_client))
+    assert "power" in tracked
+    assert "volume" in tracked
+    assert "battery_life_rl" not in tracked
+    assert "sound_field" not in tracked
+
+
+def test_mapped_feature_unavailable_reason_helper() -> None:
+    assert (
+        mapped_feature_unavailable_reason(
+            {"sound_setting.sound_field.unavailable_reason": "unsupported_tv"},
+            "sound_setting.sound_field",
+        )
+        == "unsupported_tv"
+    )
+    assert (
+        mapped_feature_unavailable_reason(
+            {"battery.life.rl": -1},
+            "battery.life.rl",
+        )
+        == "unavailable"
     )

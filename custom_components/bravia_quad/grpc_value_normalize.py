@@ -326,6 +326,19 @@ def exec_base_path(command_path: str) -> str:
     return command_path
 
 
+def feature_availability_path(value_path: str) -> str:
+    """Sibling ``*.availability`` path for a mapped entity value path."""
+    return f"{exec_base_path(value_path)}.availability"
+
+
+def feature_unavailable_reason_path(value_path: str) -> str:
+    """Sibling ``*.unavailable_reason`` path for a mapped entity value path."""
+    return f"{exec_base_path(value_path)}.unavailable_reason"
+
+
+_PLAYBACK_COMMAND_PATH = "playback_control.playback_command"
+
+
 def grpc_exec_unavailable_reason(
     notify_state: dict[str, Any], command_path: str
 ) -> str | None:
@@ -339,7 +352,10 @@ def grpc_exec_unavailable_reason(
         if reason is None:
             return "unavailable"
         if str(reason).lower() in ("", "none"):
-            return None
+            # Spotify/AirPlay quirk: only for playback_command, not mapped features.
+            if _PLAYBACK_COMMAND_PATH in (base, command_path):
+                return None
+            return "unavailable"
         return str(reason)
     return None
 

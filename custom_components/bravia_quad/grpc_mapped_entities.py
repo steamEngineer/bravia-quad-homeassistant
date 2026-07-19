@@ -38,7 +38,8 @@ from .const import (
     MIN_VOICE_ZOOM_LEVEL,
 )
 from .entity import (
-    BraviaGrpcPathMixin,
+    BraviaGrpcAvailabilityMixin,
+    BraviaGrpcFeatureAvailabilityMixin,
     BraviaQuadVolumeStepIntervalNumber,
     entity_unique_id,
     get_device_info,
@@ -58,6 +59,8 @@ from .grpc_mapping import (
 from .grpc_value_normalize import (
     coerce_bool,
     denormalize_for_exec,
+    feature_availability_path,
+    feature_unavailable_reason_path,
     grpc_exec_unavailable_reason,
     ha_options_for_mapping,
     normalize_grpc_value,
@@ -79,6 +82,56 @@ if TYPE_CHECKING:
     from .bravia_grpc_client import BraviaGrpcClientAsync
 
 _LOGGER = logging.getLogger(__name__)
+
+_GRPC_BASS_PATH = "sound_setting.volume.bass"
+_GRPC_SUBWOOFER_PATH = "sound_setting.volume.subwoofer"
+_BATTERY_LIFE_PATHS = frozenset({"battery.life.rl", "battery.life.rr"})
+
+# Synthesized when link topology blocks bass/sub but device metadata is silent.
+REASON_SUBWOOFER_LINKED = "subwoofer_linked"
+REASON_SUBWOOFER_UNLINKED = "subwoofer_unlinked"
+
+
+def _parse_battery_life(raw: Any) -> int | None:
+    """Return 0-100 battery %, or None for missing / -1 sentinel."""
+    if raw is None:
+        return None
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return None
+    if value < 0:
+        return None
+    return value
+
+
+def mapped_feature_unavailable_reason(
+    notify_state: dict[str, Any], grpc_path: str
+) -> str | None:
+    """
+    Return why a mapped feature is unavailable, or None if it should be available.
+
+    Combines device broadcast metadata with derived battery/link rules used by
+    HA entity ``available`` and the feature-availability diagnostic sensor.
+    """
+    reason = grpc_exec_unavailable_reason(notify_state, grpc_path)
+    if reason is not None:
+        return reason
+
+    if grpc_path in _BATTERY_LIFE_PATHS:
+        raw = notify_state.get(grpc_path)
+        if raw is not None and _parse_battery_life(raw) is None:
+            return "unavailable"
+        return None
+
+    # Link topology is additional to *.availability (device may also broadcast).
+    if grpc_path == _GRPC_BASS_PATH and subwoofer_currently_linked(notify_state):
+        return REASON_SUBWOOFER_LINKED
+    if grpc_path == _GRPC_SUBWOOFER_PATH and not subwoofer_currently_linked(
+        notify_state
+    ):
+        return REASON_SUBWOOFER_UNLINKED
+    return None
 
 
 def _coerce_bass_option(normalized: Any) -> str | None:
@@ -116,7 +169,9 @@ async def _async_exec(
         )
 
 
-class BraviaGrpcMappedSwitch(BraviaGrpcPathMixin, RestoreEntity, SwitchEntity):
+class BraviaGrpcMappedSwitch(
+    BraviaGrpcFeatureAvailabilityMixin, RestoreEntity, SwitchEntity
+):
     """Bool gRPC path exposed as a switch."""
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -195,11 +250,12 @@ class BraviaGrpcMappedSwitch(BraviaGrpcPathMixin, RestoreEntity, SwitchEntity):
             persist_notify_only_restore_state(self, state)
 
 
-_GRPC_BASS_PATH = "sound_setting.volume.bass"
 _PLAYBACK_SELECT_PATHS = frozenset({"playback_control.function"})
 
 
-class BraviaGrpcMappedSelect(BraviaGrpcPathMixin, RestoreEntity, SelectEntity):
+class BraviaGrpcMappedSelect(
+    BraviaGrpcFeatureAvailabilityMixin, RestoreEntity, SelectEntity
+):
     """Enum gRPC path exposed as a select."""
 
     _attr_has_entity_name = True
@@ -291,7 +347,7 @@ class BraviaGrpcMappedSelect(BraviaGrpcPathMixin, RestoreEntity, SelectEntity):
             persist_notify_only_restore_state(self, self._attr_current_option)
 
 
-class BraviaGrpcMappedNumber(BraviaGrpcPathMixin, NumberEntity):
+class BraviaGrpcMappedNumber(BraviaGrpcFeatureAvailabilityMixin, NumberEntity):
     """Int gRPC path exposed as a number."""
 
     _attr_entity_category = EntityCategory.CONFIG
@@ -397,20 +453,21 @@ class BraviaGrpcSubwooferNumber(BraviaGrpcMappedNumber):
 
     @property
     def available(self) -> bool:
-        """Require gRPC session and a live subwoofer link."""
+        """Session + device broadcast + live subwoofer link."""
         if not super().available:
             return False
+        # Link is additional to *.availability from the feature mixin.
         return subwoofer_currently_linked(self._grpc_client.notify_state)
 
     def _grpc_state_callback(self, update: Any) -> None:
-        """Refresh on level deltas and link status changes."""
+        """Refresh on level, link status, and sibling availability metadata."""
         if update.path == GRPC_PATH_SW_STATUS:
             self.async_write_ha_state()
             return
         super()._grpc_state_callback(update)
 
 
-class BraviaGrpcMappedSensor(BraviaGrpcPathMixin, SensorEntity):
+class BraviaGrpcMappedSensor(BraviaGrpcFeatureAvailabilityMixin, SensorEntity):
     """Read-only gRPC path exposed as a sensor."""
 
     _attr_has_entity_name = True
@@ -447,24 +504,8 @@ class BraviaGrpcMappedSensor(BraviaGrpcPathMixin, SensorEntity):
         self.async_write_ha_state()
 
 
-_BATTERY_LIFE_PATHS = frozenset({"battery.life.rl", "battery.life.rr"})
-
-
-def _parse_battery_life(raw: Any) -> int | None:
-    """Return 0-100 battery %, or None for missing / -1 sentinel."""
-    if raw is None:
-        return None
-    try:
-        value = int(raw)
-    except (TypeError, ValueError):
-        return None
-    if value < 0:
-        return None
-    return value
-
-
 class BraviaGrpcBatteryLifeSensor(BraviaGrpcMappedSensor):
-    """Rear speaker battery %; unavailable when life is -1 or availability is false."""
+    """Rear speaker battery %; unavailable when life is -1 or feature blocked."""
 
     _attr_device_class = SensorDeviceClass.BATTERY
     _attr_state_class = SensorStateClass.MEASUREMENT
@@ -489,27 +530,15 @@ class BraviaGrpcBatteryLifeSensor(BraviaGrpcMappedSensor):
             grpc_client.notify_state.get(spec.grpc_path)
         )
 
-    def _availability_path(self) -> str:
-        return f"{self._grpc_path}.availability"
-
     @property
     def available(self) -> bool:
-        """Require session, device availability flag, and a non-sentinel reading."""
+        """Session + device feature metadata + non-sentinel reading when present."""
         if not super().available:
-            return False
-        if self._grpc_client.notify_state.get(self._availability_path()) is False:
             return False
         raw = self._grpc_client.notify_state.get(self._grpc_path)
         if raw is None:
             return True
         return _parse_battery_life(raw) is not None
-
-    def _grpc_state_callback(self, update: Any) -> None:
-        """Refresh on life deltas and sibling availability changes."""
-        if update.path == self._availability_path():
-            self.async_write_ha_state()
-            return
-        super()._grpc_state_callback(update)
 
     async def _on_grpc_state(self, value: Any) -> None:
         self._attr_native_value = _parse_battery_life(value)
@@ -541,13 +570,14 @@ class BraviaGrpcBassLevelSelect(BraviaGrpcMappedSelect):
 
     @property
     def available(self) -> bool:
-        """Require gRPC session and no live subwoofer link."""
+        """Session + device broadcast + no live subwoofer link."""
         if not super().available:
             return False
+        # Link is additional to *.availability from the feature mixin.
         return not subwoofer_currently_linked(self._grpc_client.notify_state)
 
     def _grpc_state_callback(self, update: Any) -> None:
-        """Refresh on bass deltas and link status changes."""
+        """Refresh on bass, link status, and sibling availability metadata."""
         if update.path == GRPC_PATH_SW_STATUS:
             self.async_write_ha_state()
             return
@@ -687,6 +717,129 @@ def mapped_number_entities(
     return entities
 
 
+def tracked_feature_specs(
+    grpc_client: BraviaGrpcClientAsync,
+) -> tuple[tuple[str, str], ...]:
+    """
+    Return ``(unique_id_suffix, grpc_path)`` for capability-created mapped entities.
+
+    Mirrors the mapped_* factories (not media player, not volume_step_interval).
+    """
+    caps = grpc_client.capability_paths
+    out: list[tuple[str, str]] = []
+    seen_paths: set[str] = set()
+
+    def _add(mapping: GrpcTcpMapping | None, *, suffix: str | None = None) -> None:
+        if mapping is None:
+            return
+        if not mapping_allowed_by_capabilities(mapping.grpc_path, caps):
+            return
+        if mapping.grpc_path in seen_paths:
+            return
+        seen_paths.add(mapping.grpc_path)
+        spec = entity_spec_for_mapping(mapping)
+        # Bass select overrides EntitySpec's TCP slider suffix.
+        out.append((suffix or spec.unique_id_suffix, spec.grpc_path))
+
+    _add(mapping_for_grpc_path("power"))
+    for mapping in mappings_for_platform("switch", writable=True):
+        _add(mapping)
+
+    for mapping in mappings_for_platform("select", writable=True):
+        if mapping.grpc_path == _GRPC_BASS_PATH:
+            continue
+        _add(mapping)
+    _add(mapping_for_grpc_path(_GRPC_BASS_PATH), suffix="bass_level_select")
+
+    _add(mapping_for_grpc_path("volume"))
+    for mapping in mappings_for_platform("number", writable=True):
+        if mapping.grpc_path == _GRPC_BASS_PATH:
+            continue
+        _add(mapping)
+
+    for mapping in mappings_for_platform("sensor", writable=False):
+        _add(mapping)
+
+    return tuple(out)
+
+
+class BraviaGrpcFeatureAvailabilitySensor(BraviaGrpcAvailabilityMixin, SensorEntity):
+    """Diagnostic count of currently unavailable capability-backed features."""
+
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_has_entity_name = True
+    _attr_should_poll = False
+    _attr_translation_key = "unavailable_entities"
+
+    def __init__(
+        self,
+        grpc_client: BraviaGrpcClientAsync,
+        entry: BraviaQuadConfigEntry,
+        tracked: tuple[tuple[str, str], ...],
+    ) -> None:
+        """Initialize feature-availability diagnostic sensor."""
+        self._grpc_client = grpc_client
+        self._tracked = tracked
+        self._attr_unique_id = entity_unique_id(entry, "unavailable_entities")
+        self._attr_device_info = get_device_info(entry)
+        self._attr_entity_registry_enabled_default = True
+        self._unavailable_features: dict[str, str] = {}
+        self._refresh_from_notify()
+
+    @property
+    def native_value(self) -> int:
+        """Return count of currently unavailable tracked features."""
+        return len(self._unavailable_features)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, str]:
+        """Map unique_id_suffix → reason for currently unavailable features only."""
+        return dict(self._unavailable_features)
+
+    def _refresh_from_notify(self) -> None:
+        notify_state = self._grpc_client.notify_state
+        unavailable: dict[str, str] = {}
+        for suffix, path in self._tracked:
+            reason = mapped_feature_unavailable_reason(notify_state, path)
+            if reason is not None:
+                unavailable[suffix] = reason
+        self._unavailable_features = unavailable
+
+    def _on_notify(self, update: Any) -> None:
+        """Rebuild when watched availability, reason, or derived-rule paths change."""
+        path = update.path
+        relevant = False
+        for _suffix, value_path in self._tracked:
+            if path in (
+                value_path,
+                feature_availability_path(value_path),
+                feature_unavailable_reason_path(value_path),
+            ):
+                relevant = True
+                break
+        if path == GRPC_PATH_SW_STATUS:
+            relevant = True
+        if not relevant:
+            return
+        self._refresh_from_notify()
+        self.async_write_ha_state()
+
+    def _on_grpc_availability_changed(self, available: bool) -> None:  # noqa: FBT001
+        """Refresh feature map when the session comes back online."""
+        if available:
+            self._refresh_from_notify()
+        super()._on_grpc_availability_changed(available)
+
+    async def async_added_to_hass(self) -> None:
+        """Register notify + session callbacks."""
+        await super().async_added_to_hass()
+        self._refresh_from_notify()
+        self._grpc_client.add_state_callback(self._on_notify)
+        self.async_on_remove(
+            lambda: self._grpc_client.remove_state_callback(self._on_notify)
+        )
+
+
 def mapped_sensor_entities(
     grpc_client: BraviaGrpcClientAsync, entry: ConfigEntry
 ) -> list[SensorEntity]:
@@ -712,4 +865,9 @@ def mapped_sensor_entities(
         entities.append(
             BraviaGrpcMappedSensor(grpc_client, entry, spec, enabled_default=enabled)
         )
+    entities.append(
+        BraviaGrpcFeatureAvailabilitySensor(
+            grpc_client, entry, tracked_feature_specs(grpc_client)
+        )
+    )
     return entities

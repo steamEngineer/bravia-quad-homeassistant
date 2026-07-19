@@ -395,6 +395,9 @@
       },
       "battery_life_rr": {
         "name": "Rear right battery"
+      },
+      "unavailable_entities": {
+        "name": "Unavailable Entities"
       }
     }
   },

@@ -33,6 +33,8 @@ Only one bass-level control is writable at a time based on whether a wireless su
 
 gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gRPC media player. Exact set depends on model, firmware, and subwoofer detection: mapped entities are created when the path is advertised by `GetCapabilities` (Seeds / notify-only paths are exempt and still created).
 
+When the device reports a mapped feature unavailable over notify (`*.availability` / `*.unavailable_reason`), the matching control or sensor greys out in Home Assistant. The **Unavailable Entities** diagnostic sensor stays online while the gRPC session is up; its state is the count of currently unavailable mapped features, and its attributes list each blocked feature (by entity unique-id suffix) with the device reason.
+
 | Entity | Type | Description | Range/Options | Notes |
 |--------|------|-------------|---------------|-------|
 | `media_player.bravia_quad_*` | Media player | Power, volume, mute, source; sound field **mode**; now-playing; play/pause/next/prev on Spotify / Bluetooth / AirPlay | Sources: TV, HDMI, Spotify, Bluetooth; AirPlay detect-only; modes: Dolby Speaker Virtualizer, Neural:X, 360SSM | Sound field mode is on the media player only (no standalone select) |
@@ -77,6 +79,7 @@ gRPC builds entities from [grpc-tcp-mapping.md](grpc-tcp-mapping.md) plus the gR
 | `sensor.bravia_quad_*_raee_measured` | Sensor | Room calibration measured | — | Disabled by default; gRPC-only |
 | `sensor.bravia_quad_*_battery_life_rl` | Sensor | Rear left battery | 0–100% | Disabled by default; created when `battery.life.rl` is in GetCapabilities |
 | `sensor.bravia_quad_*_battery_life_rr` | Sensor | Rear right battery | 0–100% | Disabled by default; created when `battery.life.rr` is in GetCapabilities |
+| `sensor.bravia_quad_*_unavailable_entities` | Sensor | Unavailable Entities | integer count | Diagnostic; count of currently unavailable mapped features; attributes list each blocked feature key and device reason |
 | `switch.bravia_quad_*_mix_stage` | Switch | Mix stage | on/off | Disabled by default; capability-gated |
 | `select.bravia_quad_*_stereo_playback` | Select | Stereo playback | up_mix, multi_stereo | Disabled by default; capability-gated |
 | `select.bravia_quad_*_sw_phase` | Select | Subwoofer phase | 0, 180, dual-sub pair values | Disabled by default; capability-gated |
