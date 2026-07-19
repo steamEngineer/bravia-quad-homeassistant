@@ -38,6 +38,24 @@ def test_entity_critical_paths_include_media_player_and_handcrafted() -> None:
     assert "sound_setting.sound_field.availability" not in paths
 
 
+def test_filter_field_paths_keeps_metadata_for_advertised_base() -> None:
+    from custom_components.bravia_quad.grpc.get_capabilities_response import (
+        filter_field_paths,
+    )
+
+    ha_paths = [
+        "sound_setting.voice_zoom.on_off",
+        "sound_setting.voice_zoom.availability",
+        "sound_setting.voice_zoom.unavailable_reason",
+        "power",
+    ]
+    caps = frozenset({"sound_setting.voice_zoom.on_off", "power"})
+    filtered = filter_field_paths(ha_paths, caps)
+    assert "sound_setting.voice_zoom.availability" in filtered
+    assert "sound_setting.voice_zoom.unavailable_reason" in filtered
+    assert "sound_setting.voice_zoom.on_off" in filtered
+
+
 def test_missing_entity_paths_treats_none_as_unset() -> None:
     state = {"power": True, "mute": None, "volume": 34}
     missing = missing_entity_paths(state)

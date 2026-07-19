@@ -18,6 +18,8 @@ CONF_GRPC_OAUTH_REDIRECT = "grpc_oauth_redirect"
 CONF_GRPC_DEVICE_ID = "grpc_device_id"
 CONF_GRPC_DEBUG = "grpc_debug"
 CONF_GRPC_SEEDS_POLL = "grpc_seeds_poll"
+# Persisted gRPC ``*.unavailable_reason`` map (reload survives GetStates ``none``).
+CONF_FEATURE_UNAVAILABLE_REASONS = "feature_unavailable_reasons"
 
 TRANSPORT_TCP = "tcp"
 TRANSPORT_GRPC = "grpc"

@@ -144,6 +144,10 @@ async def _async_options_updated(
     hass: HomeAssistant, entry: BraviaQuadConfigEntry
 ) -> None:
     """Reload when integration options change."""
+    # Feature-reason persistence writes entry.data and must not reload.
+    meta = hass.data.get(DOMAIN, {}).get(entry.entry_id)
+    if isinstance(meta, dict) and meta.pop("_suppress_entry_reload", False):
+        return
     await hass.config_entries.async_reload(entry.entry_id)
 
 

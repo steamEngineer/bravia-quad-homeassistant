@@ -271,6 +271,76 @@ def test_playback_command_false_availability_none_reason_is_available() -> None:
     )
 
 
+def test_notify_cache_retains_reason_over_none_without_availability_true() -> None:
+    from custom_components.bravia_quad.grpc.client import BraviaGrpcClient
+
+    client = BraviaGrpcClient("127.0.0.1")
+    client.update_notify_cache(
+        {"sound_setting.voice_zoom.unavailable_reason": "unsupported_tv"}
+    )
+    client.update_notify_cache({"sound_setting.voice_zoom.unavailable_reason": "none"})
+    assert (
+        client.notify_state["sound_setting.voice_zoom.unavailable_reason"]
+        == "unsupported_tv"
+    )
+    # Notify delivers availability then reason as separate deltas — allow clear.
+    client.update_notify_cache({"sound_setting.voice_zoom.availability": True})
+    client.update_notify_cache({"sound_setting.voice_zoom.unavailable_reason": "none"})
+    assert client.notify_state["sound_setting.voice_zoom.unavailable_reason"] == "none"
+
+
+def test_bulk_getstates_true_none_does_not_clear_sticky_reason() -> None:
+    """GetStates True+none must not defeat a known real reason (bulk scrub)."""
+    from custom_components.bravia_quad.grpc.client import BraviaGrpcClient
+
+    client = BraviaGrpcClient("127.0.0.1")
+    client.update_notify_cache(
+        {"sound_setting.voice_zoom.unavailable_reason": "unsupported_tv"}
+    )
+    client.update_notify_cache(
+        {
+            "sound_setting.voice_zoom.availability": True,
+            "sound_setting.voice_zoom.unavailable_reason": "none",
+            "volume": 10,
+        }
+    )
+    assert (
+        client.notify_state["sound_setting.voice_zoom.unavailable_reason"]
+        == "unsupported_tv"
+    )
+
+
+def test_apply_persisted_feature_unavailable_reasons_over_none_seed() -> None:
+    from custom_components.bravia_quad.grpc.client import BraviaGrpcClient
+
+    client = BraviaGrpcClient("127.0.0.1")
+    client.update_notify_cache(
+        {
+            "sound_setting.voice_zoom.availability": True,
+            "sound_setting.voice_zoom.unavailable_reason": "none",
+            "volume": 1,
+        }
+    )
+    applied = client.apply_persisted_feature_unavailable_reasons(
+        {"sound_setting.voice_zoom.unavailable_reason": "unsupported_tv"}
+    )
+    assert applied == 1
+    assert (
+        client.notify_state["sound_setting.voice_zoom.unavailable_reason"]
+        == "unsupported_tv"
+    )
+    assert client.notify_state.get("sound_setting.voice_zoom.availability") is not True
+    # Later none-only notify must not clear without a fresh availability=True.
+    client.update_notify_cache({"sound_setting.voice_zoom.unavailable_reason": "none"})
+    assert (
+        client.notify_state["sound_setting.voice_zoom.unavailable_reason"]
+        == "unsupported_tv"
+    )
+    assert client.export_feature_unavailable_reasons() == {
+        "sound_setting.voice_zoom.unavailable_reason": "unsupported_tv"
+    }
+
+
 def _entity_suffixes(entities: list, grpc_entry: MagicMock) -> set[str]:
     prefix = f"{grpc_entry.unique_id}_"
     return {e._attr_unique_id.removeprefix(prefix) for e in entities}

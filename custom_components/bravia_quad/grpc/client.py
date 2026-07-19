@@ -121,6 +121,7 @@ class BraviaGrpcClient:
         self._capability_index: dict[str, CapabilityMeta] | None = None
         self.last_rpc_error: str | None = None
         self.last_error_is_transport = False
+        self.last_cleared_unavailable_reasons: tuple[str, ...] = ()
 
     @property
     def notify_state(self) -> dict[str, Any]:
@@ -161,9 +162,115 @@ class BraviaGrpcClient:
             )
         return filtered
 
+    @staticmethod
+    def _is_clearing_unavailable_reason(value: Any) -> bool:
+        """Return True when value means 'no unavailable reason'."""
+        if value is None:
+            return True
+        return str(value).lower() in ("", "none")
+
+    def _should_retain_unavailable_reason(
+        self, path: str, new_value: Any, pending: dict[str, Any]
+    ) -> bool:
+        """
+        Keep a real unavailable_reason when notify/GetStates sends ``none``.
+
+        Device streams often emit ``unavailable_reason=none`` without
+        ``availability=True`` while the feature is still blocked (Voice Zoom
+        transitions). Only honor a clear when availability is True (pending
+        wins over cache so a same-batch GetStates True+none can clear; notify
+        delivers the two fields as separate deltas, so cache True still counts).
+        """
+        if not path.endswith(".unavailable_reason"):
+            return False
+        if not self._is_clearing_unavailable_reason(new_value):
+            return False
+        old = self._notify_state.get(path)
+        if old is None or self._is_clearing_unavailable_reason(old):
+            return False
+        base = path[: -len(".unavailable_reason")]
+        avail_path = f"{base}.availability"
+        availability = pending.get(avail_path, self._notify_state.get(avail_path))
+        return availability is not True
+
+    def export_feature_unavailable_reasons(self) -> dict[str, str]:
+        """Return ``*.unavailable_reason`` paths that currently block a feature."""
+        out: dict[str, str] = {}
+        for path, value in self._notify_state.items():
+            if not path.endswith(".unavailable_reason"):
+                continue
+            if value is None or self._is_clearing_unavailable_reason(value):
+                continue
+            out[path] = str(value)
+        return out
+
+    def apply_persisted_feature_unavailable_reasons(
+        self, persisted: dict[str, Any] | None
+    ) -> int:
+        """
+        Re-apply last-known real reasons after GetStates seed.
+
+        Bulk GetStates / reload often lands ``unavailable_reason=none`` with
+        ``availability`` null; notify may not re-emit until an input change.
+        Single-path GetStates for metadata fails with UNKNOWN on this firmware.
+        """
+        if not persisted:
+            return 0
+        applied = 0
+        for path, reason in persisted.items():
+            if not isinstance(path, str) or not path.endswith(".unavailable_reason"):
+                continue
+            if reason is None or self._is_clearing_unavailable_reason(reason):
+                continue
+            current = self._notify_state.get(path)
+            if current is not None and not self._is_clearing_unavailable_reason(
+                current
+            ):
+                continue
+            base = path[: -len(".unavailable_reason")]
+            avail_path = f"{base}.availability"
+            # Restore over GetStates ``True``+``none`` lies; scrub stale True so a
+            # later notify ``none`` delta cannot clear via cached availability.
+            self._notify_state[path] = str(reason)
+            self._notify_state.pop(avail_path, None)
+            applied += 1
+        return applied
+
     def update_notify_cache(self, updates: dict[str, Any]) -> None:
         """Merge path values into the notify cache."""
-        self._notify_state.update(updates)
+        self.last_cleared_unavailable_reasons = ()
+        if not updates:
+            return
+        pending = dict(updates)
+        # Bulk GetStates often pairs availability=True with reason=none while the
+        # feature is still blocked. Scrub that True so sticky/persist can hold.
+        # Single-path notify deltas (len==1) are left alone for True-then-none.
+        if len(pending) > 1:
+            for path, value in list(pending.items()):
+                if not path.endswith(".unavailable_reason"):
+                    continue
+                if not self._is_clearing_unavailable_reason(value):
+                    continue
+                avail_path = f"{path[: -len('.unavailable_reason')]}.availability"
+                if pending.get(avail_path) is True:
+                    pending[avail_path] = None
+        filtered: dict[str, Any] = {}
+        cleared: list[str] = []
+        for path, value in pending.items():
+            if self._should_retain_unavailable_reason(path, value, pending):
+                continue
+            old = self._notify_state.get(path)
+            if (
+                path.endswith(".unavailable_reason")
+                and self._is_clearing_unavailable_reason(value)
+                and old is not None
+                and not self._is_clearing_unavailable_reason(old)
+            ):
+                cleared.append(path)
+            filtered[path] = value
+        self.last_cleared_unavailable_reasons = tuple(cleared)
+        if filtered:
+            self._notify_state.update(filtered)
 
     def _say(self, msg: str) -> None:
         """Log normal gRPC client events."""
@@ -748,7 +855,7 @@ class BraviaGrpcClient:
         self._apply_get_states_response_tokens(raw)
         parsed = parse_get_states_response(raw)
         if parsed:
-            self._notify_state.update(parsed)
+            self.update_notify_cache(parsed)
         return parsed
 
     @staticmethod
@@ -854,7 +961,7 @@ class BraviaGrpcClient:
                         if delta_blob:
                             path, value = decode_notify_delta(delta_blob)
                             if path:
-                                self._notify_state[path] = value
+                                self.update_notify_cache({path: value})
                         if stop.is_set():
                             break
                 except Exception:
@@ -957,7 +1064,7 @@ class BraviaGrpcClient:
                     if delta_blob:
                         path, value = decode_notify_delta(delta_blob)
                         if path:
-                            self._notify_state[path] = value
+                            self.update_notify_cache({path: value})
                     if time.monotonic() >= stop_at:
                         return
             except grpc.RpcError as e:
@@ -1285,7 +1392,7 @@ class BraviaGrpcClient:
                     path, value = decode_notify_delta(delta_blob)
                     if not path:
                         continue
-                    self._notify_state[path] = value
+                    self.update_notify_cache({path: value})
                     self._debug(f"Notify {path}={value!r}")
                     yield NotifyStateUpdate(path=path, value=value)
             finally:
