@@ -16,7 +16,6 @@ from .const import (
     BASS_LEVEL_OPTIONS,
     BT_CONNECTION_QUALITY_OPTIONS,
     CEC_POWER_OFF_SYNC_OPTIONS,
-    CENTER_SPEAKER_MODE_OPTIONS,
     DIMMER_OPTIONS,
     DRC_OPTIONS,
     DUAL_MONO_OPTIONS,
@@ -136,6 +135,7 @@ _GRPC_ONLY_BOOL_PATHS: frozenset[str] = frozenset(
         "sound_setting.dsee_ultimate",
         "sound_setting.dts_dialog_control",
         "sound_setting.mix_stage",
+        "speaker_sound_setting.center_speaker_mode",
     }
 )
 
@@ -197,7 +197,7 @@ def denormalize_input_source(ha_value: str) -> str:
     return ha_value
 
 
-def normalize_grpc_value(  # noqa: PLR0915
+def normalize_grpc_value(
     mapping: GrpcTcpMapping,
     raw_value: Any,
     *,
@@ -233,10 +233,6 @@ def normalize_grpc_value(  # noqa: PLR0915
         return coerced if coerced is not None else raw_value
 
     if grpc_path == "speaker_sound_setting.360ssm_height":
-        text = str(raw_value)
-        return text or None
-
-    if grpc_path == "speaker_sound_setting.center_speaker_mode":
         text = str(raw_value)
         return text or None
 
@@ -469,8 +465,6 @@ def ha_options_for_mapping(mapping: GrpcTcpMapping) -> list[str] | None:
         return list(CEC_POWER_OFF_SYNC_OPTIONS)
     if mapping.grpc_path == "speaker_sound_setting.360ssm_height":
         return list(SSM360_HEIGHT_OPTIONS)
-    if mapping.grpc_path == "speaker_sound_setting.center_speaker_mode":
-        return list(CENTER_SPEAKER_MODE_OPTIONS)
     if mapping.grpc_path == "sound_setting.sound_effect":
         return list(SOUND_EFFECT_OPTIONS)
     if mapping.grpc_path == "system_setting.dimmer":

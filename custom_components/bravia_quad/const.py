@@ -219,9 +219,6 @@ SOUND_EFFECT_OPTIONS: list[str] = list(SOUND_EFFECT_HA_TO_DEVICE.keys())
 # gRPC 360SSM height (speaker_sound_setting.360ssm_height)
 SSM360_HEIGHT_OPTIONS: list[str] = ["high", "mid", "low"]
 
-# gRPC center speaker mode — extend at runtime if device reports other values
-CENTER_SPEAKER_MODE_OPTIONS: list[str] = ["off", "on"]
-
 # Capability-gated (e.g. HT-A8): stereo playback / subwoofer phase
 # Dual-sub phase device enums use commas; HA translation keys must be [a-z0-9-_]+.
 STEREO_PLAYBACK_OPTIONS: list[str] = ["up_mix", "multi_stereo"]

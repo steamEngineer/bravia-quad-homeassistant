@@ -357,9 +357,10 @@ GRPC_TCP_MAPPINGS: tuple[GrpcTcpMapping, ...] = (
     GrpcTcpMapping(
         "speaker_sound_setting.center_speaker_mode",
         None,
-        "select",
+        "switch",
         writable=True,
         app_setting_id="speaker_sound_setting.center_speaker_mode",
+        notes="Bool wire; gRPC-only",
     ),
     GrpcTcpMapping(
         "sound_setting.dts_dialog_control",

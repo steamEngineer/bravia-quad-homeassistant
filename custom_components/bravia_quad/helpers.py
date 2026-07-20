@@ -55,12 +55,16 @@ GATED_CAPABILITY_SENSOR_SUFFIXES: frozenset[str] = frozenset(
 )
 GATED_CAPABILITY_SELECT_SUFFIXES: frozenset[str] = frozenset(
     {
-        "center_speaker_mode",
         "stereo_playback",
         "sw_phase",
     }
 )
-GATED_CAPABILITY_SWITCH_SUFFIXES: frozenset[str] = frozenset({"mix_stage"})
+GATED_CAPABILITY_SWITCH_SUFFIXES: frozenset[str] = frozenset(
+    {
+        "center_speaker_mode",
+        "mix_stage",
+    }
+)
 
 
 async def async_apply_has_subwoofer(

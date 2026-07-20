@@ -47,7 +47,7 @@ def test_mapped_grpc_switch_and_select_factories_include_former_handcrafted(
     assert GRPC_PATH_EARC in switch_paths
     assert GRPC_PATH_SSM360_HEIGHT in select_paths
     assert GRPC_PATH_DIMMER in select_paths
-    assert "speaker_sound_setting.center_speaker_mode" in select_paths
+    assert "speaker_sound_setting.center_speaker_mode" in switch_paths
     assert GRPC_PATH_EARC not in select_paths
 
 

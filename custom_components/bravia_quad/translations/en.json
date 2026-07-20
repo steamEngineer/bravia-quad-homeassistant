@@ -228,9 +228,6 @@
           "low": "Low"
         }
       },
-      "center_speaker_mode": {
-        "name": "Center speaker mode"
-      },
       "stereo_playback": {
         "name": "Stereo playback",
         "state": {
@@ -357,6 +354,9 @@
       },
       "dts_dialog_control": {
         "name": "DTS Dialog Control"
+      },
+      "center_speaker_mode": {
+        "name": "Center speaker mode"
       },
       "audio_return_channel": {
         "name": "HDMI ARC (TV)"

@@ -63,7 +63,7 @@ When the device reports a mapped feature unavailable over notify (`*.availabilit
 | `select.bravia_quad_*_hdmi_signal_format` | Select | HDMI Signal Format | standard, enhanced, enhanced_4k120_8k | Seeds / restore; gRPC-only |
 | `switch.bravia_quad_*_dsee_ultimate` | Switch | DSEE Ultimate | on/off | Seeds / restore; gRPC-only |
 | `select.bravia_quad_*_ssm_360_height` | Select | 360SSM height | high, mid, low | Seeds / restore; gRPC-only |
-| `select.bravia_quad_*_center_speaker_mode` | Select | Center speaker mode | off, on | Disabled by default; gRPC-only |
+| `switch.bravia_quad_*_center_speaker_mode` | Switch | Center speaker mode | on/off | Disabled by default; gRPC-only |
 | `switch.bravia_quad_*_dts_dialog_control` | Switch | DTS Dialog Control | on/off | Disabled by default; gRPC-only |
 | `switch.bravia_quad_*_net_bt_standby` | Switch | Network/Bluetooth standby | on/off | |
 | `switch.bravia_quad_*_auto_standby` | Switch | Auto standby | on/off | Disabled by default; Seeds / restore |
