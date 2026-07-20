@@ -86,16 +86,18 @@ async def async_setup_entry(
     if data.transport == TRANSPORT_GRPC:
         if data.grpc_client is None:
             return
-        # Legacy select → gRPC switch; TCP transport keeps tri-state select.
+        # Legacy select → gRPC switch (ARC: TCP still uses tri-state select).
         registry = er.async_get(hass)
-        arc_unique_id = entity_unique_id(entry, "audio_return_channel")
+        legacy_select_unique_ids = {
+            entity_unique_id(entry, "audio_return_channel"),
+            entity_unique_id(entry, "center_speaker_mode"),
+        }
         for entity_entry in er.async_entries_for_config_entry(registry, entry.entry_id):
             if (
                 entity_entry.entity_id.startswith("select.")
-                and entity_entry.unique_id == arc_unique_id
+                and entity_entry.unique_id in legacy_select_unique_ids
             ):
                 registry.async_remove(entity_entry.entity_id)
-                break
         entities = mapped_switch_entities(data.grpc_client, entry)
         prune_gated_unique_id_suffixes(
             hass,

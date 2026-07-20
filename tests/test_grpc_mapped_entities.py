@@ -364,7 +364,7 @@ def test_factories_omit_quad_only_when_absent_from_caps(
     select_paths = _mapped_grpc_paths(mapped_select_entities(grpc_client, grpc_entry))
     sensor_paths = _mapped_grpc_paths(mapped_sensor_entities(grpc_client, grpc_entry))
     switch_paths = _mapped_grpc_paths(mapped_switch_entities(grpc_client, grpc_entry))
-    assert "speaker_sound_setting.center_speaker_mode" not in select_paths
+    assert "speaker_sound_setting.center_speaker_mode" not in switch_paths
     assert "system_setting.wifi_mac_address_wired" not in sensor_paths
     assert "sound_setting.drc" in select_paths
     assert "system_setting.cec_power_off_sync" in select_paths
@@ -486,7 +486,7 @@ def test_factories_soft_fallback_includes_quad_only_when_caps_none(
     select_paths = _mapped_grpc_paths(mapped_select_entities(grpc_client, grpc_entry))
     sensor_paths = _mapped_grpc_paths(mapped_sensor_entities(grpc_client, grpc_entry))
     switch_paths = _mapped_grpc_paths(mapped_switch_entities(grpc_client, grpc_entry))
-    assert "speaker_sound_setting.center_speaker_mode" in select_paths
+    assert "speaker_sound_setting.center_speaker_mode" in switch_paths
     # Wired MAC requires a positive GetCapabilities hit (no soft-allow).
     assert "system_setting.wifi_mac_address_wired" not in sensor_paths
     assert "battery.life.rl" in sensor_paths

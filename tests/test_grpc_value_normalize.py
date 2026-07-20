@@ -233,6 +233,19 @@ def test_normalize_raee_measured() -> None:
     assert normalize_grpc_value(mapping, '{"a":1}') == '{"a": 1}'
 
 
+def test_center_speaker_mode_bool_wire() -> None:
+    """Device notify/exec use bool; HA exposes a switch."""
+    mapping = mapping_for_grpc_path("speaker_sound_setting.center_speaker_mode")
+    assert mapping is not None
+    assert mapping.ha_platform == "switch"
+    assert normalize_grpc_value(mapping, True) is True
+    assert normalize_grpc_value(mapping, False) is False
+    assert denormalize_for_exec(mapping, True) == ("bool_value", True)
+    assert denormalize_for_exec(mapping, False) == ("bool_value", False)
+    assert denormalize_for_exec(mapping, "on") == ("bool_value", True)
+    assert denormalize_for_exec(mapping, "off") == ("bool_value", False)
+
+
 def test_tcp_seed_denormalize_drc() -> None:
     mapping = mapping_for_grpc_path("sound_setting.drc")
     assert mapping is not None
