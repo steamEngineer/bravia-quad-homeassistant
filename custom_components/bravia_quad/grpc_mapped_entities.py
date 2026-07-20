@@ -13,7 +13,12 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.components.switch import SwitchEntity
-from homeassistant.const import PERCENTAGE, EntityCategory, UnitOfTime
+from homeassistant.const import (
+    PERCENTAGE,
+    EntityCategory,
+    UnitOfSoundPressure,
+    UnitOfTime,
+)
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.restore_state import RestoreEntity
 
@@ -29,11 +34,13 @@ from .const import (
     FEATURE_VOICE_ZOOM_LEVEL,
     MAX_AV_SYNC,
     MAX_BASS_LEVEL,
+    MAX_DTS_DIALOG_CONTROL,
     MAX_REAR_LEVEL,
     MAX_VOICE_ZOOM_LEVEL,
     MAX_VOLUME,
     MIN_AV_SYNC,
     MIN_BASS_LEVEL,
+    MIN_DTS_DIALOG_CONTROL,
     MIN_REAR_LEVEL,
     MIN_VOICE_ZOOM_LEVEL,
 )
@@ -407,6 +414,10 @@ class BraviaGrpcMappedNumber(BraviaGrpcFeatureAvailabilityMixin, NumberEntity):
         elif spec.mapping.tcp_feature == FEATURE_VOICE_ZOOM_LEVEL:
             self._attr_mode = NumberMode.SLIDER
             self._attr_native_step = 1
+        elif spec.grpc_path == "sound_setting.dts_dialog_control":
+            self._attr_mode = NumberMode.SLIDER
+            self._attr_native_step = 1
+            self._attr_native_unit_of_measurement = UnitOfSoundPressure.DECIBEL
         raw = grpc_client.notify_state.get(spec.grpc_path)
         normalized = normalize_grpc_value(
             spec.mapping,
@@ -622,6 +633,8 @@ def _number_range(  # noqa: PLR0911
         return (MIN_AV_SYNC, MAX_AV_SYNC)
     if mapping.tcp_feature == FEATURE_VOICE_ZOOM_LEVEL:
         return (MIN_VOICE_ZOOM_LEVEL, MAX_VOICE_ZOOM_LEVEL)
+    if mapping.grpc_path == "sound_setting.dts_dialog_control":
+        return (MIN_DTS_DIALOG_CONTROL, MAX_DTS_DIALOG_CONTROL)
     return (0, MAX_VOLUME)
 
 

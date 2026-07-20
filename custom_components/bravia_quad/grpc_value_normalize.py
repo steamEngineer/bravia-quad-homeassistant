@@ -133,7 +133,6 @@ _BASS_TCP_TO_GRPC: dict[int, str] = {v: k for k, v in BASS_LEVEL_OPTIONS.items()
 _GRPC_ONLY_BOOL_PATHS: frozenset[str] = frozenset(
     {
         "sound_setting.dsee_ultimate",
-        "sound_setting.dts_dialog_control",
         "sound_setting.mix_stage",
         "speaker_sound_setting.center_speaker_mode",
     }
@@ -220,7 +219,7 @@ def normalize_grpc_value(
     if grpc_path.endswith((".availability", ".unavailable_reason")):
         return None
 
-    if grpc_path == "sound_setting.volume.subwoofer":
+    if mapping.ha_platform == "number":
         try:
             return int(raw_value)
         except (TypeError, ValueError):

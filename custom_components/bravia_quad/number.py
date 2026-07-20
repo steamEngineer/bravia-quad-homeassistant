@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.components.number import NumberEntity, NumberMode
 from homeassistant.const import EntityCategory
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_registry as er
 
 from .const import (
     CONF_HAS_SUBWOOFER,
@@ -37,6 +38,7 @@ from .entity import (
 from .grpc_mapped_entities import mapped_number_entities
 from .helpers import (
     raise_set_rejected,
+    remove_entities_by_unique_id_suffixes,
     verify_feature_value,
 )
 
@@ -68,6 +70,13 @@ async def async_setup_entry(
     if data.transport == TRANSPORT_GRPC:
         if data.grpc_client is None:
             return
+        # Former switch platform for the same unique_id suffix.
+        remove_entities_by_unique_id_suffixes(
+            er.async_get(_hass),
+            entry,
+            "switch",
+            ("dts_dialog_control",),
+        )
         async_add_entities(
             mapped_number_entities(data.grpc_client, entry),
             update_before_add=True,

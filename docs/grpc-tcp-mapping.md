@@ -115,7 +115,7 @@ Created only when `GetCapabilities` advertises the path. Advertised on HT-A8-cla
 
 gRPC always exposes both the −10…10 subwoofer number and the bass min/mid/max select. Availability flips with live link status (`speaker_connection_setting.connection_status.sw`): linked → subwoofer available / bass unavailable; unlinked → the reverse. Not from Seeds and not from a TCP `:33336` probe.
 
-**Not aliased:** `sound_setting.dts_dialog_control` (DTS Dialog Control) is a separate gRPC-only switch from DRC.
+**Not aliased:** `sound_setting.dts_dialog_control` (DTS Dialog Control) is a separate gRPC-only number (GetCapabilities `int` min/max, typically 0–6 dB) from DRC.
 
 **Distinct features:** TCP **Sound field** (`sound_setting.sound_field`, bool) ≠ gRPC **Sound field mode** (`sound_setting.sound_effect`, select).
 

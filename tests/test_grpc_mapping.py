@@ -71,6 +71,13 @@ def test_config_option_keys() -> None:
 def test_drc_path_not_dts_dialog_control() -> None:
     drc = next(m for m in GRPC_TCP_MAPPINGS if m.tcp_feature == FEATURE_DRC)
     assert drc.grpc_path == "sound_setting.drc"
+    dts = next(
+        m
+        for m in GRPC_TCP_MAPPINGS
+        if m.grpc_path == "sound_setting.dts_dialog_control"
+    )
+    assert dts.ha_platform == "number"
+    assert dts.tcp_feature is None
 
 
 def test_aav_on_auto_volume_path() -> None:
@@ -116,7 +123,7 @@ def test_grpc_path_needs_ha_restore() -> None:
     assert grpc_path_needs_ha_restore("sound_setting.dsee_ultimate") is True
     assert grpc_path_needs_ha_restore("system_setting.dimmer") is True
     assert grpc_path_needs_ha_restore("system_setting.hdmi_signal_format") is True
-    assert grpc_path_needs_ha_restore("sound_setting.dts_dialog_control") is True
+    assert grpc_path_needs_ha_restore("sound_setting.dts_dialog_control") is False
     assert (
         grpc_path_needs_ha_restore("speaker_sound_setting.center_speaker_mode") is True
     )

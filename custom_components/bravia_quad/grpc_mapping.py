@@ -76,7 +76,6 @@ NOTIFY_ONLY_GRPC_PATHS_SET: frozenset[str] = frozenset(NOTIFY_ONLY_GRPC_PATHS)
 # Hand-crafted exec-only paths with no TCP read fallback.
 _HANDCRAFTED_NO_READ_GRPC_PATHS: frozenset[str] = frozenset(
     {
-        "sound_setting.dts_dialog_control",
         "speaker_sound_setting.center_speaker_mode",
     }
 )
@@ -365,9 +364,9 @@ GRPC_TCP_MAPPINGS: tuple[GrpcTcpMapping, ...] = (
     GrpcTcpMapping(
         "sound_setting.dts_dialog_control",
         None,
-        "switch",
+        "number",
         writable=True,
-        notes="DTS Dialog Control; separate from DRC",
+        notes="DTS Dialog Control; int 0-6 from GetCapabilities; separate from DRC",
     ),
     GrpcTcpMapping(
         "system_setting.dimmer",

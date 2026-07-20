@@ -110,6 +110,9 @@
       },
       "voice_zoom_level": {
         "name": "Voice Zoom level"
+      },
+      "dts_dialog_control": {
+        "name": "DTS Dialog Control"
       }
     },
     "select": {
@@ -327,9 +330,6 @@
       },
       "dsee_ultimate": {
         "name": "DSEE Ultimate"
-      },
-      "dts_dialog_control": {
-        "name": "DTS Dialog Control"
       },
       "center_speaker_mode": {
         "name": "Center speaker mode"
