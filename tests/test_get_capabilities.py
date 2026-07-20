@@ -102,12 +102,17 @@ def test_field_paths_for_get_states_filters_and_falls_back() -> None:
         }
     )
     filtered = client.field_paths_for_get_states()
-    assert filtered[0] == "bluetooth_setting.connection_quality"
-    assert "power" in filtered
-    assert "volume" in filtered
-    assert "mute" in filtered
+    # Metadata siblings stay when the base path is advertised.
+    assert filtered == [
+        "bluetooth_setting.connection_quality",
+        "bluetooth_setting.connection_quality.availability",
+        "mute",
+        "power",
+        "volume",
+        "volume.availability",
+        "volume.unavailable_reason",
+    ]
     assert "sound_setting.drc" not in filtered
-    assert len(filtered) == 4
 
     client._capability_paths = frozenset({"totally.unknown.path"})
     assert client.field_paths_for_get_states() == ha_paths
@@ -153,7 +158,13 @@ def test_get_states_dict_uses_filtered_paths(monkeypatch: pytest.MonkeyPatch) ->
 
     result = client.get_states_dict()
     assert result == {"power": True}
-    assert built_paths == ["power", "volume"]
+    # Metadata siblings stay when the base path is advertised.
+    assert built_paths == [
+        "power",
+        "volume",
+        "volume.availability",
+        "volume.unavailable_reason",
+    ]
     assert captured["request"] == b"req"
 
 

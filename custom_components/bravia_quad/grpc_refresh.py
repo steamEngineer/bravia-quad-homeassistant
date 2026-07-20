@@ -11,7 +11,14 @@ from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 
 from .bravia_grpc_client import BraviaGrpcClientAsync
-from .const import CONF_GRPC_DEBUG, CONF_GRPC_KEYS, CONF_GRPC_SEEDS_POLL, DEFAULT_NAME
+from .const import (
+    CONF_FEATURE_UNAVAILABLE_REASONS,
+    CONF_GRPC_DEBUG,
+    CONF_GRPC_KEYS,
+    CONF_GRPC_SEEDS_POLL,
+    DEFAULT_NAME,
+    DOMAIN,
+)
 from .external_control import async_ensure_external_control_enabled
 from .grpc.credentials import (
     GrpcCredentialsError,
@@ -177,6 +184,23 @@ async def async_setup_grpc_client(
             return True
 
     grpc_client.set_refresh_keys_callback(_refresh_keys_callback)
+
+    async def _persist_feature_reasons(reasons: dict[str, str]) -> None:
+        if entry.data.get(CONF_FEATURE_UNAVAILABLE_REASONS) == reasons:
+            return
+        # Data-only write must not trip options update_listener → reload.
+        hass.data.setdefault(DOMAIN, {}).setdefault(entry.entry_id, {})[
+            "_suppress_entry_reload"
+        ] = True
+        hass.config_entries.async_update_entry(
+            entry,
+            data={**entry.data, CONF_FEATURE_UNAVAILABLE_REASONS: reasons},
+        )
+
+    grpc_client.configure_feature_unavailable_persistence(
+        entry.data.get(CONF_FEATURE_UNAVAILABLE_REASONS),
+        _persist_feature_reasons,
+    )
 
     try:
         connected = await grpc_client.async_connect()

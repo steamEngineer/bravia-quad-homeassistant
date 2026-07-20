@@ -110,6 +110,27 @@ class BraviaGrpcClientAsync:
         self._seeds_refresh_pending: bool = False
         # path → monotonic deadline; force Seeds must not overwrite until then.
         self._seeds_write_guard: dict[str, float] = {}
+        self._feature_unavailable_reasons: dict[str, str] = {}
+        self._persist_feature_reasons: (
+            Callable[[dict[str, str]], Awaitable[None]] | None
+        ) = None
+        self._persist_feature_reasons_task: asyncio.Task[None] | None = None
+
+    def configure_feature_unavailable_persistence(
+        self,
+        initial: dict[str, Any] | None,
+        persist: Callable[[dict[str, str]], Awaitable[None]],
+    ) -> None:
+        """Restore last-known feature block reasons across reload / GetStates none."""
+        self._feature_unavailable_reasons = {
+            str(path): str(reason)
+            for path, reason in (initial or {}).items()
+            if isinstance(path, str)
+            and path.endswith(".unavailable_reason")
+            and reason is not None
+            and str(reason).lower() not in ("", "none")
+        }
+        self._persist_feature_reasons = persist
 
     def note_external_control_ensure(self, result: ExternalControlEnsureResult) -> None:
         """Record TCP reachability from the external-control ensure probe."""
@@ -484,10 +505,41 @@ class BraviaGrpcClientAsync:
             _LOGGER.warning("gRPC GetStates snapshot failed for %s", self.host)
             return 0
         self._client.update_notify_cache(snapshot)
+        restored = self._client.apply_persisted_feature_unavailable_reasons(
+            self._feature_unavailable_reasons
+        )
+        if restored:
+            self._debug(
+                "Restored %d persisted feature unavailable_reason values on %s",
+                restored,
+                self.host,
+            )
+        self._sync_feature_unavailable_reasons_from_cache()
         self._debug(
             "GetStates snapshot seeded %d fields on %s", len(snapshot), self.host
         )
         return len(snapshot)
+
+    def _sync_feature_unavailable_reasons_from_cache(self) -> None:
+        """Persist export of real reasons from notify_state (debounced)."""
+        exported = self._client.export_feature_unavailable_reasons()
+        if exported == self._feature_unavailable_reasons:
+            return
+        self._feature_unavailable_reasons = exported
+        persist = self._persist_feature_reasons
+        if persist is None or self._hass is None:
+            return
+        if (
+            self._persist_feature_reasons_task is not None
+            and not self._persist_feature_reasons_task.done()
+        ):
+            self._persist_feature_reasons_task.cancel()
+        reasons = dict(self._feature_unavailable_reasons)
+
+        async def _persist() -> None:
+            await persist(reasons)
+
+        self._persist_feature_reasons_task = self._hass.async_create_task(_persist())
 
     async def async_backfill_entity_paths(self) -> tuple[int, int, int]:
         """
@@ -894,6 +946,8 @@ class BraviaGrpcClientAsync:
                 self._debug("Notify delta %s=%r", states.path, states.value)
                 if states.path == _PATH_NO_AUDIO:
                     self.schedule_seeds_refresh()
+                if states.path.endswith((".unavailable_reason", ".availability")):
+                    self._sync_feature_unavailable_reasons_from_cache()
                 for callback in self._state_callbacks:
                     try:
                         callback(states)

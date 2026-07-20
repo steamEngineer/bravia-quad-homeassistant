@@ -73,7 +73,7 @@ Bulk GetStates (static HA path list, app-sequence with HMAC signing; filtered to
 | Core media | `power`, `volume`, `playback_control.function` | Real values | Same as bulk | Optional |
 | Bulk bools (empty wire) | `mute`, `sound_setting.night_mode`, `sound_setting.sound_field`, `sound_setting.voice_mode` | Key present, value `None` | Still `None` on fw 001.454 | First delta after change; Seeds seed when `grpc_seeds_poll` is on (TCP seed when Seeds is off) |
 | NOTIFY-only app settings | `sound_setting.drc`, `speaker_sound_setting.360ssm_height`, `system_setting.earc` | Absent from bulk | Fails (`UNKNOWN`) | **Not emitted** on fw 001.454 |
-| Metadata | `*.availability`, `*.unavailable_reason` | Present | N/A | N/A |
+| Metadata | `*.availability`, `*.unavailable_reason` | Present | N/A | N/A — drives mapped-entity grey-out + Unavailable Entities sensor (see [entities.md](entities.md)) |
 
 Startup sequence in [`__init__.py`](../custom_components/bravia_quad/__init__.py):
 

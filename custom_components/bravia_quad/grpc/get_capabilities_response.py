@@ -209,18 +209,41 @@ def enum_values_from_capability(
     return meta.values
 
 
+_METADATA_SUFFIXES = (".availability", ".unavailable_reason", ".range")
+
+
+def _capability_covers_path(path: str, capability_paths: frozenset[str]) -> bool:
+    """Return True when *path* is advertised or is metadata for an advertised base."""
+    if path in capability_paths:
+        return True
+    if not path.endswith(_METADATA_SUFFIXES):
+        return False
+    base = path.rsplit(".", maxsplit=1)[0]
+    if base in capability_paths:
+        return True
+    # Value path may be advertised as ``base.on_off`` while metadata is on ``base``.
+    prefix = f"{base}."
+    return any(cap == base or cap.startswith(prefix) for cap in capability_paths)
+
+
 def filter_field_paths(
     ha_paths: list[str], capability_paths: frozenset[str] | None
 ) -> list[str]:
     """
     Intersect HA path list with device capabilities, preserving HA order.
 
+    Metadata siblings (``*.availability`` / ``*.unavailable_reason`` / ``*.range``)
+    are kept when their base feature is advertised, even if GetCapabilities omits
+    the metadata path name itself.
+
     When *capability_paths* is None or the intersection is empty, return
     *ha_paths* unchanged (soft fallback).
     """
     if capability_paths is None:
         return list(ha_paths)
-    filtered = [path for path in ha_paths if path in capability_paths]
+    filtered = [
+        path for path in ha_paths if _capability_covers_path(path, capability_paths)
+    ]
     if not filtered:
         return list(ha_paths)
     return filtered
