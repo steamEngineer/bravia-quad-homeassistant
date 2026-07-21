@@ -38,22 +38,34 @@ def test_entity_critical_paths_include_media_player_and_handcrafted() -> None:
     assert "sound_setting.sound_field.availability" not in paths
 
 
-def test_filter_field_paths_keeps_metadata_for_advertised_base() -> None:
+def test_filter_field_paths_drops_non_advertised_metadata_siblings() -> None:
+    """HT-A8 rejects bulk GetStates if any path is not advertised (e.g. testtone)."""
     from custom_components.bravia_quad.grpc.get_capabilities_response import (
         filter_field_paths,
     )
 
     ha_paths = [
+        "speaker_sound_setting.testtone_playback",
+        "speaker_sound_setting.testtone_playback.availability",
         "sound_setting.voice_zoom.on_off",
         "sound_setting.voice_zoom.availability",
         "sound_setting.voice_zoom.unavailable_reason",
         "power",
     ]
-    caps = frozenset({"sound_setting.voice_zoom.on_off", "power"})
+    # Base advertised; metadata siblings not — must drop siblings only.
+    caps = frozenset(
+        {
+            "speaker_sound_setting.testtone_playback",
+            "sound_setting.voice_zoom.on_off",
+            "power",
+        }
+    )
     filtered = filter_field_paths(ha_paths, caps)
-    assert "sound_setting.voice_zoom.availability" in filtered
-    assert "sound_setting.voice_zoom.unavailable_reason" in filtered
-    assert "sound_setting.voice_zoom.on_off" in filtered
+    assert filtered == [
+        "speaker_sound_setting.testtone_playback",
+        "sound_setting.voice_zoom.on_off",
+        "power",
+    ]
 
 
 def test_missing_entity_paths_treats_none_as_unset() -> None:
