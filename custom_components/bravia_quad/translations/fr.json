@@ -5,24 +5,76 @@
         "title": "Configuration Bravia Theatre",
         "description": "Entrez l'adresse IP de votre appareil Bravia Theatre.",
         "data": {
-          "host": "Adresse IP",
-          "name": "Nom"
+          "host": "Adresse IP"
         }
+      },
+      "transport": {
+        "title": "Méthode de connexion",
+        "description": "Choisissez comment Home Assistant contrôle votre Bravia Theatre.\n\n**gRPC — BRAVIA Connect (recommandé)**\nMême plan de contrôle que l'application Sony Home Entertainment Connect : mises à jour en direct, métadonnées de lecture en cours, lecture/pause/suivant sur Spotify et AirPlay, mode de champ sonore, DSEE Ultimate, hauteur 360SSM, mode enceinte centrale, DTS Dialog Control et niveau du caisson de basses. Nécessite une connexion unique au compte Sony. **Fonctionnalité bêta :** encore en évolution — attendez-vous à des écarts de parité avec TCP et à des changements occasionnels selon les versions ou le micrologiciel.\n\n**TCP — contrôle IP historique**\nProtocole IP d'origine (port 33336). Pas de connexion Sony, mais moins de fonctionnalités : pas de commandes de transport de streaming, pas de métadonnées de lecture en cours, et pas des réglages sonores réservés à BRAVIA Connect. TCP expose encore quelques extras comme le bouton d'appairage Bluetooth, le passage HDMI, la température et les diagnostics réseau détaillés.\n\nLes deux modes utilisent HTTP pour les capteurs de micrologiciel et réseau. Pour changer plus tard, retirez puis réajoutez l'intégration.",
+        "data": {
+          "transport": "Méthode de connexion"
+        }
+      },
+      "grpc_oauth": {
+        "title": "Connexion à Sony",
+        "description": "Utilisez **Chrome** (recommandé) et ouvrez les outils de développement **avant** de vous connecter :\n\n1. Appuyez sur **F12** → **Réseau** → activez **Conserver le journal**\n2. Ouvrez ce lien de connexion et terminez la connexion Sony pour Home Entertainment & Sound Service :\n\n{authorize_url}\n\n3. Après la connexion, Chrome tente d'ouvrir `ssh-app://signin?...` et échoue sur le bureau. C'est normal — l'URL n'apparaît **pas** dans la barre d'adresse.\n4. Dans **Réseau**, filtrez `signin` et trouvez la requête vers `ssh-app://signin?code=...`. Copiez l'URL complète depuis **URL de la requête** ou l'en-tête **Location**.\n5. Sélectionnez **Envoyer** ci-dessous et collez l'URL (ou seulement la valeur `code`) à l'étape suivante."
+      },
+      "grpc_oauth_callback": {
+        "title": "Coller la redirection de connexion Sony",
+        "description": "Collez l'URL `ssh-app://signin?code=...` depuis les outils **Réseau** de Chrome, ou collez uniquement la valeur `code`.\n\n**Chrome :** **F12** → **Réseau** → filtrez `signin` → sélectionnez la requête `ssh-app://signin` → copiez **URL de la requête** ou l'en-tête de réponse **Location**.",
+        "data": {
+          "grpc_oauth_redirect": "URL de redirection ou code d'autorisation"
+        }
+      },
+      "grpc_oauth_device": {
+        "title": "Choisir l'appareil Sony",
+        "description": "Votre compte Sony a plus d'un appareil. Sélectionnez le Bravia Theatre que vous configurez.",
+        "data": {
+          "grpc_device_id": "Appareil Sony"
+        }
+      },
+      "user_confirm": {
+        "title": "Confirmer la configuration",
+        "description": "La connexion à {host} a réussi. Voulez-vous ajouter cet appareil ?"
       },
       "zeroconf_confirm": {
         "title": "Bravia Theatre découvert",
         "description": "Voulez-vous configurer {name} ?\n\nAssurez-vous que le **contrôle externe** est activé dans l'application Sony Home Entertainment Connect sous **Paramètres > Paramètres réseau**."
+      },
+      "reauth_confirm": {
+        "title": "Réauthentifier {name}",
+        "description": "L'appareil n'est plus joignable. Mettez à jour l'adresse IP si elle a changé. Les entrées gRPC se reconnecteront à Sony aux étapes suivantes.",
+        "data": {
+          "host": "Adresse IP"
+        }
       }
     },
     "error": {
-      "cannot_connect": "Impossible de se connecter à l'appareil Bravia Theatre. Veuillez vérifier :\n- L'adresse IP est correcte\n- Le contrôle IP est activé sur l'appareil\n- Le port 33336 est accessible",
+      "cannot_connect": "Impossible de se connecter à l'appareil Bravia Theatre. Veuillez vérifier :\n- L'adresse IP est correcte\n- L'appareil est sur votre réseau\n- Pour TCP : le contrôle IP est activé et le port 33336 est accessible\n- Pour gRPC : le port 55051 est accessible et le contrôle externe est activé dans l'application Sony",
+      "invalid_grpc_keys": "Identifiants Sony Seeds invalides après la connexion.",
+      "invalid_oauth_redirect": "Impossible de lire un code d'autorisation dans votre saisie. Dans les outils **Réseau** de Chrome, copiez l'URL complète `ssh-app://signin?...` ou collez uniquement la valeur `code`.",
+      "oauth_failed": "La connexion Sony a échoué. Recommencez et utilisez un nouveau lien de connexion.",
       "unknown": "Une erreur inattendue s'est produite"
     },
     "abort": {
       "already_configured": "L'appareil est déjà configuré",
       "not_bravia_theatre": "L'appareil découvert n'est pas une enceinte Bravia Theatre",
       "cannot_connect": "Impossible de se connecter à l'appareil",
-      "wrong_account": "Le compte Sony connecté ne correspond pas à cet appareil Bravia Theatre"
+      "reauth_successful": "La réauthentification a réussi",
+      "wrong_account": "Le compte Sony connecté ne correspond pas à cet appareil Bravia Theatre",
+      "not_grpc_transport": "Les options gRPC ne sont disponibles que pour les entrées en transport gRPC"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Options gRPC",
+        "description": "Paramètres du transport gRPC. Les lectures cloud Seeds utilisent la même API Sony que BRAVIA Connect (@mafredri) pour les réglages non lisibles via gRPC local — requis sur les modèles où TCP est bloqué (p. ex. HT-A8).",
+        "data": {
+          "grpc_debug": "Journalisation de débogage gRPC verbeuse",
+          "grpc_seeds_poll": "Lire les réglages notify-only depuis le cloud Sony Seeds"
+        }
+      }
     }
   },
   "entity": {
@@ -44,19 +96,226 @@
       "bass_level": {
         "name": "Niveau des basses"
       },
+      "subwoofer_level": {
+        "name": "Niveau du caisson de basses"
+      },
       "volume_step_interval": {
         "name": "Pas du volume"
+      },
+      "av_sync": {
+        "name": "Synchro AV (HDMI)"
+      },
+      "tv_av_sync": {
+        "name": "Synchro AV (TV)"
+      },
+      "voice_zoom_level": {
+        "name": "Niveau Voice Zoom"
+      },
+      "dts_dialog_control": {
+        "name": "DTS Dialog Control"
       }
     },
     "select": {
       "input": {
-        "name": "Source"
+        "name": "Source",
+        "state": {
+          "tv": "TV (eARC)",
+          "hdmi1": "HDMI",
+          "spotify": "Spotify",
+          "bluetooth": "Bluetooth",
+          "airplay2": "AirPlay",
+          "360racast": "360 Reality Audio Cast",
+          "other": "Autre"
+        }
       },
       "bass_level": {
-        "name": "Niveau des basses"
+        "name": "Niveau des basses",
+        "state": {
+          "min": "Min",
+          "mid": "Moyen",
+          "max": "Max"
+        }
       },
       "drc": {
-        "name": "DRC audio"
+        "name": "Compresseur de plage dynamique",
+        "state": {
+          "auto": "Auto",
+          "on": "Activé",
+          "off": "Désactivé"
+        }
+      },
+      "display_brightness": {
+        "name": "Luminosité de l'affichage",
+        "state": {
+          "dark": "Sombre",
+          "off": "Éteint",
+          "bright": "Clair"
+        }
+      },
+      "imax_mode": {
+        "name": "IMAX Enhanced",
+        "state": {
+          "auto": "Automatique",
+          "on": "Activé",
+          "off": "Désactivé"
+        }
+      },
+      "hdmi_passthrough": {
+        "name": "Passage du signal HDMI",
+        "state": {
+          "auto": "Auto",
+          "on": "Activé",
+          "off": "Désactivé"
+        }
+      },
+      "dual_mono": {
+        "name": "Dual mono",
+        "state": {
+          "main": "Principal",
+          "sub": "Secondaire",
+          "main_sub": "Principal/Secondaire"
+        }
+      },
+      "bt_connection_quality": {
+        "name": "Qualité de connexion Bluetooth",
+        "state": {
+          "prioritysound": "Priorité à la qualité sonore",
+          "priorityconnection": "Priorité à la connexion stable"
+        }
+      },
+      "hdmi_standby_link": {
+        "name": "Passage HDMI en veille",
+        "state": {
+          "auto": "Auto",
+          "on": "Activé",
+          "off": "Désactivé"
+        }
+      },
+      "cec_power_off_sync": {
+        "name": "Synchro extinction HDMI CEC",
+        "state": {
+          "auto": "Auto",
+          "on": "Activé",
+          "off": "Désactivé"
+        }
+      },
+      "hdmi_signal_format": {
+        "name": "Format du signal HDMI",
+        "state": {
+          "standard": "Format standard",
+          "enhanced": "Format amélioré",
+          "enhanced_4k120_8k": "Format amélioré (4K120, 8K)"
+        }
+      },
+      "audio_return_channel": {
+        "name": "Canal de retour audio",
+        "state": {
+          "off": "Désactivé",
+          "arc": "ARC",
+          "earc": "eARC"
+        }
+      },
+      "sound_effect": {
+        "name": "Mode de champ sonore",
+        "state": {
+          "dolby_speaker_virtualizer": "Dolby Speaker Virtualizer",
+          "neural_x": "DTS Neural:X",
+          "ssm_360": "360 Spatial Sound Mapping"
+        }
+      },
+      "ssm_360_height": {
+        "name": "Hauteur 360SSM",
+        "state": {
+          "high": "Haut",
+          "mid": "Moyen",
+          "low": "Bas"
+        }
+      },
+      "stereo_playback": {
+        "name": "Lecture stéréo",
+        "state": {
+          "up_mix": "Up mix",
+          "multi_stereo": "Multi stéréo"
+        }
+      },
+      "sw_phase": {
+        "name": "Phase du caisson de basses",
+        "state": {
+          "0": "0°",
+          "180": "180°",
+          "0_0": "0° / 0°",
+          "180_180": "180° / 180°",
+          "0_180": "0° / 180°",
+          "180_0": "180° / 0°"
+        }
+      }
+    },
+    "media_player": {
+      "bravia_quad": {
+        "state_attributes": {
+          "source": {
+            "state": {
+              "tv": "TV (eARC)",
+              "hdmi1": "HDMI",
+              "spotify": "Spotify",
+              "bluetooth": "Bluetooth",
+              "airplay2": "AirPlay",
+              "360racast": "360 Reality Audio Cast",
+              "other": "Autre"
+            }
+          },
+          "sound_mode": {
+            "state": {
+              "dolby_speaker_virtualizer": "Dolby Speaker Virtualizer",
+              "neural_x": "DTS Neural:X",
+              "ssm_360": "360 Spatial Sound Mapping"
+            }
+          },
+          "audio_format": {
+            "name": "Format audio"
+          },
+          "audio_channel": {
+            "name": "Canal audio"
+          },
+          "sampling_rate": {
+            "name": "Fréquence d'échantillonnage"
+          },
+          "is_360ra": {
+            "name": "360 Reality Audio"
+          },
+          "upmixer": {
+            "name": "Upmixer"
+          },
+          "virtualizer": {
+            "name": "Virtualiseur"
+          },
+          "bt_codec": {
+            "name": "Codec Bluetooth"
+          },
+          "bt_device_name": {
+            "name": "Appareil Bluetooth"
+          },
+          "bt_signal_strength": {
+            "name": "Signal Bluetooth"
+          },
+          "hdmi_error": {
+            "name": "Erreur HDMI"
+          },
+          "no_audio": {
+            "name": "Pas d'audio"
+          },
+          "spotify_status": {
+            "name": "État Spotify"
+          },
+          "source_unavailable_reason": {
+            "name": "Source indisponible"
+          }
+        }
+      }
+    },
+    "update": {
+      "firmware": {
+        "name": "Mise à jour du micrologiciel"
       }
     },
     "switch": {
@@ -80,6 +339,89 @@
       },
       "auto_volume": {
         "name": "Volume automatique"
+      },
+      "auto_update": {
+        "name": "Mise à jour automatique"
+      },
+      "net_bt_standby": {
+        "name": "Veille réseau/Bluetooth"
+      },
+      "voice_zoom": {
+        "name": "Voice Zoom"
+      },
+      "external_control": {
+        "name": "Contrôle externe"
+      },
+      "dsee_ultimate": {
+        "name": "DSEE Ultimate"
+      },
+      "center_speaker_mode": {
+        "name": "Mode enceinte centrale"
+      },
+      "audio_return_channel": {
+        "name": "HDMI ARC (TV)"
+      },
+      "mix_stage": {
+        "name": "Mix stage"
+      }
+    },
+    "sensor": {
+      "temperature": {
+        "name": "Température"
+      },
+      "timezone": {
+        "name": "Fuseau horaire"
+      },
+      "ssm_360": {
+        "name": "360 Spatial Sound Mapping"
+      },
+      "voice_zoom_level": {
+        "name": "Niveau Voice Zoom"
+      },
+      "network_mode": {
+        "name": "Mode réseau"
+      },
+      "ip_address": {
+        "name": "Adresse IP"
+      },
+      "device_name": {
+        "name": "Nom de l'appareil"
+      },
+      "destination": {
+        "name": "Région"
+      },
+      "language": {
+        "name": "Langue"
+      },
+      "dhcp": {
+        "name": "DHCP"
+      },
+      "internet": {
+        "name": "Internet"
+      },
+      "ipv6_address": {
+        "name": "Adresse IP (IPv6)"
+      },
+      "wifi_signal": {
+        "name": "Signal Wi-Fi"
+      },
+      "mac_wired": {
+        "name": "Adresse MAC (filaire)"
+      },
+      "mac_wireless": {
+        "name": "Adresse MAC (sans fil)"
+      },
+      "raee_measured": {
+        "name": "Calibration de la pièce mesurée"
+      },
+      "battery_life_rl": {
+        "name": "Batterie arrière gauche"
+      },
+      "battery_life_rr": {
+        "name": "Batterie arrière droite"
+      },
+      "unavailable_entities": {
+        "name": "Entités indisponibles"
       }
     }
   },
@@ -89,6 +431,38 @@
     },
     "detection_failed": {
       "message": "Échec de la détection du caisson de basses en raison d'une erreur de connexion. Veuillez réessayer."
+    },
+    "firmware_update_failed": {
+      "message": "Échec du déclenchement de la mise à jour du micrologiciel. L'appareil est peut-être occupé ou injoignable. Veuillez réessayer plus tard."
+    },
+    "verify_set_rejected": {
+      "message": "L'appareil a rejeté la valeur {requested} pour {feature}"
+    },
+    "verify_read_failed": {
+      "message": "Impossible de vérifier {feature} après avoir défini {requested}"
+    },
+    "verify_unexpected_value": {
+      "message": "L'appareil a renvoyé une valeur inattendue {actual} pour {feature}"
+    },
+    "verify_value_mismatch": {
+      "message": "L'appareil a conservé {feature} à {actual} (demandé {requested})"
+    },
+    "verify_value_mismatch_hint": {
+      "message": "L'appareil a conservé {feature} à {actual} (demandé {requested}). {hint}"
+    },
+    "grpc_exec_failed": {
+      "message": "Échec de la commande gRPC pour {path}"
+    },
+    "grpc_feature_unavailable": {
+      "message": "Commande gRPC bloquée pour {path} : {reason}"
+    }
+  },
+  "selector": {
+    "transport": {
+      "options": {
+        "grpc": "gRPC — BRAVIA Connect (recommandé)",
+        "tcp": "TCP — contrôle IP historique"
+      }
     }
   }
 }
