@@ -14,6 +14,7 @@ from custom_components.bravia_quad.grpc_entity_registry import entity_spec_for_p
 from custom_components.bravia_quad.grpc_mapped_entities import (
     BraviaGrpcMappedSelect,
     BraviaGrpcMappedSwitch,
+    mapped_number_entities,
     mapped_select_entities,
     mapped_switch_entities,
 )
@@ -42,8 +43,14 @@ def test_mapped_grpc_switch_and_select_factories_include_former_handcrafted(
     select_paths = {
         e._grpc_path for e in mapped_select_entities(grpc_client, grpc_entry)
     }
+    number_paths = {
+        e._grpc_path
+        for e in mapped_number_entities(grpc_client, grpc_entry)
+        if hasattr(e, "_grpc_path")
+    }
     assert GRPC_PATH_DSEE in switch_paths
-    assert GRPC_PATH_DTS_DIALOG in switch_paths
+    assert GRPC_PATH_DTS_DIALOG not in switch_paths
+    assert GRPC_PATH_DTS_DIALOG in number_paths
     assert GRPC_PATH_EARC in switch_paths
     assert GRPC_PATH_SSM360_HEIGHT in select_paths
     assert GRPC_PATH_DIMMER in select_paths
@@ -125,31 +132,6 @@ async def test_dsee_switch_restores_on_added_to_hass(
     assert entity._attr_is_on is False
     grpc_client.merge_notify_cache.assert_called_once_with({GRPC_PATH_DSEE: False})
     entity.async_write_ha_state.assert_called_once()
-
-
-@pytest.mark.asyncio
-async def test_dts_dialog_restores_on_added_to_hass(
-    hass: HomeAssistant, grpc_client: MagicMock, grpc_entry: MagicMock
-) -> None:
-    spec = entity_spec_for_path(GRPC_PATH_DTS_DIALOG)
-    assert spec is not None
-    entity = BraviaGrpcMappedSwitch(grpc_client, grpc_entry, spec)
-    entity.entity_id = f"switch.{DOMAIN}_serial123_dts_dialog_control"
-    entity.hass = hass
-    entity.async_write_ha_state = MagicMock()
-    grpc_client.merge_notify_cache = MagicMock()
-    grpc_client.notify_state = {}
-
-    async_get(hass).last_states[entity.entity_id] = StoredState(
-        State(entity.entity_id, "on"),
-        None,
-        datetime.now(tz=UTC),
-    )
-
-    await entity.async_added_to_hass()
-
-    assert entity._attr_is_on is True
-    grpc_client.merge_notify_cache.assert_called_once_with({GRPC_PATH_DTS_DIALOG: True})
 
 
 @pytest.mark.asyncio

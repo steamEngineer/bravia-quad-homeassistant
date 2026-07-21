@@ -19,7 +19,6 @@ _BOOL_COMMAND_PATHS = frozenset(
         "system_setting.cec",
         "system_setting.nw_bt_standby",
         "sound_setting.dsee_ultimate",
-        "sound_setting.dts_dialog_control",
     }
 )
 

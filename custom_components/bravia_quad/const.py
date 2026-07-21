@@ -165,6 +165,10 @@ VOICE_ZOOM_OFF = "off"
 MIN_VOICE_ZOOM_LEVEL = 0
 MAX_VOICE_ZOOM_LEVEL = 2
 
+# DTS Dialog Control (GetCapabilities fallback: min 0, max 6, span 1)
+MIN_DTS_DIALOG_CONTROL = 0
+MAX_DTS_DIALOG_CONTROL = 6
+
 # Input options (API values used as translation keys)
 INPUT_OPTIONS: list[str] = ["tv", "hdmi1", "spotify", "bluetooth", "airplay2"]
 

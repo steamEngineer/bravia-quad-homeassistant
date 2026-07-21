@@ -209,6 +209,48 @@ def test_mapped_number_omit_zero_and_capability_range(
     assert entity._attr_native_value == 0.0
 
 
+def test_dts_dialog_control_is_capability_ranged_number(
+    grpc_client: MagicMock, grpc_entry: MagicMock
+) -> None:
+    from homeassistant.const import UnitOfSoundPressure
+
+    from custom_components.bravia_quad.grpc.get_capabilities_response import (
+        CapabilityMeta,
+    )
+    from custom_components.bravia_quad.grpc_mapped_entities import (
+        BraviaGrpcMappedNumber,
+        _number_range,
+    )
+
+    path = "sound_setting.dts_dialog_control"
+    mapping = mapping_for_grpc_path(path)
+    assert mapping is not None
+
+    kind, payload = denormalize_for_exec(mapping, 3)
+    assert (kind, payload) == ("int_value", 3)
+
+    index = {
+        path: CapabilityMeta(name=path, type="int", min=0, max=6),
+    }
+    lo, hi = _number_range(mapping, capability_index=index)
+    assert (lo, hi) == (0.0, 6.0)
+    assert _number_range(mapping) == (0.0, 6.0)
+
+    grpc_client.capability_index = index
+    grpc_client.notify_state = {path: 2}
+    entity = BraviaGrpcMappedNumber(
+        grpc_client,
+        grpc_entry,
+        entity_spec_for_mapping(mapping),
+        native_min_value=lo,
+        native_max_value=hi,
+    )
+    assert entity._attr_mode == NumberMode.SLIDER
+    assert entity._attr_native_step == 1
+    assert entity._attr_native_unit_of_measurement == UnitOfSoundPressure.DECIBEL
+    assert entity._attr_native_value == 2.0
+
+
 def test_av_sync_mapped_numbers_match_tcp_slider(
     grpc_client: MagicMock, grpc_entry: MagicMock
 ) -> None:
