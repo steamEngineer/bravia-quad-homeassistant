@@ -20,7 +20,7 @@ jobs:
       code: ${{ steps.filter.outputs.code }}
     steps:
       - name: Checkout the repository
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
 
       - name: Detect code paths
         uses: dorny/paths-filter@v4.0.2
@@ -60,7 +60,7 @@ jobs:
         if: >-
           github.event_name == 'push' ||
           needs.changes.outputs.code == 'true'
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
 
       - name: Install uv
         if: >-
@@ -108,7 +108,7 @@ jobs:
         if: >-
           github.event_name == 'push' ||
           needs.changes.outputs.code == 'true'
-        uses: actions/checkout@v7.0.0
+        uses: actions/checkout@v7.0.1
 
       - name: Install uv
         if: >-
