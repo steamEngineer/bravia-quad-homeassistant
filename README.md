@@ -23,7 +23,7 @@ A Home Assistant custom integration for Sony Bravia Theatre home theater systems
 <details>
 <summary>View Home Assistant screenshots</summary>
 
-<img src="docs/images/combinedView_mediaPlayer.png" alt="Bravia Theatre in Home Assistant: media player, configuration entities, and unavailable-entities diagnostic" width="900">
+<img src="docs/images/combinedView_media_player.png" alt="Bravia Theatre in Home Assistant: media player, configuration entities, and unavailable-entities diagnostic" width="900">
 
 </details>
 
