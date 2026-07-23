@@ -20,14 +20,8 @@ A Home Assistant custom integration for Sony Bravia Theatre home theater systems
 >
 > Practical caveats: this is an **unofficial** integration with **no affiliation with or endorsement by Sony**. It targets one model on one firmware (`001.454`); Sony can change or break the protocol at any time, and firmware updates may disable it. Trademarks (Sony, BRAVIA) belong to their owners and are used here only to identify the device. **Use at your own risk** — there is no warranty, and you are responsible for complying with the terms of service and laws that apply in your own jurisdiction. Nothing in this document is legal advice.
 
-<details>
-<summary>View Home Assistant screenshots</summary>
 
-<img src="docs/images/combinedView_media_player.png" alt="Bravia Theatre media player and related entities in Home Assistant" width="900">
 
-<img src="docs/images/combinedView_config_control.png" alt="Bravia Theatre configuration controls and diagnostics in Home Assistant" width="900">
-
-</details>
 
 ## Features
 
@@ -40,6 +34,20 @@ A Home Assistant custom integration for Sony Bravia Theatre home theater systems
 - **Multiple Theatres** — zeroconf rediscovery matches by host or MAC so each device gets its own config entry; entities nest under one HA device per Theatre
 
 Full entity list: [docs/entities.md](docs/entities.md)
+
+ **Quick Pics**
+<details>
+  <summary> 
+   Media Player View
+  </summary>
+
+<img src="docs/images/combinedView_media_player.png" alt="Bravia Theatre media player and related entities in Home Assistant" width="800">
+</details>
+
+<details>
+<summary>Entity View</summary>
+<img src="docs/images/combinedView_config_control.png" alt="Bravia Theatre configuration controls and diagnostics in Home Assistant" width="900">
+</details>
 
 ## Device compatibility
 
