@@ -1,0 +1,468 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Bravia Theatre のセットアップ",
+        "description": "Bravia Theatre 機器の IP アドレスを入力してください。",
+        "data": {
+          "host": "IP アドレス"
+        }
+      },
+      "transport": {
+        "title": "接続方法",
+        "description": "Home Assistant が Bravia Theatre を制御する方法を選んでください。\n\n**gRPC — BRAVIA Connect（推奨）**\nSony Home Entertainment Connect アプリと同じ制御面です。ライブのプッシュ更新、再生中のメタデータ、Spotify と AirPlay の再生/一時停止/次へ、サウンドフィールド、DSEE Ultimate、360SSM の高さ、センタースピーカーモード、DTSダイアログコントロール、サブウーファーレベルに対応します。初回のみ Sony アカウントへのサインインが必要です。**ベータ機能:** まだ進化中です。TCP との機能差や、リリース・ファームウェアによる変更がある場合があります。\n\n**TCP — 従来の IP 制御**\n従来の IP 制御プロトコル（ポート 33336）です。Sony へのサインインは不要ですが、機能は少なめです。ストリーミングの再生操作、再生中メタデータ、BRAVIA Connect 専用のサウンド設定はありません。一方で、Bluetooth の機器登録（ペアリング）ボタン、HDMI シグナルパススルー、温度、詳細なネットワーク診断など、一部の機能は TCP 側に残っています。\n\nどちらのモードも、ファームウェアとネットワークセンサーには HTTP を使います。後から切り替える場合は、連携を削除してから再追加してください。",
+        "data": {
+          "transport": "接続方法"
+        }
+      },
+      "grpc_oauth": {
+        "title": "Sony にサインイン",
+        "description": "**Chrome**（推奨）を使い、サインインの**前に**デベロッパーツールを開いてください。\n\n1. **F12** → **ネットワーク** → **ログを保持** を有効にする\n2. 次のサインインリンクを開き、Home Entertainment & Sound Service 用の Sony ログインを完了する:\n\n{authorize_url}\n\n3. ログイン後、Chrome は `ssh-app://signin?...` を開こうとしてデスクトップでは失敗します。これは想定どおりです。URL はアドレスバーに**表示されません**。\n4. **ネットワーク**で `signin` を絞り込み、`ssh-app://signin?code=...` へのリクエストを見つけます。**リクエスト URL** または **Location** ヘッダーから完全な URL をコピーします。\n5. 下の **送信** を選び、次の手順で URL（または `code` の値だけ）を貼り付けます。"
+      },
+      "grpc_oauth_callback": {
+        "title": "Sony サインインのリダイレクトを貼り付け",
+        "description": "Chrome の **ネットワーク** ツールから `ssh-app://signin?code=...` URL を貼り付けるか、`code` の値だけを貼り付けてください。\n\n**Chrome:** **F12** → **ネットワーク** → `signin` で絞り込み → `ssh-app://signin` リクエストを選択 → **リクエスト URL** または応答ヘッダーの **Location** をコピー。",
+        "data": {
+          "grpc_oauth_redirect": "リダイレクト URL または認可コード"
+        }
+      },
+      "grpc_oauth_device": {
+        "title": "Sony 機器を選択",
+        "description": "Sony アカウントに複数の機器があります。セットアップする Bravia Theatre を選んでください。",
+        "data": {
+          "grpc_device_id": "Sony 機器"
+        }
+      },
+      "user_confirm": {
+        "title": "セットアップの確認",
+        "description": "{host} への接続に成功しました。この機器を追加しますか？"
+      },
+      "zeroconf_confirm": {
+        "title": "Bravia Theatre を検出",
+        "description": "{name} をセットアップしますか？\n\nSony Home Entertainment Connect アプリの **設定 > ネットワーク設定** で **外部機器からの操作** が有効になっていることを確認してください。"
+      },
+      "reauth_confirm": {
+        "title": "{name} の再認証",
+        "description": "機器に接続できません。IP アドレスが変わっている場合は更新してください。gRPC エントリは次の手順で再度 Sony にサインインします。",
+        "data": {
+          "host": "IP アドレス"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Bravia Theatre 機器に接続できません。次を確認してください:\n- IP アドレスが正しいこと\n- 機器が同じネットワーク上にあること\n- TCP の場合: IP 制御が有効でポート 33336 に到達できること\n- gRPC の場合: ポート 55051 に到達でき、Sony アプリで外部機器からの操作が有効であること",
+      "invalid_grpc_keys": "サインイン後の Sony Seeds 認証情報が無効です。",
+      "invalid_oauth_redirect": "入力から認可コードを読み取れませんでした。Chrome の **ネットワーク** ツールで、完全な `ssh-app://signin?...` URL をコピーするか、`code` の値だけを貼り付けてください。",
+      "oauth_failed": "Sony へのサインインに失敗しました。最初からやり直し、新しいログインリンクを使ってください。",
+      "unknown": "予期しないエラーが発生しました"
+    },
+    "abort": {
+      "already_configured": "機器はすでに設定されています",
+      "not_bravia_theatre": "検出された機器は Bravia Theatre スピーカーではありません",
+      "cannot_connect": "機器に接続できませんでした",
+      "reauth_successful": "再認証に成功しました",
+      "wrong_account": "サインインした Sony アカウントが、この Bravia Theatre 機器と一致しません",
+      "not_grpc_transport": "gRPC オプションは gRPC トランスポートのエントリでのみ利用できます"
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "gRPC オプション",
+        "description": "gRPC トランスポートの設定です。Seeds クラウド読み取りは、ローカル gRPC では読めない設定について BRAVIA Connect と同じ Sony API を使います（@mafredri）。TCP がブロックされている機種（例: HT-A8）で必要です。",
+        "data": {
+          "grpc_debug": "詳細な gRPC デバッグログ",
+          "grpc_seeds_poll": "notify のみの設定を Sony Seeds クラウドから読み取る"
+        }
+      }
+    }
+  },
+  "entity": {
+    "button": {
+      "detect_subwoofer": {
+        "name": "サブウーファーを検出"
+      },
+      "bluetooth_pairing": {
+        "name": "機器登録（ペアリング）"
+      }
+    },
+    "number": {
+      "volume": {
+        "name": "音量"
+      },
+      "rear_level": {
+        "name": "リアレベル"
+      },
+      "bass_level": {
+        "name": "低音レベル"
+      },
+      "subwoofer_level": {
+        "name": "サブウーファーレベル"
+      },
+      "volume_step_interval": {
+        "name": "音量ステップ間隔"
+      },
+      "av_sync": {
+        "name": "AVシンク（HDMI）"
+      },
+      "tv_av_sync": {
+        "name": "AVシンク（テレビ）"
+      },
+      "voice_zoom_level": {
+        "name": "ボイスズームレベル"
+      },
+      "dts_dialog_control": {
+        "name": "DTSダイアログコントロール"
+      }
+    },
+    "select": {
+      "input": {
+        "name": "入力",
+        "state": {
+          "tv": "テレビ (eARC)",
+          "hdmi1": "HDMI",
+          "spotify": "Spotify",
+          "bluetooth": "Bluetooth",
+          "airplay2": "AirPlay",
+          "360racast": "360 Reality Audio Cast",
+          "other": "その他"
+        }
+      },
+      "bass_level": {
+        "name": "低音レベル",
+        "state": {
+          "min": "最小",
+          "mid": "中",
+          "max": "最大"
+        }
+      },
+      "drc": {
+        "name": "オーディオDRC",
+        "state": {
+          "auto": "自動",
+          "on": "オン",
+          "off": "オフ"
+        }
+      },
+      "display_brightness": {
+        "name": "本体表示の明るさ",
+        "state": {
+          "dark": "暗い",
+          "off": "オフ",
+          "bright": "明るい"
+        }
+      },
+      "imax_mode": {
+        "name": "IMAX Enhanced Mode",
+        "state": {
+          "auto": "自動",
+          "on": "オン",
+          "off": "オフ"
+        }
+      },
+      "hdmi_passthrough": {
+        "name": "シグナルパススルー",
+        "state": {
+          "auto": "自動",
+          "on": "オン",
+          "off": "オフ"
+        }
+      },
+      "dual_mono": {
+        "name": "二重音声（デュアルモノラル）",
+        "state": {
+          "main": "メイン",
+          "sub": "サブ",
+          "main_sub": "メイン/サブ"
+        }
+      },
+      "bt_connection_quality": {
+        "name": "Bluetooth接続品質",
+        "state": {
+          "prioritysound": "音質優先",
+          "priorityconnection": "接続優先"
+        }
+      },
+      "hdmi_standby_link": {
+        "name": "HDMIスタンバイパススルー",
+        "state": {
+          "auto": "自動",
+          "on": "オン",
+          "off": "オフ"
+        }
+      },
+      "cec_power_off_sync": {
+        "name": "テレビ電源オフ連動",
+        "state": {
+          "auto": "自動",
+          "on": "オン",
+          "off": "オフ"
+        }
+      },
+      "hdmi_signal_format": {
+        "name": "HDMI信号フォーマット",
+        "state": {
+          "standard": "標準フォーマット",
+          "enhanced": "拡張フォーマット",
+          "enhanced_4k120_8k": "拡張フォーマット (4K120, 8K)"
+        }
+      },
+      "audio_return_channel": {
+        "name": "オーディオリターンチャンネル",
+        "state": {
+          "off": "オフ",
+          "arc": "ARC",
+          "earc": "eARC"
+        }
+      },
+      "sound_effect": {
+        "name": "サウンドフィールド設定",
+        "state": {
+          "dolby_speaker_virtualizer": "ドルビー・スピーカー・バーチャライザー",
+          "neural_x": "DTS Neural:X",
+          "ssm_360": "360 Spatial Sound Mapping"
+        }
+      },
+      "ssm_360_height": {
+        "name": "サウンドフィールドの高さ",
+        "state": {
+          "high": "高",
+          "mid": "中",
+          "low": "低"
+        }
+      },
+      "stereo_playback": {
+        "name": "ステレオ再生",
+        "state": {
+          "up_mix": "アップミックス",
+          "multi_stereo": "マルチステレオ"
+        }
+      },
+      "sw_phase": {
+        "name": "サブウーファーの位相設定",
+        "state": {
+          "0": "0°",
+          "180": "180°",
+          "0_0": "0° / 0°",
+          "180_180": "180° / 180°",
+          "0_180": "0° / 180°",
+          "180_0": "180° / 0°"
+        }
+      }
+    },
+    "media_player": {
+      "bravia_quad": {
+        "state_attributes": {
+          "source": {
+            "state": {
+              "tv": "テレビ (eARC)",
+              "hdmi1": "HDMI",
+              "spotify": "Spotify",
+              "bluetooth": "Bluetooth",
+              "airplay2": "AirPlay",
+              "360racast": "360 Reality Audio Cast",
+              "other": "その他"
+            }
+          },
+          "sound_mode": {
+            "state": {
+              "dolby_speaker_virtualizer": "ドルビー・スピーカー・バーチャライザー",
+              "neural_x": "DTS Neural:X",
+              "ssm_360": "360 Spatial Sound Mapping"
+            }
+          },
+          "audio_format": {
+            "name": "音声フォーマット"
+          },
+          "audio_channel": {
+            "name": "音声チャンネル"
+          },
+          "sampling_rate": {
+            "name": "サンプリングレート"
+          },
+          "is_360ra": {
+            "name": "360 Reality Audio"
+          },
+          "upmixer": {
+            "name": "アップミキサー"
+          },
+          "virtualizer": {
+            "name": "バーチャライザー"
+          },
+          "bt_codec": {
+            "name": "Bluetooth コーデック"
+          },
+          "bt_device_name": {
+            "name": "Bluetooth 機器"
+          },
+          "bt_signal_strength": {
+            "name": "Bluetooth 信号"
+          },
+          "hdmi_error": {
+            "name": "HDMI エラー"
+          },
+          "no_audio": {
+            "name": "音声なし"
+          },
+          "spotify_status": {
+            "name": "Spotify の状態"
+          },
+          "source_unavailable_reason": {
+            "name": "入力を利用できません"
+          }
+        }
+      }
+    },
+    "update": {
+      "firmware": {
+        "name": "ソフトウェアアップデート"
+      }
+    },
+    "switch": {
+      "power": {
+        "name": "電源"
+      },
+      "hdmi_cec": {
+        "name": "HDMI機器制御"
+      },
+      "auto_standby": {
+        "name": "自動電源オフ"
+      },
+      "voice_enhancer": {
+        "name": "ボイスモード"
+      },
+      "sound_field": {
+        "name": "サウンドフィールド"
+      },
+      "night_mode": {
+        "name": "ナイトモード"
+      },
+      "auto_volume": {
+        "name": "入力レベル自動調整"
+      },
+      "auto_update": {
+        "name": "自動アップデート"
+      },
+      "net_bt_standby": {
+        "name": "ネットワーク/Bluetoothスタンバイ"
+      },
+      "voice_zoom": {
+        "name": "ボイスズーム"
+      },
+      "external_control": {
+        "name": "外部機器からの操作"
+      },
+      "dsee_ultimate": {
+        "name": "DSEE Ultimate"
+      },
+      "center_speaker_mode": {
+        "name": "アコースティックセンターシンク"
+      },
+      "audio_return_channel": {
+        "name": "HDMI ARC（テレビ）"
+      },
+      "mix_stage": {
+        "name": "ミックスステージ"
+      }
+    },
+    "sensor": {
+      "temperature": {
+        "name": "温度"
+      },
+      "timezone": {
+        "name": "タイムゾーン"
+      },
+      "ssm_360": {
+        "name": "360 Spatial Sound Mapping"
+      },
+      "voice_zoom_level": {
+        "name": "ボイスズームレベル"
+      },
+      "network_mode": {
+        "name": "ネットワークモード"
+      },
+      "ip_address": {
+        "name": "IP アドレス"
+      },
+      "device_name": {
+        "name": "本機の名前"
+      },
+      "destination": {
+        "name": "地域"
+      },
+      "language": {
+        "name": "言語"
+      },
+      "dhcp": {
+        "name": "DHCP"
+      },
+      "internet": {
+        "name": "インターネット"
+      },
+      "ipv6_address": {
+        "name": "IP アドレス（IPv6）"
+      },
+      "wifi_signal": {
+        "name": "Wi-Fi 信号"
+      },
+      "mac_wired": {
+        "name": "MAC アドレス（有線）"
+      },
+      "mac_wireless": {
+        "name": "MAC アドレス（無線）"
+      },
+      "raee_measured": {
+        "name": "サウンドフィールド最適化（測定済み）"
+      },
+      "battery_life_rl": {
+        "name": "リア左バッテリー"
+      },
+      "battery_life_rr": {
+        "name": "リア右バッテリー"
+      },
+      "unavailable_entities": {
+        "name": "利用できないエンティティ"
+      }
+    }
+  },
+  "exceptions": {
+    "reload_failed": {
+      "message": "連携の再読み込みに失敗しました。設定 > デバイスとサービス > Bravia Theatre > 再読み込み から手動で再読み込みしてください"
+    },
+    "detection_failed": {
+      "message": "接続エラーのためサブウーファーを検出できませんでした。もう一度お試しください。"
+    },
+    "firmware_update_failed": {
+      "message": "ソフトウェアアップデートを開始できませんでした。機器がビジーか到達できない可能性があります。しばらくしてからもう一度お試しください。"
+    },
+    "verify_set_rejected": {
+      "message": "機器が {feature} の値 {requested} を拒否しました"
+    },
+    "verify_read_failed": {
+      "message": "{requested} を設定した後、{feature} を確認できませんでした"
+    },
+    "verify_unexpected_value": {
+      "message": "機器が予期しない {feature} の値 {actual} を返しました"
+    },
+    "verify_value_mismatch": {
+      "message": "機器は {feature} を {actual} のままにしました（要求値 {requested}）"
+    },
+    "verify_value_mismatch_hint": {
+      "message": "機器は {feature} を {actual} のままにしました（要求値 {requested}）。{hint}"
+    },
+    "grpc_exec_failed": {
+      "message": "{path} の gRPC コマンドが失敗しました"
+    },
+    "grpc_feature_unavailable": {
+      "message": "{path} の gRPC コマンドがブロックされました: {reason}"
+    }
+  },
+  "selector": {
+    "transport": {
+      "options": {
+        "grpc": "gRPC — BRAVIA Connect（推奨）",
+        "tcp": "TCP — 従来の IP 制御"
+      }
+    }
+  }
+}
