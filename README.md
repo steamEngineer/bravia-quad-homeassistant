@@ -21,9 +21,9 @@ A Home Assistant custom integration for Sony Bravia Theatre home theater systems
 > Practical caveats: this is an **unofficial** integration with **no affiliation with or endorsement by Sony**. It targets one model on one firmware (`001.454`); Sony can change or break the protocol at any time, and firmware updates may disable it. Trademarks (Sony, BRAVIA) belong to their owners and are used here only to identify the device. **Use at your own risk** — there is no warranty, and you are responsible for complying with the terms of service and laws that apply in your own jurisdiction. Nothing in this document is legal advice.
 
 <details>
-<summary>View Device Page Screenshot</summary>
+<summary>View Home Assistant screenshots</summary>
 
-<img src="assets/pictures/bravia_quad_device_page.png" alt="Bravia Quad Device Page in Home Assistant" width="500">
+<img src="docs/images/combinedView_mediaPlayer.png" alt="Bravia Theatre in Home Assistant: media player, configuration entities, and unavailable-entities diagnostic" width="900">
 
 </details>
 
