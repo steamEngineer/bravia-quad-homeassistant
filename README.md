@@ -82,17 +82,36 @@ Requirements depend on the transport you choose during setup:
 
 ### HACS (Recommended)
 
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=steamEngineer&repository=bravia-quad-homeassistant&category=integration)
+
+<details>
+<summary>Manual HACS steps</summary>
+
 1. Ensure [HACS](https://hacs.xyz/) is installed
 2. Go to HACS → Integrations
 3. Search for "Bravia Theatre" and install it
-4. Restart Home Assistant
+
+</details>
+
+1. Click **Download**, then restart Home Assistant.
+
+### Add the integration
+
+[![Set up a new integration in Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=bravia_quad)
+
+<details>
+<summary>Manual steps</summary>
+
+1. Go to **Settings** → **Devices & Services** → **Add Integration**
+2. Search for "Bravia Theatre" and follow the setup wizard
+
+</details>
 
 ### Manual Installation
 
 1. Copy the `bravia_quad` folder to `<config>/custom_components/bravia_quad/`
 2. Restart Home Assistant
-3. Go to **Settings** → **Devices & Services** → **Add Integration**
-4. Search for "Bravia Theatre" and follow the setup wizard
+3. Add the integration with the button above (or **Settings** → **Devices & Services** → **Add Integration** → "Bravia Theatre")
 
 ## Configuration
 
