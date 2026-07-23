@@ -7,6 +7,16 @@
 
 A Home Assistant custom integration for Sony Bravia Theatre home theater systems. Choose **gRPC** (recommended, BRAVIA Connect control plane) or **TCP** (legacy IP control, no Sony sign-in) at setup.
 
+<img src="docs/images/combinedView_config_control.png" alt="Bravia Theatre configuration controls and diagnostics in Home Assistant" width="900">
+
+<details>
+  <summary> 
+   Media Player View
+  </summary>
+
+<img src="docs/images/combinedView_media_player.png" alt="Bravia Theatre media player and related entities in Home Assistant" width="800">
+</details>
+
 > **Legal and ethical note**
 >
 > This work was done for **interoperability** — making hardware I own talk to software I run — which is the purpose most explicitly protected for reverse engineering (e.g. the interoperability exemptions under 17 U.S.C. § 1201(f) in the US and Article 6 of the EU Software Directive). It was all done on **my own HT-A9M2, on my own LAN, with my own Sony account and my own credentials.** Nothing here touched anyone else's device, account, or network.
@@ -20,12 +30,8 @@ A Home Assistant custom integration for Sony Bravia Theatre home theater systems
 >
 > Practical caveats: this is an **unofficial** integration with **no affiliation with or endorsement by Sony**. It targets one model on one firmware (`001.454`); Sony can change or break the protocol at any time, and firmware updates may disable it. Trademarks (Sony, BRAVIA) belong to their owners and are used here only to identify the device. **Use at your own risk** — there is no warranty, and you are responsible for complying with the terms of service and laws that apply in your own jurisdiction. Nothing in this document is legal advice.
 
-<details>
-<summary>View Device Page Screenshot</summary>
 
-<img src="assets/pictures/bravia_quad_device_page.png" alt="Bravia Quad Device Page in Home Assistant" width="500">
 
-</details>
 
 ## Features
 
@@ -39,31 +45,80 @@ A Home Assistant custom integration for Sony Bravia Theatre home theater systems
 
 Full entity list: [docs/entities.md](docs/entities.md)
 
+
+## Device compatibility
+
+Compatibility depends on whether a device exposes the same control planes as the BRAVIA Quad: legacy TCP (port **33336**) and/or BRAVIA Connect gRPC (port **55051**). Setup chooses one transport — not both.
+
+Capability-gated entities vary by model — see [docs/entities.md](docs/entities.md).
+
+### Models
+
+
+| Device                  | Model        | Network        | Status                      |
+| ----------------------- | ------------ | -------------- | --------------------------- |
+| BRAVIA Theatre Quad     | HT-A9M2      | WiFi/Ethernet  | gRPC ✓ · TCP ✓ (fw 001.454) |
+| BRAVIA Theatre A9       | HT-A9        | WiFi/Ethernet  | gRPC ✗ · TCP ✓              |
+| BRAVIA Theatre Trio     | HT-A8        | WiFi/Ethernet  | gRPC ✓ · TCP ✗              |
+| BRAVIA Theatre Bar 8    | HT-A8000     | WiFi/Ethernet  | gRPC * · TCP ✓              |
+| BRAVIA Theatre Bar 9    | HT-A9000     | WiFi/Ethernet  | gRPC — · TCP ✓              |
+| BRAVIA Theatre Bar 6    | HT-B600/BD60 | Bluetooth only | Incompatible                |
+| BRAVIA Theatre System 6 | HT-S60       | Bluetooth only | Incompatible                |
+| HT-AX7                  | HT-AX7       | Bluetooth only | Incompatible                |
+| HT-S2000                | HT-S2000     | Bluetooth only | Incompatible                |
+
+✓ = verified working · ✗ = not working · — = untested · \* = partial
+
+> Bar 8 gRPC setup reported; feature parity not fully mapped ([#176](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/176))
+>
+> Theatre Bar 9 TCP: [community report](https://community.home-assistant.io/t/custom-integration-sony-bravia-theatre-quad-bar-8-bar-9-control-testers-needed/972831/2).
+>
+> Quad (HT-A9M2) gRPC/TCP feature mapping and parity gaps: [docs/grpc-tcp-mapping.md](docs/grpc-tcp-mapping.md). Entity list: [docs/entities.md](docs/entities.md).
+
+**Feedback from owners of untested models is welcome**. For Sony's full product list, see the [Sony support article](https://www.sony.com/electronics/support/articles/00305900).
+
 ## Prerequisites
 
-Before setup, enable **External control** on your Bravia device:
+Requirements depend on the transport you choose during setup:
 
-1. Open the **BRAVIA Connect** app
-2. Go to **Settings** → **Network settings**
-3. Enable **External control**
-
-> Without this setting, the integration cannot communicate with your device.
+- **Either mode** — Bravia Theatre on your LAN; Home Assistant can reach the device IP.
+- **TCP** — enable **External control** in the BRAVIA Connect app (**Settings** → **Network settings**); port **33336** reachable from Home Assistant.
+- **gRPC** — port **55051** reachable; complete Sony sign-in during setup. You do **not** need to enable External control beforehand — the integration checks that setting and attempts to enable it automatically when a TCP listener is present (hybrid seed on models that expose port 33336). Step-by-step: [docs/grpc-setup.md](docs/grpc-setup.md).
 
 ## Installation
 
 ### HACS (Recommended)
 
+[![Open your Home Assistant instance and open a repository inside the Home Assistant Community Store.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=steamEngineer&repository=bravia-quad-homeassistant&category=integration)
+
+<details>
+<summary>Manual HACS steps</summary>
+
 1. Ensure [HACS](https://hacs.xyz/) is installed
 2. Go to HACS → Integrations
 3. Search for "Bravia Theatre" and install it
-4. Restart Home Assistant
+
+</details>
+
+1. Click **Download**, then restart Home Assistant.
+
+### Add the integration
+
+[![Set up a new integration in Home Assistant](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=bravia_quad)
+
+<details>
+<summary>Manual steps</summary>
+
+1. Go to **Settings** → **Devices & Services** → **Add Integration**
+2. Search for "Bravia Theatre" and follow the setup wizard
+
+</details>
 
 ### Manual Installation
 
 1. Copy the `bravia_quad` folder to `<config>/custom_components/bravia_quad/`
 2. Restart Home Assistant
-3. Go to **Settings** → **Devices & Services** → **Add Integration**
-4. Search for "Bravia Theatre" and follow the setup wizard
+3. Add the integration with the button above (or **Settings** → **Devices & Services** → **Add Integration** → "Bravia Theatre")
 
 ## Configuration
 
@@ -81,63 +136,15 @@ During setup you choose a **transport**:
 
 gRPC mode prompts for Sony sign-in (OAuth). Session keys refresh automatically when possible.
 
+On gRPC, some settings are writable locally but not readable over the local plane. Enable opt-in **Seeds cloud reads** (`grpc_seeds_poll`) in integration options if entities such as DRC stay `unknown` — see [docs/seeds-cloud-states.md](docs/seeds-cloud-states.md).
+
 Step-by-step gRPC setup (Chrome Network redirect, Seeds options): [docs/grpc-setup.md](docs/grpc-setup.md). Transport comparison and migration: [docs/configuration.md](docs/configuration.md#transport-modes).
-
-## Device compatibility
-
-Compatibility depends on whether a device exposes the same control planes as the BRAVIA Quad: legacy TCP (port **33336**) and/or BRAVIA Connect gRPC (port **55051**). Setup chooses one transport — not both.
-
-### Models
-
-
-| Device                  | Model        | Network        | Status                      |
-| ----------------------- | ------------ | -------------- | --------------------------- |
-| BRAVIA Theatre Quad     | HT-A9M2      | WiFi/Ethernet  | gRPC ✓ · TCP ✓ (fw 001.454) |
-| BRAVIA Theatre A9       | HT-A9        | WiFi/Ethernet  | gRPC — · TCP ✓              |
-| BRAVIA Theatre Trio     | HT-A8        | WiFi/Ethernet  | gRPC * · TCP ✗              |
-| BRAVIA Theatre Bar 8    | HT-A8000     | WiFi/Ethernet  | gRPC * · TCP ✓              |
-| BRAVIA Theatre Bar 9    | HT-A9000     | WiFi/Ethernet  | gRPC — · TCP ✓              |
-| BRAVIA Theatre Bar 6    | HT-B600/BD60 | Bluetooth only | Incompatible                |
-| BRAVIA Theatre System 6 | HT-S60       | Bluetooth only | Incompatible                |
-| HT-AX7                  | HT-AX7       | Bluetooth only | Incompatible                |
-| HT-S2000                | HT-S2000     | Bluetooth only | Incompatible                |
-
-
-✓ = verified working · ✗ = not working · — = untested · \* = in progress / partial ([#122](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/122) — Trio gRPC works with capability-gated entities; HT-A8-oriented controls ship disabled by default pending live confirmation — see [docs/entities.md](docs/entities.md); [#176](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/176) — Bar 8 gRPC setup reported working, feature parity not fully mapped). Theatre Bar 9 TCP: [community report](https://community.home-assistant.io/t/custom-integration-sony-bravia-theatre-quad-bar-8-bar-9-control-testers-needed/972831/2). Quad gRPC/TCP detail: [transport verification](#transport-verification-ht-a9m2) below.
-
-**Feedback from owners of untested models is welcome**. For Sony's full product list, see the [Sony support article](https://www.sony.com/electronics/support/articles/00305900).
-
-### Transport verification (HT-A9M2)
-
-
-| Feature area                                                         | TCP (33336)                | gRPC (55051)                                                                                                                      |
-| -------------------------------------------------------------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Power, volume, mute, input source                                    | Read/write + push          | Read/write + live notify                                                                                                          |
-| Rear level; bass level (no sub)                                      | Read/write + push          | Read/write + notify                                                                                                               |
-| Voice enhancer, night mode, sound field on/off                       | Read/write + push          | Read/write + notify; empty GetStates bools can be seeded via Seeds when `grpc_seeds_poll` is on                                    |
-| HDMI CEC, dual mono, BT connection quality                           | Read/write + push          | Read/write                                                                                                                        |
-| IMAX Enhanced, AV sync (HDMI / TV)                                   | Read/write + push          | Read/write                                                                                                                        |
-| DRC, auto volume                                                     | Read/write + push          | Write verified; **not readable** over gRPC on fw 001.454 — HA seeds from TCP, restore, or last write                              |
-| eARC (audio return) | Read/write + push | gRPC **switch** (on/off), bool exec; **not readable** locally — Seeds/TCP seed |
-| HDMI standby through, auto standby, auto update, external control | Read/write + push          | Write verified; **not readable** over gRPC — same seeding; entities ship **disabled by default** until confirmed on your firmware |
-| Subwoofer level (with sub)                                           | Read/write + push (number) | Read/write (gRPC-only entity)                                                                                                     |
-| Detect subwoofer (diagnostic)                                        | TCP probe                  | gRPC GetStates probe                                                                                                              |
-| Firmware update                                                      | HTTP (probe-gated)         | HTTP (probe-gated) — created only when management FCGI on `:54545` responds                                                       |
-
-
-Mapped gRPC switch/select/number/sensor entities are created when `GetCapabilities` advertises the path (notify-only / Seeds paths are exempt). Models without a path omit that entity — see [docs/entities.md](docs/entities.md).
-
-**TCP only** (no confirmed gRPC path): Bluetooth pairing button, HDMI passthrough, temperature, 360SSM sensor, network mode / DHCP / region / language diagnostics.
-
-**gRPC only** (not on legacy TCP plane): sound field **mode** select (`Dolby Speaker Virtualizer`, `Neural:X`, `360SSM`), now-playing metadata and playback attributes, play/pause/next on Spotify / Bluetooth / AirPlay, DSEE Ultimate, 360SSM height, HDMI Signal Format (Seeds / restore), center speaker mode, DTS Dialog Control, voice zoom on/off and level, room calibration (RAEE) sensor.
-
-On gRPC, AirPlay is **detect-only** — it appears when a client casts; it cannot be selected via command. DSEE Ultimate, 360SSM height, and HDMI Signal Format have no TCP read fallback — gRPC write only, with Seeds (when enabled), HA restore, or last-write cache for display. Other notify-only settings may show `unknown` until changed, restored, or seeded — see [notify-only paths](docs/sony-grpc-reference.md#notify-only-paths).
-
-Full entity mapping and parity gaps: [docs/grpc-tcp-mapping.md](docs/grpc-tcp-mapping.md)
 
 ## Blueprints
 
 Automate settings (**Voice Enhancer**, **Auto Volume**, **Sound Field**, **Night Mode**, **Volume**, **Rear Level**) per input source.
+
+> **TCP mode only** for now — not validated against gRPC entity layouts. Last updated in GitHub release [v1.6.0](https://github.com/steamEngineer/bravia-quad-homeassistant/releases/tag/v1.6.0).
 
 [![Open your Home Assistant instance and show the blueprint import dialog with a specific blueprint pre-filled.](https://my.home-assistant.io/badges/blueprint_import.svg)](https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url=https%3A%2F%2Fgithub.com%2FsteamEngineer%2Fbravia-quad-homeassistant%2Fblob%2Fmain%2Fblueprints%2Fsource_based_config.yaml)
 

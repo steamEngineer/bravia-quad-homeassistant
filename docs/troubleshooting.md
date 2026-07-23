@@ -5,10 +5,11 @@
 If you encounter connection problems:
 
 1. **Verify IP address**: Ensure the IP address is correct and the device is on the same network
-2. **Check external control**: Verify that **External control** is enabled in the BRAVIA Connect app (see [README prerequisites](../README.md#prerequisites))
-3. **Firewall (TCP)**: Ensure port 33336 is not blocked by your firewall
-4. **Firewall (gRPC)**: Ensure port 55051 is not blocked by your firewall
-5. **Test TCP connection**: For TCP transport, test manually using netcat — see [tcp-protocol.md](tcp-protocol.md#manual-connection-test)
+2. **TCP — External control**: For TCP transport, verify **External control** is enabled in the BRAVIA Connect app (see [README prerequisites](../README.md#prerequisites))
+3. **gRPC — port and setup**: For gRPC transport, ensure port **55051** is reachable; External control is not a manual prerequisite (the integration may enable it automatically when a TCP listener exists) — see [grpc-setup.md](grpc-setup.md)
+4. **Firewall (TCP)**: Ensure port 33336 is not blocked by your firewall
+5. **Firewall (gRPC)**: Ensure port 55051 is not blocked by your firewall
+6. **Test TCP connection**: For TCP transport, test manually using netcat — see [tcp-protocol.md](tcp-protocol.md#manual-connection-test)
 
 ## Entity states not updating
 
