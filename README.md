@@ -7,6 +7,16 @@
 
 A Home Assistant custom integration for Sony Bravia Theatre home theater systems. Choose **gRPC** (recommended, BRAVIA Connect control plane) or **TCP** (legacy IP control, no Sony sign-in) at setup.
 
+<img src="docs/images/combinedView_config_control.png" alt="Bravia Theatre configuration controls and diagnostics in Home Assistant" width="900">
+
+<details>
+  <summary> 
+   Media Player View
+  </summary>
+
+<img src="docs/images/combinedView_media_player.png" alt="Bravia Theatre media player and related entities in Home Assistant" width="800">
+</details>
+
 > **Legal and ethical note**
 >
 > This work was done for **interoperability** — making hardware I own talk to software I run — which is the purpose most explicitly protected for reverse engineering (e.g. the interoperability exemptions under 17 U.S.C. § 1201(f) in the US and Article 6 of the EU Software Directive). It was all done on **my own HT-A9M2, on my own LAN, with my own Sony account and my own credentials.** Nothing here touched anyone else's device, account, or network.
@@ -35,19 +45,6 @@ A Home Assistant custom integration for Sony Bravia Theatre home theater systems
 
 Full entity list: [docs/entities.md](docs/entities.md)
 
- **Quick Pics**
-<details>
-  <summary> 
-   Media Player View
-  </summary>
-
-<img src="docs/images/combinedView_media_player.png" alt="Bravia Theatre media player and related entities in Home Assistant" width="800">
-</details>
-
-<details>
-<summary>Entity View</summary>
-<img src="docs/images/combinedView_config_control.png" alt="Bravia Theatre configuration controls and diagnostics in Home Assistant" width="900">
-</details>
 
 ## Device compatibility
 
