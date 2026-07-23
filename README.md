@@ -5,17 +5,53 @@
 ![GitHub Release](https://img.shields.io/github/v/release/steamEngineer/bravia-quad-homeassistant)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-A Home Assistant custom integration for Sony Bravia Theatre home theater systems. Choose **gRPC** (recommended, BRAVIA Connect control plane) or **TCP** (legacy IP control, no Sony sign-in) at setup.
+<table>
+  <tr>
+    <td>
+     A Home Assistant custom integration for Sony Bravia Theatre home theater systems.<br><br>
+      Choose <strong>gRPC</strong> (recommended, BRAVIA Connect control plane) <br><br>or <br><br><strong>TCP</strong> (legacy IP control, no Sony sign-in) at setup.
+    </td>
+    <td>
+    <img src="docs/images/deadmau9_header.jpg" alt="Bravia Theatre Home Assistant Integration" width="400">
+    </td>
+  </tr>
+</table>
 
-<img src="docs/images/combinedView_config_control.png" alt="Bravia Theatre configuration controls and diagnostics in Home Assistant" width="900">
+## Features
 
-<details>
-  <summary> 
-   Media Player View
-  </summary>
+- **Auto-discovery** via mDNS/zeroconf — no manual IP required
+- **Power, volume, mute, and source** control via media player and companion entities
+- **Rear and bass level** — bass adapts automatically (slider with subwoofer, MIN/MID/MAX without)
+- **Audio settings** — voice enhancer, sound field, night mode, DRC, auto volume, HDMI CEC, auto standby
+- **Real-time updates** from the device where the transport supports notify/push
+- **gRPC extras** — now-playing metadata, sound field mode select, play/pause/next on Spotify/Bluetooth/AirPlay, DSEE Ultimate, 360SSM height, and more (see [docs/entities.md](docs/entities.md))
+- **Multiple Theatres** — zeroconf rediscovery matches by host or MAC so each device gets its own config entry; entities nest under one HA device per Theatre
 
-<img src="docs/images/combinedView_media_player.png" alt="Bravia Theatre media player and related entities in Home Assistant" width="800">
-</details>
+> Full entity list: [docs/entities.md](docs/entities.md)
+
+<table>
+  <tr>
+    <th>Preview</th>
+    <th>Description</th>
+  </tr>
+  <tr>
+    <td>
+      <img src="docs/images/combinedView_config_control.png" alt="Bravia Theatre configuration controls and diagnostics in Home Assistant" width="800">
+    </td>
+    <td>
+      Device page with configuration entities — sound, HDMI, and system settings all in one place.
+    </td>
+  </tr>
+  <tr>
+    <td>
+      <img src="docs/images/combinedView_media_player.png" alt="Bravia Theatre media player and related entities in Home Assistant" width="800">
+    </td>
+    <td>
+      Media player view — now playing, volume, source control, sound field control and playback controls for streaming sources.
+    </td>
+  </tr>
+</table>
+
 
 > **Legal and ethical note**
 >
@@ -31,19 +67,6 @@ A Home Assistant custom integration for Sony Bravia Theatre home theater systems
 > Practical caveats: this is an **unofficial** integration with **no affiliation with or endorsement by Sony**. It targets one model on one firmware (`001.454`); Sony can change or break the protocol at any time, and firmware updates may disable it. Trademarks (Sony, BRAVIA) belong to their owners and are used here only to identify the device. **Use at your own risk** — there is no warranty, and you are responsible for complying with the terms of service and laws that apply in your own jurisdiction. Nothing in this document is legal advice.
 
 
-
-
-## Features
-
-- **Auto-discovery** via mDNS/zeroconf — no manual IP required
-- **Power, volume, mute, and source** control via media player and companion entities
-- **Rear and bass level** — bass adapts automatically (slider with subwoofer, MIN/MID/MAX without)
-- **Audio settings** — voice enhancer, sound field, night mode, DRC, auto volume, HDMI CEC, auto standby
-- **Real-time updates** from the device where the transport supports notify/push
-- **gRPC extras** — now-playing metadata, sound field mode select, play/pause/next on Spotify/Bluetooth/AirPlay, DSEE Ultimate, 360SSM height, and more (see [docs/entities.md](docs/entities.md))
-- **Multiple Theatres** — zeroconf rediscovery matches by host or MAC so each device gets its own config entry; entities nest under one HA device per Theatre
-
-Full entity list: [docs/entities.md](docs/entities.md)
 
 
 ## Device compatibility
