@@ -1,5 +1,7 @@
 # Bravia Theatre Home Assistant Integration
 
+<img src="docs/images/deadmau9_header.jpg" alt="Bravia Theatre Home Assistant Integration" width="280">
+
 [![hacs_badge](https://img.shields.io/badge/HACS-Default-green.svg)](https://github.com/custom-components/hacs)
 ![GitHub Downloads](https://img.shields.io/github/downloads/steamEngineer/bravia-quad-homeassistant/total)
 ![GitHub Release](https://img.shields.io/github/v/release/steamEngineer/bravia-quad-homeassistant)
@@ -10,7 +12,7 @@ A Home Assistant custom integration for Sony Bravia Theatre home theater systems
 <img src="docs/images/combinedView_config_control.png" alt="Bravia Theatre configuration controls and diagnostics in Home Assistant" width="900">
 
 <details>
-  <summary> 
+  <summary>
    Media Player View
   </summary>
 
