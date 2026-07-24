@@ -97,6 +97,13 @@ class BraviaGrpcClientAsync:
         self._last_notify_at: float | None = None
         self._notify_task: asyncio.Task[None] | None = None
         self._notify_stop = asyncio.Event()
+        # Serialize session-authenticated RPCs (ExecCommand + GetStates): each
+        # does a fresh GetSessionRandom on the shared session, so if several run
+        # concurrently -- a scene toggling multiple settings, or a write that
+        # overlaps a reconnect state-seed -- the GetSessionRandom calls race and
+        # crash the device's gRPC daemon (needs a power cycle to recover). One
+        # session RPC at a time; they are near-instant, so this is imperceptible.
+        self._session_lock = asyncio.Lock()
         self._state_callbacks: list[Callable[[NotifyStateUpdate], None]] = []
         self._reconnect_callback: ReconnectCallback | None = None
         self._refresh_keys_callback: RefreshKeysCallback | None = None
@@ -451,7 +458,8 @@ class BraviaGrpcClientAsync:
         """Fetch full device state snapshot."""
         if not self._connected:
             return None
-        return await asyncio.to_thread(self._client.get_states)
+        async with self._session_lock:
+            return await asyncio.to_thread(self._client.get_states)
 
     async def async_fetch_capabilities(self) -> frozenset[str] | None:
         """
@@ -465,27 +473,30 @@ class BraviaGrpcClientAsync:
         """Fetch GetStatesWithAuth as parsed field-path dict."""
         if not self._connected:
             return None
-        snapshot = await asyncio.to_thread(
-            self._client.get_states_with_preflight,
-            use_signed_auth=True,
-        )
+        async with self._session_lock:
+            snapshot = await asyncio.to_thread(
+                self._client.get_states_with_preflight,
+                use_signed_auth=True,
+            )
         if snapshot:
             return snapshot
-        return await asyncio.to_thread(
-            self._client.get_states_dict,
-            use_signed_auth=True,
-        )
+        async with self._session_lock:
+            return await asyncio.to_thread(
+                self._client.get_states_dict,
+                use_signed_auth=True,
+            )
 
     async def async_get_states_single_path(self, path: str) -> Any | None:
         """Return one field from a signed single-path GetStates, or None."""
         if not self._connected:
             return None
-        result = await asyncio.to_thread(
-            self._client.get_states_single_path,
-            path,
-            use_signed_auth=True,
-            quiet=True,
-        )
+        async with self._session_lock:
+            result = await asyncio.to_thread(
+                self._client.get_states_single_path,
+                path,
+                use_signed_auth=True,
+                quiet=True,
+            )
         if not result:
             return None
         return result.get(path)
@@ -494,11 +505,15 @@ class BraviaGrpcClientAsync:
         """Mirror BRAVIA Connect GetStates RPC order (signed full + mutex)."""
         if not self._connected:
             return None
-        return await asyncio.to_thread(self._client.get_states_app_sequence)
+        async with self._session_lock:
+            return await asyncio.to_thread(self._client.get_states_app_sequence)
 
     async def async_seed_notify_from_snapshot(self) -> int:
         """Merge GetStates snapshot into notify_state cache; return field count."""
-        snapshot = await asyncio.to_thread(self._client.get_states_app_sequence)
+        # Lock only this direct wire call; the async_get_states_dict() fallback
+        # below takes the lock itself, so holding it here would deadlock.
+        async with self._session_lock:
+            snapshot = await asyncio.to_thread(self._client.get_states_app_sequence)
         if not snapshot:
             snapshot = await self.async_get_states_dict()
         if not snapshot:
@@ -733,7 +748,11 @@ class BraviaGrpcClientAsync:
             int_value,
             bool_value,
         )
-        ok = await asyncio.to_thread(_run)
+        # Serialize the GetSessionRandom + write against other session RPCs. Do
+        # NOT hold it across _async_restore_session below (re-enters this method
+        # via external-control enable; asyncio.Lock is not reentrant -> deadlock).
+        async with self._session_lock:
+            ok = await asyncio.to_thread(_run)
         if ok:
             self._debug("ExecCommand %s -> True", command_path)
             # Trust exec cache for HA writes. Immediate Seeds force-refresh was
@@ -757,7 +776,8 @@ class BraviaGrpcClientAsync:
                     "ExecCommand %s retrying after session restore",
                     command_path,
                 )
-                ok = await asyncio.to_thread(_run)
+                async with self._session_lock:
+                    ok = await asyncio.to_thread(_run)
                 if ok:
                     self._debug("ExecCommand %s -> True after restore", command_path)
                 else:
