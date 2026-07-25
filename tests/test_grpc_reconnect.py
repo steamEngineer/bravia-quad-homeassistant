@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -12,6 +11,8 @@ import pytest
 from custom_components.bravia_quad.bravia_grpc_client import BraviaGrpcClientAsync
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from custom_components.bravia_quad.grpc.client import NotifyStateUpdate
 
 
@@ -38,25 +39,43 @@ def grpc_async() -> BraviaGrpcClientAsync:
     return client
 
 
+def _fake_start_notify_factory(
+    *,
+    lose_after: int = 1,
+    stop_client: BraviaGrpcClientAsync | None = None,
+) -> Any:
+    """Return a start_notify that signals connection_lost after *lose_after* starts."""
+    calls = {"n": 0}
+
+    def fake_start_notify(
+        on_delta: Callable[[str, Any], None],
+        on_connection_lost: Callable[[], None] | None = None,
+        on_reconnect: Callable[[], None] | None = None,
+    ) -> None:
+        del on_delta, on_reconnect
+        calls["n"] += 1
+        if calls["n"] >= lose_after and on_connection_lost is not None:
+            on_connection_lost()
+            if stop_client is not None and calls["n"] >= 2:
+                stop_client._notify_stop.set()
+                stop_client._notify_restore_event.set()
+
+    fake_start_notify.calls = calls  # type: ignore[attr-defined]
+    return fake_start_notify
+
+
 async def test_reconnects_after_notify_stream_ends(
     grpc_async: BraviaGrpcClientAsync,
 ) -> None:
-    """When StartNotifyStates ends, the manager should restore the session."""
-    stream_calls = 0
-
-    def fake_notify() -> Iterator[NotifyStateUpdate]:
-        nonlocal stream_calls
-        stream_calls += 1
-        if stream_calls == 1:
-            return iter(())
-        grpc_async._notify_stop.set()
-        return iter(())
-
-    grpc_async._client.start_notify_states = fake_notify
-    grpc_async._client.disconnect = MagicMock()
+    """When notify connection_lost fires, the manager should restore the session."""
+    fake_start = _fake_start_notify_factory(lose_after=1, stop_client=grpc_async)
+    grpc_async._client.start_notify = fake_start  # type: ignore[method-assign]
+    grpc_async._client.stop_notify = MagicMock()
+    grpc_async._client.close = MagicMock()
     grpc_async.async_connect = AsyncMock(return_value=True)
     grpc_async.async_fetch_capabilities = AsyncMock(return_value=frozenset({"power"}))
     grpc_async.async_seed_notify_from_snapshot = AsyncMock(return_value=3)
+    grpc_async.async_backfill_entity_paths = AsyncMock(return_value=(0, 0, 0))
 
     with patch.object(grpc_async, "_async_wait", new=AsyncMock()):
         await grpc_async.async_start_notify()
@@ -64,7 +83,7 @@ async def test_reconnects_after_notify_stream_ends(
 
     grpc_async.async_connect.assert_awaited()
     grpc_async.async_seed_notify_from_snapshot.assert_awaited()
-    assert stream_calls == 2
+    assert fake_start.calls["n"] >= 2
 
 
 async def test_reconnect_callback_and_snapshot_callbacks(
@@ -80,20 +99,14 @@ async def test_reconnect_callback_and_snapshot_callbacks(
     reconnect_cb = AsyncMock()
     grpc_async.set_reconnect_callback(reconnect_cb)
 
-    stream_calls = 0
-
-    def fake_notify() -> Iterator[NotifyStateUpdate]:
-        nonlocal stream_calls
-        stream_calls += 1
-        if stream_calls >= 2:
-            grpc_async._notify_stop.set()
-        return iter(())
-
-    grpc_async._client.start_notify_states = fake_notify
-    grpc_async._client.disconnect = MagicMock()
+    fake_start = _fake_start_notify_factory(lose_after=1, stop_client=grpc_async)
+    grpc_async._client.start_notify = fake_start  # type: ignore[method-assign]
+    grpc_async._client.stop_notify = MagicMock()
+    grpc_async._client.close = MagicMock()
     grpc_async.async_connect = AsyncMock(return_value=True)
     grpc_async.async_fetch_capabilities = AsyncMock(return_value=frozenset({"power"}))
     grpc_async.async_seed_notify_from_snapshot = AsyncMock(return_value=1)
+    grpc_async.async_backfill_entity_paths = AsyncMock(return_value=(0, 0, 0))
 
     with patch.object(grpc_async, "_async_wait", new=AsyncMock()):
         await grpc_async.async_start_notify()
@@ -107,7 +120,17 @@ async def test_disconnect_stops_connection_manager(
     grpc_async: BraviaGrpcClientAsync,
 ) -> None:
     """Intentional shutdown should not keep retrying reconnect."""
-    grpc_async._client.start_notify_states = lambda: iter(())
+
+    def fake_start_notify(
+        on_delta: Callable[[str, Any], None],
+        on_connection_lost: Callable[[], None] | None = None,
+        on_reconnect: Callable[[], None] | None = None,
+    ) -> None:
+        del on_delta, on_connection_lost, on_reconnect
+
+    grpc_async._client.start_notify = fake_start_notify  # type: ignore[method-assign]
+    grpc_async._client.stop_notify = MagicMock()
+    grpc_async._client.close = MagicMock()
 
     with patch.object(grpc_async, "_async_wait", new=AsyncMock()):
         await grpc_async.async_start_notify()

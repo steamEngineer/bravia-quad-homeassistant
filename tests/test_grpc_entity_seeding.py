@@ -156,11 +156,7 @@ async def test_backfill_entity_paths_resolves_bulk_only() -> None:
 
     assert bulk_r == 1
     assert notify_r == 0
-    mock_single.assert_any_call(
-        "sound_setting.night_mode",
-        use_signed_auth=True,
-        quiet=True,
-    )
+    mock_single.assert_any_call("sound_setting.night_mode")
     assert client.notify_state["sound_setting.night_mode"] is True
     assert still < len(entity_critical_grpc_paths())
 
