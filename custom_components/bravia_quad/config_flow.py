@@ -27,13 +27,11 @@ from homeassistant.helpers.selector import (
 from pybravia_connect import (
     CredentialsRefreshError,
     OAuthError,
-    credentials_to_json,
-    start_oauth_login,
-)
-from pybravia_connect.credentials import (
     async_credentials_from_oauth,
     async_exchange_oauth_redirect,
     async_list_oauth_devices,
+    credentials_to_json,
+    start_oauth_login,
 )
 
 from .bravia_grpc_client import BraviaGrpcClientAsync
