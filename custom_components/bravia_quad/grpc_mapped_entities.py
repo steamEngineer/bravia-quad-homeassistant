@@ -358,9 +358,11 @@ class BraviaGrpcMappedSelect(
                 },
             )
         await _async_exec(self._grpc_client, self._spec, option)
-        self._sync_select_from_notify()
+        # Notify-only paths never get a stream delta; merge optimistic value
+        # before sync so we do not write the stale Seeds/restore cache to HA.
         if grpc_path_needs_ha_restore(self._grpc_path):
             self._grpc_client.merge_notify_cache({self._grpc_path: option})
+        self._sync_select_from_notify()
         self.async_write_ha_state()
 
     def _sync_select_from_notify(self) -> None:
@@ -467,6 +469,9 @@ class BraviaGrpcMappedNumber(BraviaGrpcFeatureAvailabilityMixin, NumberEntity):
         """Set the number value."""
         int_value = int(value)
         await _async_exec(self._grpc_client, self._spec, int_value)
+        # Exec does not update notify_state; without an optimistic merge,
+        # sync rewrites the stale cache (often omit-zero 0) back to HA.
+        self._grpc_client.merge_notify_cache({self._grpc_path: int_value})
         self._sync_number_from_notify()
         self.async_write_ha_state()
 
