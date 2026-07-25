@@ -23,7 +23,7 @@ dev = [
     "pytest-homeassistant-custom-component>=0.13.297",
     "pytest-xdist>=3.8.0",
     "ruff>=0.14.0",
-    "pybravia-connect==0.1.0a3",
+    "pybravia-connect==0.1.0a4",
     "grpcio-tools>=1.76.0",
     "requests>=2.32.0",
 ]
@@ -38,11 +38,7 @@ testpaths = ["tests"]
 python-version = "3.14"
 
 [tool.ty.src]
-exclude = [
-    "custom_components/bravia_quad/grpc/bravia_control_pb2.py",
-    "custom_components/bravia_quad/grpc/bravia_control_pb2_grpc.py",
-    "custom_components/bravia_quad/grpc/client.py",
-]
+exclude = []
 
 [tool.ty.rules]
 invalid-argument-type = "warn"

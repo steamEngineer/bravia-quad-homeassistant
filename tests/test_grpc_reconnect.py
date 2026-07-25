@@ -13,7 +13,7 @@ from custom_components.bravia_quad.bravia_grpc_client import BraviaGrpcClientAsy
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from custom_components.bravia_quad.grpc.client import NotifyStateUpdate
+    from custom_components.bravia_quad.notify_state import NotifyStateUpdate
 
 
 @pytest.fixture(autouse=True)

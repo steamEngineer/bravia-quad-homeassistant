@@ -9,13 +9,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-_SCRIPTS_GRPC = Path(__file__).resolve().parent
-sys.path.insert(0, str(REPO_ROOT / "custom_components"))
-sys.path.insert(0, str(_SCRIPTS_GRPC))
+from pybravia_connect import (
+    DEFAULT_THEATRE_PORT,
+    AuthError,
+    BraviaConnectClient,
+)
+from pybravia_connect import ConnectionError as BraviaConnectionError
+from pybravia_connect.credentials import refresh_credentials
 
-from bravia_quad.grpc.client import BraviaGrpcClient  # noqa: E402
-from bravia_quad.grpc.credentials import refresh_credentials  # noqa: E402
+_SCRIPTS_GRPC = Path(__file__).resolve().parent
+if str(_SCRIPTS_GRPC) not in sys.path:
+    sys.path.insert(0, str(_SCRIPTS_GRPC))
+
 from get_session_keys import write_credentials  # noqa: E402
 
 DEFAULT_KEYS_PATH = Path(__file__).resolve().parent / "session_keys.json"
@@ -55,6 +60,24 @@ def refresh_keys_file(keys_path: Path) -> dict[str, Any]:
     return refreshed
 
 
+def _connect_client(host: str, keys: dict[str, Any]) -> BraviaConnectClient:
+    device_id = keys.get("device_id")
+    hmac_key = keys.get("hmac_key")
+    if not device_id or not hmac_key:
+        msg = "keys missing device_id or hmac_key"
+        raise ValueError(msg)
+    client = BraviaConnectClient(
+        host,
+        DEFAULT_THEATRE_PORT,
+        device_id=device_id,
+        hmac_key=hmac_key,
+        key_id=keys.get("key_id"),
+        session_key=keys.get("session_key"),
+    )
+    client.connect()
+    return client
+
+
 def run_auth_gate(
     host: str,
     keys: dict[str, Any],
@@ -63,61 +86,39 @@ def run_auth_gate(
     check_notify: bool = False,
 ) -> AuthGateReport:
     """Connect and authenticate; optionally verify notify stream opens."""
+    del debug  # library has no sync debug flag; kept for CLI compat
     report = AuthGateReport(
         refresh_ok=True,
         auth_ok=False,
         session_keys_expires_at=keys.get("session_keys_expires_at"),
     )
-    client = BraviaGrpcClient(host, debug=debug)
+    client: BraviaConnectClient | None = None
     try:
-        client.connect()
-        ok = client.authenticate(
-            session_key=keys.get("session_key"),
-            hmac_key=keys["hmac_key"],
-            key_id=keys["key_id"],
-            device_id=keys.get("device_id"),
-        )
-        report.auth_ok = ok
-        report.confirm_signin = ok
-        report.get_nonce = client.nonce is not None and client.nonce_hmac is not None
-        report.get_session_random = (
-            client.session_random is not None and client.auth_token is not None
-        )
-        if not ok:
-            report.error = "gRPC authenticate() returned False"
-            return report
-        if not report.get_nonce:
-            report.error = "GetNonce did not populate nonce/nonce_hmac"
-            report.auth_ok = False
-            return report
-        if not report.get_session_random:
-            report.error = "GetSessionRandom did not populate session tokens"
-            report.auth_ok = False
-            return report
+        client = _connect_client(host, keys)
+        report.auth_ok = True
+        report.confirm_signin = True
+        # connect() completes ConfirmSignin/ConfirmKeys/GetSessionRandom.
+        report.get_nonce = True
+        report.get_session_random = True
         if check_notify:
             notify_ok = False
-            stop = threading.Event()
+            seen = threading.Event()
 
-            def _probe_notify() -> None:
+            def _on_delta(_path: str, _value: Any) -> None:
                 nonlocal notify_ok
-                try:
-                    for _ in client.start_notify_states():
-                        notify_ok = True
-                        break
-                except Exception:
-                    pass
-                finally:
-                    stop.set()
+                notify_ok = True
+                seen.set()
 
-            worker = threading.Thread(target=_probe_notify, daemon=True)
-            worker.start()
-            worker.join(timeout=2.0)
+            client.start_notify(_on_delta)
+            seen.wait(timeout=2.0)
+            client.stop_notify()
             report.notify_stream_ok = notify_ok
-    except OSError as exc:
+    except (AuthError, BraviaConnectionError, OSError, ValueError) as exc:
         report.error = str(exc)
         report.auth_ok = False
     finally:
-        client.disconnect()
+        if client is not None:
+            client.close()
     return report
 
 

@@ -22,11 +22,7 @@ from pathlib import Path
 from typing import Any
 
 import requests
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / "custom_components"))
-
-from bravia_quad.grpc.credentials import (  # noqa: E402
+from pybravia_connect.credentials import (
     AUTH_BASE_URL,
     CLIENT_ID,
     REDIRECT_URI,

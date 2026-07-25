@@ -9,6 +9,14 @@ from typing import TYPE_CHECKING, Any
 from homeassistant.const import CONF_NAME
 from homeassistant.exceptions import ConfigEntryAuthFailed, ConfigEntryNotReady
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from pybravia_connect import (
+    CredentialsError,
+    CredentialsRefreshError,
+    async_refresh_credentials,
+    credentials_to_json,
+    keys_need_refresh,
+    parse_credentials_json,
+)
 
 from .bravia_grpc_client import BraviaGrpcClientAsync
 from .const import (
@@ -20,14 +28,6 @@ from .const import (
     DOMAIN,
 )
 from .external_control import async_ensure_external_control_enabled
-from .grpc.credentials import (
-    GrpcCredentialsError,
-    GrpcCredentialsRefreshError,
-    async_refresh_credentials,
-    credentials_to_json,
-    keys_need_refresh,
-    parse_credentials_json,
-)
 from .transport import grpc_keys_json
 
 if TYPE_CHECKING:
@@ -54,7 +54,7 @@ async def async_refresh_grpc_keys(
         keys_json = grpc_keys_json(entry)
         if not keys_json:
             msg = "No Sony Seeds keys configured"
-            raise GrpcCredentialsError(msg)
+            raise CredentialsError(msg)
         credentials = parse_credentials_json(keys_json)
 
     session = async_get_clientsession(hass)
@@ -88,13 +88,13 @@ async def async_try_refresh_grpc_keys(
         return None
     try:
         return await async_refresh_grpc_keys(hass, entry, credentials)
-    except GrpcCredentialsError:
+    except CredentialsError:
         _LOGGER.warning(
             "Sony Seeds gRPC keys for %s cannot be refreshed (missing refresh_token)",
             entry.data.get("host", entry.entry_id),
         )
         return None
-    except GrpcCredentialsRefreshError:
+    except CredentialsRefreshError:
         _LOGGER.exception(
             "Sony Seeds gRPC key refresh failed for %s",
             entry.data.get("host", entry.entry_id),
@@ -117,12 +117,12 @@ async def _maybe_refresh_credentials(
             "No refresh_token in credentials; run scripts/grpc/get_session_keys.py "
             "--login to obtain one"
         )
-        raise GrpcCredentialsError(msg)
+        raise CredentialsError(msg)
     try:
         refreshed = await async_refresh_grpc_keys(hass, entry, credentials)
-    except GrpcCredentialsError:
+    except CredentialsError:
         raise
-    except GrpcCredentialsRefreshError as err:
+    except CredentialsRefreshError as err:
         raise ConfigEntryAuthFailed(_REFRESH_FAILED_MSG) from err
     else:
         return refreshed, True
@@ -174,7 +174,7 @@ async def async_setup_grpc_client(
             )
             keys_json = credentials_to_json(credentials)
             grpc_client.update_keys(credentials)
-        except (GrpcCredentialsError, GrpcCredentialsRefreshError):
+        except (CredentialsError, CredentialsRefreshError):
             _LOGGER.exception(
                 "Sony Seeds gRPC key refresh failed during reconnect for %s",
                 entry.data["host"],
@@ -241,7 +241,7 @@ async def async_setup_grpc_client(
     except ConfigEntryAuthFailed:
         await grpc_client.async_disconnect()
         raise
-    except GrpcCredentialsError as err:
+    except CredentialsError as err:
         await grpc_client.async_disconnect()
         raise ConfigEntryAuthFailed(str(err)) from err
     except OSError as err:

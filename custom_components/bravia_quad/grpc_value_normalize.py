@@ -63,7 +63,8 @@ from .grpc_mapping import GRPC_TCP_MAPPINGS
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-    from .grpc.get_capabilities_response import CapabilityMeta
+    from pybravia_connect import CapabilityMeta
+
     from .grpc_mapping import GrpcTcpMapping
 
 ExecValueKind = Literal["bool_value", "int_value", "string_value"]

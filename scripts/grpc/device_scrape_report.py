@@ -9,14 +9,23 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from bravia_quad.grpc.get_capabilities_response import decode_capabilities_json_text
-from bravia_quad.grpc.get_states_request import load_field_paths
 from bravia_quad.grpc_mapping import (
     GRPC_TCP_MAPPINGS,
     NOTIFY_ONLY_GRPC_PATHS_SET,
     entity_critical_grpc_paths,
 )
 from bravia_quad.transport import identity_from_grpc_snapshot
+from pybravia_connect.wire.capabilities import decode_capabilities_json_text
+
+_FIELD_PATHS_FILE = Path(__file__).resolve().parent / "all_field_paths.txt"
+
+
+def load_field_paths(path: Path | None = None) -> list[str]:
+    """Load HA field-path catalog shipped next to scrape scripts."""
+    target = path or _FIELD_PATHS_FILE
+    lines = target.read_text(encoding="utf-8").splitlines()
+    return [line.strip() for line in lines if line.strip() and not line.startswith("#")]
+
 
 REPORT_SCHEMA_VERSION = 3
 

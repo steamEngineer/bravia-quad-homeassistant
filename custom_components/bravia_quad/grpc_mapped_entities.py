@@ -21,6 +21,7 @@ from homeassistant.const import (
 )
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.restore_state import RestoreEntity
+from pybravia_connect.wire.capabilities import int_range_from_capability
 
 from .const import (
     AV_SYNC_STEP,
@@ -51,10 +52,6 @@ from .entity import (
     entity_unique_id,
     get_device_info,
 )
-from .grpc.get_capabilities_response import (
-    CapabilityMeta,
-    int_range_from_capability,
-)
 from .grpc_entity_registry import EntitySpec, entity_spec_for_mapping
 from .grpc_mapping import (
     GrpcTcpMapping,
@@ -84,6 +81,7 @@ from .transport import GRPC_PATH_SW_STATUS, subwoofer_currently_linked
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
+    from pybravia_connect import CapabilityMeta
 
     from . import BraviaQuadConfigEntry
     from .bravia_grpc_client import BraviaGrpcClientAsync
