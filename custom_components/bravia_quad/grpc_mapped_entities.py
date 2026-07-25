@@ -21,7 +21,7 @@ from homeassistant.const import (
 )
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.restore_state import RestoreEntity
-from pybravia_connect.wire.capabilities import int_range_from_capability
+from pybravia_connect import int_range_from_capability
 
 from .const import (
     AV_SYNC_STEP,

@@ -5,12 +5,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from pybravia_connect import AuthError, BraviaConnectClient, CapabilityMeta
-from pybravia_connect import ConnectionError as BraviaConnectionError
-from pybravia_connect.wire.capabilities import (
+from pybravia_connect import (
+    AuthError,
+    BraviaConnectClient,
+    CapabilityMeta,
     int_range_from_capability,
     is_int_capability,
 )
+from pybravia_connect import ConnectionError as BraviaConnectionError
 
 DeltaCallback = Callable[[str, Any], None]
 

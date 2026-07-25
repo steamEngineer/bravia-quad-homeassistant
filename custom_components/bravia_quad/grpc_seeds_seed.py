@@ -6,8 +6,7 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from pybravia_connect import CredentialsRefreshError
-from pybravia_connect.credentials import async_get_device_states
+from pybravia_connect import CredentialsRefreshError, async_get_device_states
 
 from .grpc_mapping import NOTIFY_ONLY_GRPC_PATHS
 

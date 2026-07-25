@@ -36,14 +36,14 @@ from pathlib import Path
 from typing import Any
 
 import grpc
-from pybravia_connect import DEFAULT_THEATRE_PORT, BraviaConnectClient
-from pybravia_connect import ConnectionError as BraviaConnectionError
-from pybravia_connect.credentials import get_device_states, get_devices
-from pybravia_connect.wire.capabilities import (
-    capability_path_names,
-    get_capabilities_method,
-    paths_for_safe_get_states,
+from pybravia_connect import (
+    DEFAULT_THEATRE_PORT,
+    BraviaConnectClient,
+    get_device_states,
+    get_devices,
 )
+from pybravia_connect import ConnectionError as BraviaConnectionError
+from pybravia_connect.wire.capabilities import paths_for_safe_get_states
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS_GRPC = Path(__file__).resolve().parent
@@ -60,7 +60,6 @@ from device_scrape_report import (  # noqa: E402
     GETSTATES_STRATEGY_SAFE_BULK,
     battery_paths_from_capabilities,
     build_full_report,
-    decode_get_capabilities_response,
     flatten_seeds_states,
     identity_from_seeds_device,
     load_field_paths,
@@ -72,31 +71,12 @@ from device_scrape_report import (  # noqa: E402
 from http_54545_catalog import scrape_http_catalog  # noqa: E402
 from scrape_auth_gate import DEFAULT_KEYS_PATH, gate_or_exit  # noqa: E402
 
-_RPC_GET_CAPABILITIES = get_capabilities_method()
-
 
 def _print_banner() -> None:
     print(
         "\n*** Stop Home Assistant before running — only one :55051 client at a time ***\n",
         file=sys.stderr,
     )
-
-
-def _unary(
-    client: BraviaConnectClient,
-    method: str,
-    request: bytes,
-    *,
-    timeout: float = 15.0,
-) -> tuple[bytes | None, str | None, float]:
-    started = time.monotonic()
-    try:
-        response = client._raw_unary(method)(request, timeout=timeout)
-    except grpc.RpcError as exc:
-        return None, f"{exc.code().name}: {exc.details()}", time.monotonic() - started
-    except BraviaConnectionError as exc:
-        return None, str(exc), time.monotonic() - started
-    return response, None, time.monotonic() - started
 
 
 def _connect_client(host: str, keys: dict[str, Any]) -> BraviaConnectClient:
@@ -130,22 +110,27 @@ def probe_get_capabilities(
 
 
 def _fetch_capabilities_on_client(client: BraviaConnectClient) -> dict[str, Any]:
-    raw, err, latency = _unary(client, _RPC_GET_CAPABILITIES, b"")
-    decoded = decode_get_capabilities_response(raw) if raw else {}
-    cap_json: dict[str, Any] | None = None
-    if decoded.get("text"):
-        try:
-            cap_json = json.loads(decoded["text"])
-        except json.JSONDecodeError as exc:
-            decoded["json_error"] = str(exc)
+    """Fetch GetCapabilities JSON via the public client helper."""
+    started = time.monotonic()
+    try:
+        cap_json = client.get_capabilities_json()
+        err: str | None = None
+    except grpc.RpcError as exc:
+        cap_json = None
+        err = f"{exc.code().name}: {exc.details()}"
+    except (BraviaConnectionError, OSError) as exc:
+        cap_json = None
+        err = str(exc)
+    latency = time.monotonic() - started
+    decoded: dict[str, Any] = {}
     if cap_json is not None:
-        # Warm library capability cache for subsequent get_states defaults.
-        capability_path_names(cap_json)
-        with contextlib.suppress(BraviaConnectionError, OSError):
-            client.get_capabilities()
+        text = json.dumps(cap_json, separators=(",", ":"), sort_keys=True)
+        decoded = {"format": "text", "text": text, "raw_len": len(text.encode())}
     return {
-        "ok": err is None,
-        "error": err,
+        "ok": err is None and cap_json is not None,
+        "error": err
+        if err is not None
+        else (None if cap_json is not None else "empty"),
         "latency_s": round(latency, 4),
         "decoded": decoded,
         "capabilities_json": cap_json,

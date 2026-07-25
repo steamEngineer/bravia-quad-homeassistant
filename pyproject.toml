@@ -23,7 +23,7 @@ dev = [
     "pytest-homeassistant-custom-component>=0.13.297",
     "pytest-xdist>=3.8.0",
     "ruff>=0.14.0",
-    "pybravia-connect==0.1.0a4",
+    "pybravia-connect==0.1.0a7",
     "grpcio-tools>=1.76.0",
     "requests>=2.32.0",
 ]

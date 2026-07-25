@@ -17,7 +17,7 @@ from homeassistant.components.media_player import (
     MediaType,
 )
 from homeassistant.util import dt as dt_util
-from pybravia_connect.wire.capabilities import enum_values_from_capability
+from pybravia_connect import enum_values_from_capability
 
 from .const import (
     INPUT_OPTIONS,

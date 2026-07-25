@@ -13,9 +13,9 @@ from pybravia_connect import (
     DEFAULT_THEATRE_PORT,
     AuthError,
     BraviaConnectClient,
+    refresh_credentials,
 )
 from pybravia_connect import ConnectionError as BraviaConnectionError
-from pybravia_connect.credentials import refresh_credentials
 
 _SCRIPTS_GRPC = Path(__file__).resolve().parent
 if str(_SCRIPTS_GRPC) not in sys.path:
