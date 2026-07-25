@@ -80,13 +80,15 @@ jobs:
         if: >-
           github.event_name == 'push' ||
           needs.changes.outputs.code == 'true'
-        run: uvx ruff check .
+        # Pin to match .pre-commit-config.yaml (ruff-pre-commit v0.14.9).
+        # Unpinned uvx ruff + select=["ALL"] breaks CI when new rules land.
+        run: uvx ruff@0.14.9 check .
 
       - name: Format
         if: >-
           github.event_name == 'push' ||
           needs.changes.outputs.code == 'true'
-        run: uvx ruff format . --check
+        run: uvx ruff@0.14.9 format . --check
 
   ty:
     name: "🔎 Ty"

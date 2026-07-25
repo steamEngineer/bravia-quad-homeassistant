@@ -4,6 +4,7 @@ set -e
 
 cd "$(dirname "$0")/.."
 
-uvx ruff format .
-uvx ruff check . --fix
+# Pin matches .pre-commit-config.yaml / lint.yml (ruff-pre-commit v0.14.9).
+uvx ruff@0.14.9 format .
+uvx ruff@0.14.9 check . --fix
 uvx ty check custom_components/bravia_quad
