@@ -11,12 +11,16 @@ import socket
 import time
 from typing import TYPE_CHECKING, Any
 
+from pybravia_connect import AuthError
+from pybravia_connect import ConnectionError as BraviaConnectionError
+
+from .bravia_connect_backend import BraviaConnectBackend
 from .const import DEFAULT_GRPC_PORT, RECONNECT_INITIAL_DELAY, RECONNECT_MAX_DELAY
 from .external_control import (
     ExternalControlEnsureResult,
     async_ensure_external_control_enabled,
 )
-from .grpc.client import BraviaGrpcClient, NotifyStateUpdate, load_keys_from_file
+from .grpc.client import NotifyStateUpdate, load_keys_from_file
 from .grpc_mapping import (
     NOTIFY_ONLY_GRPC_PATHS,
     entity_critical_grpc_paths,
@@ -62,7 +66,7 @@ def _session_lost_reason(last_rpc_error: str | None) -> str:
 
 
 class BraviaGrpcClientAsync:
-    """Asyncio facade over the sync gRPC client (runs blocking calls in executor)."""
+    """Asyncio facade over pybravia-connect (runs blocking calls in executor)."""
 
     def __init__(
         self,
@@ -91,7 +95,7 @@ class BraviaGrpcClientAsync:
         self.seeds_poll = seeds_poll
         self._credentials = dict(credentials or {})
         self._hass = hass
-        self._client = BraviaGrpcClient(host, port, debug=debug)
+        self._client = BraviaConnectBackend()
         self._connected = False
         self._transport_error = False
         self._last_notify_at: float | None = None
@@ -122,6 +126,8 @@ class BraviaGrpcClientAsync:
             Callable[[dict[str, str]], Awaitable[None]] | None
         ) = None
         self._persist_feature_reasons_task: asyncio.Task[None] | None = None
+        self._notify_restore_event = asyncio.Event()
+        self._light_reconnect_event = asyncio.Event()
 
     def configure_feature_unavailable_persistence(
         self,
@@ -329,6 +335,14 @@ class BraviaGrpcClientAsync:
         self._transport_error = False
         self._set_connected(connected=False)
 
+        if not self.device_id or not self.hmac_key:
+            _LOGGER.error(
+                "gRPC keys incomplete for %s:%s (need device_id and hmac_key)",
+                self.host,
+                self.port,
+            )
+            return False
+
         grpc_port_status = await asyncio.to_thread(
             self._grpc_port_connect_ex, self.host, self.port
         )
@@ -342,28 +356,37 @@ class BraviaGrpcClientAsync:
             )
             return False
 
-        await asyncio.to_thread(self._client.connect)
-        ok = await asyncio.to_thread(
-            self._client.authenticate,
-            session_key=self.session_key,
-            hmac_key=self.hmac_key,
-            key_id=self.key_id,
-            device_id=self.device_id,
-        )
-        if ok:
-            self._set_connected(connected=True)
-            self._debug("Authenticated with %s:%s", self.host, self.port)
-        elif self._client.last_error_is_transport:
-            self._transport_error = True
-            _LOGGER.error(
-                "gRPC unavailable at %s:%s: %s",
+        try:
+            await asyncio.to_thread(
+                self._client.connect,
                 self.host,
                 self.port,
-                self._client.last_rpc_error or "transport error",
+                keys={
+                    "device_id": str(self.device_id),
+                    "hmac_key": str(self.hmac_key),
+                    "key_id": self.key_id,
+                    "session_key": self.session_key,
+                },
             )
-        else:
-            _LOGGER.error("gRPC authentication failed for %s:%s", self.host, self.port)
-        return ok
+        except BraviaConnectionError:
+            self._transport_error = True
+            _LOGGER.exception(
+                "gRPC unavailable at %s:%s",
+                self.host,
+                self.port,
+            )
+            return False
+        except AuthError:
+            _LOGGER.exception(
+                "gRPC authentication failed for %s:%s",
+                self.host,
+                self.port,
+            )
+            return False
+
+        self._set_connected(connected=True)
+        self._debug("Authenticated with %s:%s", self.host, self.port)
+        return True
 
     def _cancel_seeds_refresh(self) -> None:
         """Cancel a pending debounced Seeds refresh."""
@@ -442,16 +465,19 @@ class BraviaGrpcClientAsync:
     async def async_disconnect(self) -> None:
         """Stop notify task and close channel."""
         self._notify_stop.set()
+        self._notify_restore_event.set()
+        self._light_reconnect_event.set()
         self._cancel_seeds_refresh()
         if self._notify_task and not self._notify_task.done():
-            # Close channel first so the blocking notify iterator unblocks.
-            await asyncio.to_thread(self._client.disconnect)
+            await asyncio.to_thread(self._client.stop_notify)
+            await asyncio.to_thread(self._client.close)
             self._notify_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await self._notify_task
             self._notify_task = None
         else:
-            await asyncio.to_thread(self._client.disconnect)
+            await asyncio.to_thread(self._client.stop_notify)
+            await asyncio.to_thread(self._client.close)
         self._set_connected(connected=False)
 
     async def async_get_states(self) -> Any | None:
@@ -474,17 +500,7 @@ class BraviaGrpcClientAsync:
         if not self._connected:
             return None
         async with self._session_lock:
-            snapshot = await asyncio.to_thread(
-                self._client.get_states_with_preflight,
-                use_signed_auth=True,
-            )
-        if snapshot:
-            return snapshot
-        async with self._session_lock:
-            return await asyncio.to_thread(
-                self._client.get_states_dict,
-                use_signed_auth=True,
-            )
+            return await asyncio.to_thread(self._client.get_states)
 
     async def async_get_states_single_path(self, path: str) -> Any | None:
         """Return one field from a signed single-path GetStates, or None."""
@@ -494,28 +510,22 @@ class BraviaGrpcClientAsync:
             result = await asyncio.to_thread(
                 self._client.get_states_single_path,
                 path,
-                use_signed_auth=True,
-                quiet=True,
             )
         if not result:
             return None
         return result.get(path)
 
     async def async_get_states_app_sequence(self) -> dict[str, Any] | None:
-        """Mirror BRAVIA Connect GetStates RPC order (signed full + mutex)."""
+        """Bulk signed GetStates (library session lock; HA asyncio lock wraps)."""
         if not self._connected:
             return None
         async with self._session_lock:
-            return await asyncio.to_thread(self._client.get_states_app_sequence)
+            return await asyncio.to_thread(self._client.get_states)
 
     async def async_seed_notify_from_snapshot(self) -> int:
         """Merge GetStates snapshot into notify_state cache; return field count."""
-        # Lock only this direct wire call; the async_get_states_dict() fallback
-        # below takes the lock itself, so holding it here would deadlock.
         async with self._session_lock:
-            snapshot = await asyncio.to_thread(self._client.get_states_app_sequence)
-        if not snapshot:
-            snapshot = await self.async_get_states_dict()
+            snapshot = await asyncio.to_thread(self._client.get_states)
         if not snapshot:
             _LOGGER.warning("gRPC GetStates snapshot failed for %s", self.host)
             return 0
@@ -581,8 +591,6 @@ class BraviaGrpcClientAsync:
                 result = await asyncio.to_thread(
                     self._client.get_states_single_path,
                     path,
-                    use_signed_auth=True,
-                    quiet=True,
                 )
             if result and result.get(path) is not None:
                 self._client.update_notify_cache(result)
@@ -662,8 +670,6 @@ class BraviaGrpcClientAsync:
                 snapshot = await asyncio.to_thread(
                     self._client.get_states_single_path,
                     path,
-                    use_signed_auth=True,
-                    quiet=True,
                 )
             if snapshot and snapshot.get(path) is not None:
                 self._client.update_notify_cache(snapshot)
@@ -823,12 +829,17 @@ class BraviaGrpcClientAsync:
         if self._notify_task and not self._notify_task.done():
             return
         self._notify_stop.clear()
+        self._notify_restore_event.clear()
+        self._light_reconnect_event.clear()
         self._notify_task = asyncio.create_task(self._connection_manager())
 
     async def async_stop_notify(self) -> None:
         """Stop notify background task."""
         self._notify_stop.set()
+        self._notify_restore_event.set()
+        self._light_reconnect_event.set()
         self._cancel_seeds_refresh()
+        await asyncio.to_thread(self._client.stop_notify)
         if self._notify_task:
             self._notify_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -836,7 +847,7 @@ class BraviaGrpcClientAsync:
             self._notify_task = None
 
     async def _connection_manager(self) -> None:
-        """Keep StartNotifyStates alive; reconnect when the app or device drops HA."""
+        """Drive library notify; restore on lost, light seed on reconnect."""
         delay = RECONNECT_INITIAL_DELAY
         try:
             while not self._notify_stop.is_set():
@@ -854,15 +865,16 @@ class BraviaGrpcClientAsync:
                         delay = min(delay * 2, RECONNECT_MAX_DELAY)
                         continue
 
-                await self._run_notify_stream()
+                await self._run_notify_bridge()
 
                 if self._notify_stop.is_set():
                     break
 
                 self._set_connected(connected=False)
-                await asyncio.to_thread(self._client.disconnect)
+                await asyncio.to_thread(self._client.stop_notify)
+                await asyncio.to_thread(self._client.close)
                 self._debug(
-                    "Notify stream ended on %s; reconnect scheduled in %ds",
+                    "Notify connection lost on %s; reconnect scheduled in %ds",
                     self.host,
                     delay,
                 )
@@ -876,7 +888,8 @@ class BraviaGrpcClientAsync:
                 delay = min(delay * 2, RECONNECT_MAX_DELAY)
         except asyncio.CancelledError:
             self._notify_stop.set()
-            await asyncio.to_thread(self._client.disconnect)
+            await asyncio.to_thread(self._client.stop_notify)
+            await asyncio.to_thread(self._client.close)
             _LOGGER.debug("gRPC connection manager cancelled for %s", self.host)
             raise
 
@@ -886,7 +899,8 @@ class BraviaGrpcClientAsync:
 
     async def _async_restore_session(self) -> bool:
         """Reconnect, authenticate, snapshot seed, and refresh entity callbacks."""
-        await asyncio.to_thread(self._client.disconnect)
+        await asyncio.to_thread(self._client.stop_notify)
+        await asyncio.to_thread(self._client.close)
         if not await self.async_connect():
             # Connection refused / unreachable is not a credentials problem.
             if self.is_transport_error:
@@ -927,6 +941,20 @@ class BraviaGrpcClientAsync:
                 _LOGGER.exception("gRPC reconnect callback failed")
         return True
 
+    async def _async_light_reconnect(self) -> None:
+        """Stream recovered without full auth loss: re-seed and refresh entities."""
+        if self._notify_stop.is_set() or not self._connected:
+            return
+        seeded = await self.async_seed_notify_from_snapshot()
+        if seeded:
+            self._debug(
+                "Notify stream recovered on %s; re-seeded %d fields",
+                self.host,
+                seeded,
+            )
+        await self.async_backfill_entity_paths()
+        self._dispatch_snapshot_callbacks()
+
     def _dispatch_snapshot_callbacks(self) -> None:
         """Push cached notify_state to registered callbacks (post-reconnect refresh)."""
         for path, value in self._client.notify_state.items():
@@ -943,43 +971,67 @@ class BraviaGrpcClientAsync:
         """Public entry: refresh entities from cached notify_state."""
         self._dispatch_snapshot_callbacks()
 
-    async def _run_notify_stream(self) -> None:
-        """Bridge blocking gRPC stream to async callbacks until the stream ends."""
+    async def _run_notify_bridge(self) -> None:
+        """Bridge library start_notify callbacks into the HA event loop."""
         loop = asyncio.get_running_loop()
-        queue: asyncio.Queue[NotifyStateUpdate | None] = asyncio.Queue()
+        self._notify_restore_event.clear()
+        self._light_reconnect_event.clear()
 
-        def _stream_worker() -> None:
-            try:
-                for states in self._client.start_notify_states():
-                    if self._notify_stop.is_set():
-                        break
-                    loop.call_soon_threadsafe(queue.put_nowait, states)
-            except Exception:
-                _LOGGER.exception("gRPC notify stream failed")
-            finally:
-                loop.call_soon_threadsafe(queue.put_nowait, None)
+        def on_delta(path: str, value: Any) -> None:
+            update = NotifyStateUpdate(path=path, value=value)
 
-        worker = loop.run_in_executor(None, _stream_worker)
-        try:
-            while not self._notify_stop.is_set():
-                states = await queue.get()
-                if states is None:
-                    break
+            def _dispatch() -> None:
+                if self._notify_stop.is_set():
+                    return
                 self._last_notify_at = time.monotonic()
-                self._debug("Notify delta %s=%r", states.path, states.value)
-                if states.path == _PATH_NO_AUDIO:
+                self._debug("Notify delta %s=%r", path, value)
+                if path == _PATH_NO_AUDIO:
                     self.schedule_seeds_refresh()
-                if states.path.endswith((".unavailable_reason", ".availability")):
+                if path.endswith((".unavailable_reason", ".availability")):
                     self._sync_feature_unavailable_reasons_from_cache()
                 for callback in self._state_callbacks:
                     try:
-                        callback(states)
+                        callback(update)
                     except Exception:
                         _LOGGER.exception("gRPC state callback failed")
-        finally:
-            await asyncio.to_thread(self._client.disconnect)
-            with contextlib.suppress(asyncio.TimeoutError):
-                await asyncio.wait_for(worker, timeout=3.0)
+
+            loop.call_soon_threadsafe(_dispatch)
+
+        def on_connection_lost() -> None:
+            loop.call_soon_threadsafe(self._notify_restore_event.set)
+
+        def on_reconnect() -> None:
+            loop.call_soon_threadsafe(self._light_reconnect_event.set)
+
+        await asyncio.to_thread(
+            self._client.start_notify,
+            on_delta,
+            on_connection_lost,
+            on_reconnect,
+        )
+
+        while not self._notify_stop.is_set():
+            restore_waiter = asyncio.create_task(self._notify_restore_event.wait())
+            light_waiter = asyncio.create_task(self._light_reconnect_event.wait())
+            stop_waiter = asyncio.create_task(self._notify_stop.wait())
+            done, pending = await asyncio.wait(
+                {restore_waiter, light_waiter, stop_waiter},
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await task
+            if stop_waiter in done or self._notify_stop.is_set():
+                await asyncio.to_thread(self._client.stop_notify)
+                return
+            if restore_waiter in done:
+                self._notify_restore_event.clear()
+                await asyncio.to_thread(self._client.stop_notify)
+                return
+            if light_waiter in done:
+                self._light_reconnect_event.clear()
+                await self._async_light_reconnect()
 
     async def async_iter_notifications(self) -> AsyncIterator[NotifyStateUpdate]:
         """Async iterator over state notifications (for scripts/tests)."""
@@ -988,14 +1040,20 @@ class BraviaGrpcClientAsync:
         loop = asyncio.get_running_loop()
         queue: asyncio.Queue[NotifyStateUpdate | None] = asyncio.Queue()
 
-        def _stream_worker() -> None:
-            try:
-                for states in self._client.start_notify_states():
-                    loop.call_soon_threadsafe(queue.put_nowait, states)
-            finally:
-                loop.call_soon_threadsafe(queue.put_nowait, None)
+        def on_delta(path: str, value: Any) -> None:
+            loop.call_soon_threadsafe(
+                queue.put_nowait, NotifyStateUpdate(path=path, value=value)
+            )
 
-        worker = loop.run_in_executor(None, _stream_worker)
+        def on_connection_lost() -> None:
+            loop.call_soon_threadsafe(queue.put_nowait, None)
+
+        await asyncio.to_thread(
+            self._client.start_notify,
+            on_delta,
+            on_connection_lost,
+            None,
+        )
         try:
             while True:
                 item = await queue.get()
@@ -1003,4 +1061,4 @@ class BraviaGrpcClientAsync:
                     break
                 yield item
         finally:
-            await worker
+            await asyncio.to_thread(self._client.stop_notify)

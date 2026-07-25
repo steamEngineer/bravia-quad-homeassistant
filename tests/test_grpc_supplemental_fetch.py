@@ -35,11 +35,7 @@ async def test_fetch_field_paths_uses_single_path_requests() -> None:
     ) as mock_single:
         count = await client.async_fetch_field_paths(["sound_setting.night_mode"])
 
-    mock_single.assert_called_once_with(
-        "sound_setting.night_mode",
-        use_signed_auth=True,
-        quiet=True,
-    )
+    mock_single.assert_called_once_with("sound_setting.night_mode")
     assert count == 1
     assert client.notify_state["sound_setting.night_mode"] is True
 
@@ -63,8 +59,4 @@ async def test_fetch_field_paths_skips_resolved_values() -> None:
         )
 
     assert count == 1
-    mock_single.assert_called_once_with(
-        "sound_setting.voice_mode",
-        use_signed_auth=True,
-        quiet=True,
-    )
+    mock_single.assert_called_once_with("sound_setting.voice_mode")
