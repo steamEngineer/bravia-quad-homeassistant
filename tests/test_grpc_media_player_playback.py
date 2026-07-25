@@ -11,13 +11,12 @@ from homeassistant.components.media_player import (
     MediaPlayerState,
     MediaType,
 )
+from pybravia_connect import CapabilityMeta
 
 from custom_components.bravia_quad.const import (
     INPUT_OPTIONS,
     SOUND_EFFECT_OPTIONS,
 )
-from custom_components.bravia_quad.grpc.client import NotifyStateUpdate
-from custom_components.bravia_quad.grpc.get_capabilities_response import CapabilityMeta
 from custom_components.bravia_quad.grpc_media_player import (
     _BASE_SUPPORTED_FEATURES,
     _PATH_ALBUM,
@@ -43,6 +42,7 @@ from custom_components.bravia_quad.grpc_media_player import (
     BraviaGrpcMediaPlayer,
     _parse_available_values,
 )
+from custom_components.bravia_quad.notify_state import NotifyStateUpdate
 
 
 def _mock_create_task(coro: object) -> MagicMock:

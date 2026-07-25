@@ -15,12 +15,12 @@ from custom_components.bravia_quad.const import (
     FEATURE_DRC,
     FEATURE_POWER,
 )
-from custom_components.bravia_quad.grpc.client import load_keys_from_file
 from custom_components.bravia_quad.grpc_mapping import (
     GRPC_TCP_MAPPINGS,
     PARITY_GATE_COMMANDS,
     mappings_for_platform,
 )
+from custom_components.bravia_quad.notify_state import load_keys_from_file
 
 
 def test_grpc_port_default() -> None:

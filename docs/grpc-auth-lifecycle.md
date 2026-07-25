@@ -14,10 +14,9 @@ Applies to **gRPC transport only**. TCP transport (port 33336) has no token auth
 
 Primary implementation files:
 
-- [`grpc/credentials.py`](../custom_components/bravia_quad/grpc/credentials.py) — Sony Seeds OAuth and session-key refresh
+- [`pybravia-connect`](https://pypi.org/project/pybravia-connect/) credentials helpers — Sony Seeds OAuth and session-key refresh
 - [`grpc_refresh.py`](../custom_components/bravia_quad/grpc_refresh.py) — proactive/reactive refresh and HA config-entry persistence
-- [`grpc/client.py`](../custom_components/bravia_quad/grpc/client.py) — device handshake and rolling `auth_token`
-- [`grpc/get_states_auth.py`](../custom_components/bravia_quad/grpc/get_states_auth.py) — HMAC signing for GetStates/ExecCommand
+- [`bravia_connect_backend.py`](../custom_components/bravia_quad/bravia_connect_backend.py) / [`bravia_grpc_client.py`](../custom_components/bravia_quad/bravia_grpc_client.py) — HA façade over `BraviaConnectClient`
 
 ---
 
@@ -72,7 +71,7 @@ flowchart TB
 `build_credentials_bundle()` merges new OAuth tokens with new session keys and timestamps:
 
 ```python
-# custom_components/bravia_quad/grpc/credentials.py — build_credentials_bundle()
+# pybravia_connect.credentials.build_credentials_bundle()
 bundle["access_token"] = token_response["access_token"]
 # refresh_token preserved from previous bundle if not returned again
 bundle["access_token_expires_at"] = now + int(expires_in)
@@ -98,7 +97,7 @@ bundle["session_keys_expires_at"] = now + int(session_keys["expires_in"])
 ### Proactive refresh rule
 
 ```python
-# custom_components/bravia_quad/grpc/credentials.py
+# pybravia_connect.credentials.keys_need_refresh()
 SESSION_KEYS_REFRESH_BUFFER = 3600  # 1 hour
 
 def keys_need_refresh(credentials, *, buffer_seconds=SESSION_KEYS_REFRESH_BUFFER):

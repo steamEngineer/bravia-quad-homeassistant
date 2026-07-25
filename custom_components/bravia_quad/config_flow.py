@@ -24,6 +24,17 @@ from homeassistant.helpers.selector import (
     SelectSelectorConfig,
     SelectSelectorMode,
 )
+from pybravia_connect import (
+    CredentialsRefreshError,
+    OAuthError,
+    credentials_to_json,
+    start_oauth_login,
+)
+from pybravia_connect.credentials import (
+    async_credentials_from_oauth,
+    async_exchange_oauth_redirect,
+    async_list_oauth_devices,
+)
 
 from .bravia_grpc_client import BraviaGrpcClientAsync
 from .bravia_quad_client import BraviaQuadClient
@@ -46,15 +57,6 @@ from .const import (
     TRANSPORT_TCP,
 )
 from .external_control import async_ensure_external_control_enabled
-from .grpc.credentials import (
-    GrpcCredentialsRefreshError,
-    GrpcOAuthError,
-    async_credentials_from_oauth,
-    async_exchange_oauth_redirect,
-    async_list_oauth_devices,
-    credentials_to_json,
-    start_oauth_login,
-)
 from .transport import identity_from_grpc_snapshot, resolve_transport
 
 if TYPE_CHECKING:
@@ -372,9 +374,9 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
                 self._setup_info = await self._finish_grpc_oauth(redirect)
             except GrpcOAuthDeviceSelectionError:
                 return await self.async_step_grpc_oauth_device()
-            except GrpcOAuthError:
+            except OAuthError:
                 errors["base"] = "invalid_oauth_redirect"
-            except GrpcCredentialsRefreshError:
+            except CredentialsRefreshError:
                 errors["base"] = "oauth_failed"
             except InvalidGrpcKeysError:
                 errors["base"] = "invalid_grpc_keys"
@@ -417,7 +419,7 @@ class BraviaQuadConfigFlow(ConfigFlow, domain=DOMAIN):
                 errors["base"] = "invalid_grpc_keys"
             except CannotConnectError:
                 errors["base"] = "cannot_connect"
-            except GrpcCredentialsRefreshError:
+            except CredentialsRefreshError:
                 errors["base"] = "oauth_failed"
             except Exception:
                 _LOGGER.exception("Unexpected exception during gRPC device selection")

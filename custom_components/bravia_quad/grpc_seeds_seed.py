@@ -6,8 +6,9 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
+from pybravia_connect import CredentialsRefreshError
+from pybravia_connect.credentials import async_get_device_states
 
-from .grpc.credentials import GrpcCredentialsRefreshError, async_get_device_states
 from .grpc_mapping import NOTIFY_ONLY_GRPC_PATHS
 
 if TYPE_CHECKING:
@@ -59,7 +60,7 @@ async def _fetch_device_states(
     """GET /states; refresh OAuth once on 401."""
     try:
         return await async_get_device_states(session, device_id, access_token)
-    except GrpcCredentialsRefreshError as err:
+    except CredentialsRefreshError as err:
         if "401" not in str(err) or not await grpc_client.async_refresh_credentials():
             _LOGGER.debug(
                 "Seeds state seed skipped for %s: %s",
@@ -78,7 +79,7 @@ async def _fetch_device_states(
             return await async_get_device_states(
                 session, device_id, str(refreshed_token)
             )
-        except (GrpcCredentialsRefreshError, OSError) as retry_err:
+        except (CredentialsRefreshError, OSError) as retry_err:
             _LOGGER.debug(
                 "Seeds state seed skipped for %s after refresh: %s",
                 grpc_client.host,

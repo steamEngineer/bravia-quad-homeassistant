@@ -20,7 +20,6 @@ from .external_control import (
     ExternalControlEnsureResult,
     async_ensure_external_control_enabled,
 )
-from .grpc.client import NotifyStateUpdate, load_keys_from_file
 from .grpc_mapping import (
     NOTIFY_ONLY_GRPC_PATHS,
     entity_critical_grpc_paths,
@@ -29,13 +28,13 @@ from .grpc_mapping import (
 )
 from .grpc_seeds_seed import SEEDS_SEED_PATHS, async_seed_from_seeds
 from .grpc_tcp_seed import async_seed_notify_only_from_tcp
+from .notify_state import NotifyStateUpdate, load_keys_from_file
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Awaitable, Callable
 
     from homeassistant.core import HomeAssistant
-
-    from .grpc.get_capabilities_response import CapabilityMeta
+    from pybravia_connect import CapabilityMeta
 
     ReconnectCallback = Callable[[], Awaitable[None]]
     RefreshKeysCallback = Callable[[], Awaitable[bool]]

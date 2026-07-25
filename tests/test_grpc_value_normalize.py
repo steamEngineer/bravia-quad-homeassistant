@@ -72,9 +72,7 @@ def test_normalize_omit_zero_int_paths() -> None:
 
 
 def test_normalize_omit_zero_uses_capability_type() -> None:
-    from custom_components.bravia_quad.grpc.get_capabilities_response import (
-        CapabilityMeta,
-    )
+    from pybravia_connect import CapabilityMeta
 
     mapping = mapping_for_grpc_path("sound_setting.night_mode")
     assert mapping is not None
@@ -146,26 +144,6 @@ def test_denormalize_rear_int() -> None:
     kind, payload = denormalize_for_exec(mapping, -3)
     assert kind == "int_value"
     assert payload == -3
-
-
-def test_exec_rear_negative_signed_varint_preimage() -> None:
-    """Rear/sub exec uses int wire with sign-extended protobuf varint."""
-    from custom_components.bravia_quad.grpc.exec_command_request import (
-        build_exec_command_signing_preimage,
-    )
-    from custom_components.bravia_quad.grpc.get_states_request import (
-        encode_signed_varint,
-    )
-
-    assert encode_signed_varint(-3) == bytes.fromhex("fdffffffffffffffff01")
-
-    preimage = build_exec_command_signing_preimage(
-        "sound_setting.volume.rear",
-        session_random=b"\xdb\x86\x6b\xae\x29\x3b\xf6\x9a",
-        session_id="6624d00d-4851-4514-8913-ab0b22a2d558",
-        int_value=-3,
-    )
-    assert bytes.fromhex("fdffffffffffffffff01") in preimage
 
 
 def test_sound_effect_mapping_is_grpc_only() -> None:

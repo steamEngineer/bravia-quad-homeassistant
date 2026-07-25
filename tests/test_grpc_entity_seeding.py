@@ -9,9 +9,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from custom_components.bravia_quad.bravia_grpc_client import BraviaGrpcClientAsync
-from custom_components.bravia_quad.grpc.get_states_response import (
-    parse_get_states_response,
-)
 from custom_components.bravia_quad.grpc_mapping import (
     GRPC_TCP_MAPPINGS,
     entity_critical_grpc_paths,
@@ -23,10 +20,9 @@ from custom_components.bravia_quad.grpc_tcp_seed import async_seed_notify_only_f
 from custom_components.bravia_quad.grpc_value_normalize import (
     coerce_bool,
 )
-from tests.conftest import frida_fixture_dir
 
 if TYPE_CHECKING:
-    from custom_components.bravia_quad.grpc.client import NotifyStateUpdate
+    from custom_components.bravia_quad.notify_state import NotifyStateUpdate
 
 
 def test_entity_critical_paths_include_media_player_and_handcrafted() -> None:
@@ -40,9 +36,7 @@ def test_entity_critical_paths_include_media_player_and_handcrafted() -> None:
 
 def test_filter_field_paths_drops_non_advertised_metadata_siblings() -> None:
     """HT-A8 rejects bulk GetStates if any path is not advertised (e.g. testtone)."""
-    from custom_components.bravia_quad.grpc.get_capabilities_response import (
-        filter_field_paths,
-    )
+    from pybravia_connect.wire.capabilities import filter_field_paths
 
     ha_paths = [
         "speaker_sound_setting.testtone_playback",
@@ -94,23 +88,6 @@ def test_coerce_bool_none_stays_none() -> None:
     assert coerce_bool(True) is True
     assert coerce_bool("off") is False
     assert coerce_bool("upon") is True
-
-
-def test_frida_snapshot_none_entity_paths() -> None:
-    capture = frida_fixture_dir() / "getstates_rx_seq51.bin"
-    if not capture.is_file():
-        pytest.skip("Frida capture not available")
-    result = parse_get_states_response(capture.read_bytes())
-    none_paths = {
-        "mute",
-        "sound_setting.night_mode",
-        "sound_setting.sound_field",
-        "sound_setting.voice_mode",
-        "sound_setting.dts_dialog_control",
-    }
-    for path in none_paths:
-        assert path in result
-        assert result[path] is None
 
 
 @pytest.mark.asyncio

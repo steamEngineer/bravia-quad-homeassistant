@@ -502,7 +502,7 @@ def test_fixture_from_investigation_capabilities_json() -> None:
 
 def test_paths_for_safe_get_states_against_a8_contrib_scrape() -> None:
     """Optional: A8 contrib caps → 228 safe bulk paths."""
-    from bravia_quad.grpc.get_capabilities_response import paths_for_safe_get_states
+    from pybravia_connect.wire.capabilities import paths_for_safe_get_states
 
     a8_report = (
         ROOT.parent

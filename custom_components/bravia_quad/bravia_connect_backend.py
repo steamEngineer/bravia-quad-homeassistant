@@ -5,33 +5,14 @@ from __future__ import annotations
 from collections.abc import Callable
 from typing import Any
 
-from pybravia_connect import AuthError, BraviaConnectClient
-from pybravia_connect import CapabilityMeta as LibCapabilityMeta
+from pybravia_connect import AuthError, BraviaConnectClient, CapabilityMeta
 from pybravia_connect import ConnectionError as BraviaConnectionError
-
-from .grpc.get_capabilities_response import (
-    CapabilityMeta,
+from pybravia_connect.wire.capabilities import (
     int_range_from_capability,
     is_int_capability,
 )
 
 DeltaCallback = Callable[[str, Any], None]
-
-
-def _to_ha_capability_index(
-    index: dict[str, LibCapabilityMeta],
-) -> dict[str, CapabilityMeta]:
-    """Copy library CapabilityMeta into the Theatre dataclass (same fields)."""
-    return {
-        path: CapabilityMeta(
-            name=meta.name,
-            type=meta.type,
-            min=meta.min,
-            max=meta.max,
-            values=meta.values,
-        )
-        for path, meta in index.items()
-    }
 
 
 class BraviaConnectBackend:
@@ -123,9 +104,8 @@ class BraviaConnectBackend:
         except (BraviaConnectionError, AuthError, OSError) as err:
             self.last_rpc_error = str(err)
             return None
-        ha_index = _to_ha_capability_index(index)
-        self._capability_index = ha_index
-        self._capability_paths = frozenset(ha_index)
+        self._capability_index = index
+        self._capability_paths = frozenset(index)
         return self._capability_paths
 
     def get_states(self, paths: list[str] | None = None) -> dict[str, Any] | None:

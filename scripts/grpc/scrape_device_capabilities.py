@@ -36,6 +36,14 @@ from pathlib import Path
 from typing import Any
 
 import grpc
+from pybravia_connect import DEFAULT_THEATRE_PORT, BraviaConnectClient
+from pybravia_connect import ConnectionError as BraviaConnectionError
+from pybravia_connect.credentials import get_device_states, get_devices
+from pybravia_connect.wire.capabilities import (
+    capability_path_names,
+    get_capabilities_method,
+    paths_for_safe_get_states,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS_GRPC = Path(__file__).resolve().parent
@@ -43,13 +51,6 @@ sys.path.insert(0, str(REPO_ROOT / "custom_components"))
 sys.path.insert(0, str(_SCRIPTS_GRPC))
 
 from bravia_quad.const import DEFAULT_PORT  # noqa: E402
-from bravia_quad.grpc.client import BraviaGrpcClient  # noqa: E402
-from bravia_quad.grpc.credentials import get_device_states, get_devices  # noqa: E402
-from bravia_quad.grpc.get_capabilities_response import (  # noqa: E402
-    capability_path_names,
-    get_capabilities_method,
-    paths_for_safe_get_states,
-)
 from bravia_quad.grpc_mapping import (  # noqa: E402
     NOTIFY_ONLY_GRPC_PATHS,
     entity_critical_grpc_paths,
@@ -62,6 +63,7 @@ from device_scrape_report import (  # noqa: E402
     decode_get_capabilities_response,
     flatten_seeds_states,
     identity_from_seeds_device,
+    load_field_paths,
     redact_report,
     render_markdown,
     report_filename_stem,
@@ -81,39 +83,37 @@ def _print_banner() -> None:
 
 
 def _unary(
-    client: BraviaGrpcClient,
+    client: BraviaConnectClient,
     method: str,
     request: bytes,
     *,
     timeout: float = 15.0,
 ) -> tuple[bytes | None, str | None, float]:
-    if not client.channel:
-        return None, "no channel", 0.0
-    call = client.channel.unary_unary(
-        method,
-        request_serializer=lambda payload: payload,
-        response_deserializer=lambda payload: payload,
-    )
     started = time.monotonic()
     try:
-        response = call.future(request, timeout=timeout).result()
+        response = client._raw_unary(method)(request, timeout=timeout)
     except grpc.RpcError as exc:
         return None, f"{exc.code().name}: {exc.details()}", time.monotonic() - started
+    except BraviaConnectionError as exc:
+        return None, str(exc), time.monotonic() - started
     return response, None, time.monotonic() - started
 
 
-def _connect_client(host: str, keys: dict[str, Any]) -> BraviaGrpcClient:
-    client = BraviaGrpcClient(host)
-    client.connect()
-    ok = client.authenticate(
-        session_key=keys.get("session_key"),
-        hmac_key=keys["hmac_key"],
-        key_id=keys["key_id"],
-        device_id=keys.get("device_id"),
-    )
-    if not ok:
-        msg = "gRPC authenticate() failed"
+def _connect_client(host: str, keys: dict[str, Any]) -> BraviaConnectClient:
+    device_id = keys.get("device_id")
+    hmac_key = keys.get("hmac_key")
+    if not device_id or not hmac_key:
+        msg = "keys missing device_id or hmac_key"
         raise RuntimeError(msg)
+    client = BraviaConnectClient(
+        host,
+        DEFAULT_THEATRE_PORT,
+        device_id=device_id,
+        hmac_key=hmac_key,
+        key_id=keys.get("key_id"),
+        session_key=keys.get("session_key"),
+    )
+    client.connect()
     return client
 
 
@@ -126,10 +126,10 @@ def probe_get_capabilities(
     try:
         return _fetch_capabilities_on_client(client)
     finally:
-        client.disconnect()
+        client.close()
 
 
-def _fetch_capabilities_on_client(client: BraviaGrpcClient) -> dict[str, Any]:
+def _fetch_capabilities_on_client(client: BraviaConnectClient) -> dict[str, Any]:
     raw, err, latency = _unary(client, _RPC_GET_CAPABILITIES, b"")
     decoded = decode_get_capabilities_response(raw) if raw else {}
     cap_json: dict[str, Any] | None = None
@@ -139,9 +139,10 @@ def _fetch_capabilities_on_client(client: BraviaGrpcClient) -> dict[str, Any]:
         except json.JSONDecodeError as exc:
             decoded["json_error"] = str(exc)
     if cap_json is not None:
-        names = capability_path_names(cap_json)
-        client._capability_paths = names
-        # Index optional; scrape uses raw JSON for safe-bulk selection.
+        # Warm library capability cache for subsequent get_states defaults.
+        capability_path_names(cap_json)
+        with contextlib.suppress(BraviaConnectionError, OSError):
+            client.get_capabilities()
     return {
         "ok": err is None,
         "error": err,
@@ -152,7 +153,8 @@ def _fetch_capabilities_on_client(client: BraviaGrpcClient) -> dict[str, Any]:
 
 
 def _backfill_paths(
-    client: BraviaGrpcClient,
+    client: BraviaConnectClient,
+    snapshot: dict[str, Any],
     paths: list[str],
     *,
     notify_only: set[str],
@@ -161,11 +163,14 @@ def _backfill_paths(
     for path in paths:
         if path in notify_only:
             continue
-        if client.notify_state.get(path) is not None:
+        if snapshot.get(path) is not None:
             continue
-        result = client.get_states_single_path(path, use_signed_auth=True, quiet=True)
+        try:
+            result = client.get_states([path])
+        except (BraviaConnectionError, OSError, ValueError):
+            continue
         if result and result.get(path) is not None:
-            client._notify_state.update(result)
+            snapshot.update(result)
             resolved += 1
     return resolved
 
@@ -177,6 +182,7 @@ def scrape_grpc_session(host: str, keys: dict[str, Any]) -> dict[str, Any]:
     Safe bulk = ``get:true`` minus ``command_independence.getstates_request``.
     """
     client = _connect_client(host, keys)
+    snapshot: dict[str, Any] = {}
     try:
         cap_result = _fetch_capabilities_on_client(client)
         cap_json = cap_result.get("capabilities_json")
@@ -186,36 +192,37 @@ def scrape_grpc_session(host: str, keys: dict[str, Any]) -> dict[str, Any]:
         bulk: dict[str, Any] = {}
 
         if safe_paths:
-            bulk_result = client.get_states_app_sequence(field_paths=safe_paths)
-            if bulk_result is None:
-                bulk_error = client.last_rpc_error or "bulk GetStates failed"
-            else:
-                bulk = bulk_result
-                client._notify_state.update(bulk)
+            try:
+                bulk = client.get_states(safe_paths)
+                snapshot.update(bulk)
+            except (BraviaConnectionError, OSError, ValueError) as exc:
+                bulk_error = str(exc) or "bulk GetStates failed"
         else:
             # Caps missing or empty — fall back to HA soft-filter list.
             strategy = "ha_field_paths_fallback"
-            bulk_result = client.get_states_app_sequence()
-            if bulk_result is None:
-                bulk_error = client.last_rpc_error or "bulk GetStates failed"
-            else:
-                bulk = bulk_result
-                client._notify_state.update(bulk)
-            safe_paths = client.field_paths_for_get_states()
+            safe_paths = load_field_paths()
+            try:
+                bulk = client.get_states(safe_paths)
+                snapshot.update(bulk)
+            except (BraviaConnectionError, OSError, ValueError) as exc:
+                bulk_error = str(exc) or "bulk GetStates failed"
 
         notify_only_set = set(NOTIFY_ONLY_GRPC_PATHS)
         entity_resolved = _backfill_paths(
             client,
+            snapshot,
             sorted(entity_critical_grpc_paths()),
             notify_only=notify_only_set,
         )
         topology_resolved = _backfill_paths(
             client,
+            snapshot,
             list(topology_backfill_paths()),
             notify_only=notify_only_set,
         )
         battery_resolved = _backfill_paths(
             client,
+            snapshot,
             battery_paths_from_capabilities(cap_json),
             notify_only=notify_only_set,
         )
@@ -229,10 +236,10 @@ def scrape_grpc_session(host: str, keys: dict[str, Any]) -> dict[str, Any]:
             "battery_backfill_resolved": battery_resolved,
             "getstates_strategy": strategy,
             "getstates_path_count": len(safe_paths),
-            "snapshot": dict(client.notify_state),
+            "snapshot": dict(snapshot),
         }
     finally:
-        client.disconnect()
+        client.close()
 
 
 def scrape_grpc_snapshot(host: str, keys: dict[str, Any]) -> dict[str, Any]:

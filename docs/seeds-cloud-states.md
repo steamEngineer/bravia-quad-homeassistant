@@ -14,7 +14,7 @@ Previously, gRPC transport used **TCP JSON-RPC** (`:33336`) to seed notify-only 
 |------|--------|
 | Endpoint | `GET https://v1.api.iot.seeds.services/devices/{device_id}/states` |
 | Auth | `Authorization: Bearer {access_token}` (same OAuth token in `CONF_GRPC_KEYS`) |
-| Headers | Reuse `_IOT_HEADERS_BASE` from [`grpc/credentials.py`](../custom_components/bravia_quad/grpc/credentials.py) (`x-api-key`, BRAVIA Connect user-agent) |
+| Headers | Same IoT headers as `pybravia-connect` Seeds helpers (`x-api-key`, BRAVIA Connect user-agent); see [`grpc_seeds_seed.py`](../custom_components/bravia_quad/grpc_seeds_seed.py) |
 | Session keys | **Not** used for this call — OAuth access token only |
 
 ### Response shape (HT-A9M2, live probe 2026-07-06)

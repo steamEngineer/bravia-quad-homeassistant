@@ -29,7 +29,7 @@ Quick reference for the BRAVIA Connect gRPC transport used in gRPC mode. See als
 
 ## GetCapabilities path filtering
 
-`GetCapabilities` returns JSON of the form `{"capabilities":[{"name":"<path>", "type":"...", "props":{...}}, ...]}`. After connect (and on reconnect), the integration fetches this list and intersects it with the static HA path list in [`grpc/all_field_paths.txt`](../custom_components/bravia_quad/grpc/all_field_paths.txt) when building bulk `GetStatesWithAuth` batches.
+`GetCapabilities` returns JSON of the form `{"capabilities":[{"name":"<path>", "type":"...", "props":{...}}, ...]}`. After connect (and on reconnect), the integration fetches this list and uses capability-safe path filtering from `pybravia-connect` when building bulk `GetStatesWithAuth` batches. A static contributor catalog lives at [`scripts/grpc/all_field_paths.txt`](../scripts/grpc/all_field_paths.txt).
 
 - Only advertised `name` values are used for filtering (props are ignored for path allowlists).
 - Order follows the HA path list; capability-only paths are never added.
@@ -40,9 +40,7 @@ Quick reference for the BRAVIA Connect gRPC transport used in gRPC mode. See als
 
 ## Request envelope
 
-This repo ships **generated** gRPC stubs ([`bravia_control_pb2.py`](../custom_components/bravia_quad/grpc/bravia_control_pb2.py), [`bravia_control_pb2_grpc.py`](../custom_components/bravia_quad/grpc/bravia_control_pb2_grpc.py)) for handshake and notify RPCs only — not a checked-in `.proto`. An early monolithic proto was removed because it did not match the live wire layout. Per [@mafredri](https://github.com/mafredri)'s reflected schema ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), authoritative auth RPCs use outer wrappers with `serialized_request + hmac`. Hand encoders in this integration build those envelopes to match observed device traffic.
-
-Hand encoders in [`get_states_request.py`](../custom_components/bravia_quad/grpc/get_states_request.py) and [`exec_command_request.py`](../custom_components/bravia_quad/grpc/exec_command_request.py) build the inner serialized blobs and outer HMAC envelope.
+Wire codecs, stubs, and HMAC envelopes live in [`pybravia-connect`](https://pypi.org/project/pybravia-connect/). This integration is a thin Home Assistant shell over `BraviaConnectClient`. Per [@mafredri](https://github.com/mafredri)'s reflected schema ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), authoritative auth RPCs use outer wrappers with `serialized_request + hmac`.
 
 ## Error codes
 
@@ -58,7 +56,7 @@ Reflected schema `ErrorCode` values (local reference):
 
 ## Field paths
 
-177 paths in Connect's bulk snapshot list ([`grpc/all_field_paths.txt`](../custom_components/bravia_quad/grpc/all_field_paths.txt)). Per @mafredri ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), the device accepts valid path names individually or in flexible batches — 177 is a Connect mirror, not a hard requirement. Bulk snapshots are filtered to paths advertised by `GetCapabilities` when that call succeeds (see [GetCapabilities path filtering](#getcapabilities-path-filtering)). Mapped HA entities use a subset documented in [grpc-tcp-mapping.md](grpc-tcp-mapping.md).
+177 paths in Connect's bulk snapshot list ([`scripts/grpc/all_field_paths.txt`](../scripts/grpc/all_field_paths.txt)). Per @mafredri ([#16](https://github.com/steamEngineer/bravia-quad-homeassistant/issues/16)), the device accepts valid path names individually or in flexible batches — 177 is a Connect mirror, not a hard requirement. Bulk snapshots are filtered to paths advertised by `GetCapabilities` when that call succeeds (see [GetCapabilities path filtering](#getcapabilities-path-filtering)). Mapped HA entities use a subset documented in [grpc-tcp-mapping.md](grpc-tcp-mapping.md).
 
 Common paths:
 
