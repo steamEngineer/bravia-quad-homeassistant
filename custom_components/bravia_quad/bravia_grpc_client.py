@@ -576,12 +576,14 @@ class BraviaGrpcClientAsync:
                 continue
             if self._client.notify_state.get(path) is not None:
                 continue
-            result = await asyncio.to_thread(
-                self._client.get_states_single_path,
-                path,
-                use_signed_auth=True,
-                quiet=True,
-            )
+            # Per wire call only; Seeds/TCP seed below must not nest this lock.
+            async with self._session_lock:
+                result = await asyncio.to_thread(
+                    self._client.get_states_single_path,
+                    path,
+                    use_signed_auth=True,
+                    quiet=True,
+                )
             if result and result.get(path) is not None:
                 self._client.update_notify_cache(result)
                 bulk_resolved += 1
@@ -656,12 +658,13 @@ class BraviaGrpcClientAsync:
                 continue
             if self._client.notify_state.get(path) is not None:
                 continue
-            snapshot = await asyncio.to_thread(
-                self._client.get_states_single_path,
-                path,
-                use_signed_auth=True,
-                quiet=True,
-            )
+            async with self._session_lock:
+                snapshot = await asyncio.to_thread(
+                    self._client.get_states_single_path,
+                    path,
+                    use_signed_auth=True,
+                    quiet=True,
+                )
             if snapshot and snapshot.get(path) is not None:
                 self._client.update_notify_cache(snapshot)
                 resolved += 1
