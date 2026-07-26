@@ -114,8 +114,9 @@ async def _maybe_refresh_credentials(
         return credentials, False
     if not proactive and not credentials.get("refresh_token"):
         msg = (
-            "No refresh_token in credentials; run scripts/grpc/get_session_keys.py "
-            "--login to obtain one"
+            "No refresh_token in credentials; re-authenticate with Sony Seeds "
+            "(pybravia-connect tools/get_session_keys.py --login, or the HA "
+            "scripts/grpc/get_session_keys.py wrapper)"
         )
         raise CredentialsError(msg)
     try:

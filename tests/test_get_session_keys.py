@@ -1,4 +1,4 @@
-"""Unit tests for Sony Seeds OAuth helpers."""
+"""Unit tests for Sony Seeds OAuth helper shim."""
 
 from __future__ import annotations
 
