@@ -1,11 +1,10 @@
-"""Test connection lifecycle and TCP stream handling."""
+"""Test adapter reconnect hooks and disconnected send semantics."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -18,29 +17,13 @@ def client() -> BraviaQuadClient:
     return BraviaQuadClient("127.0.0.1", "Test")
 
 
-def _make_writer() -> MagicMock:
-    """Create a mock writer."""
-    writer = MagicMock()
-    writer.close = MagicMock()
-    writer.wait_closed = AsyncMock()
-    return writer
-
-
-async def test_notification_loop_exits_on_eof(
-    client: BraviaQuadClient,
-) -> None:
-    """The read loop exits on EOF instead of reconnecting inline."""
-    client._connected = True
-    client._reader = AsyncMock()
-    client._reader.read = AsyncMock(return_value=b"")
-    client._writer = _make_writer()
-
-    try:
-        await asyncio.wait_for(client._notification_loop(), timeout=2.0)
-    except TimeoutError:
-        pytest.fail("Notification loop did not exit on EOF")
-
-    assert not client._connected
+async def _cancel_background(client: BraviaQuadClient) -> None:
+    """Cancel and await adapter background tasks."""
+    for task in list(client._background_tasks):
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+    client._background_tasks.clear()
 
 
 async def test_send_command_raises_when_disconnected(
@@ -62,118 +45,64 @@ async def test_fetch_is_not_awaited_during_reconnect(
     need the read loop, but the read loop can't run until the
     reconnect path returns.
     """
-    client._listening = True
-
-    async def fake_connect() -> None:
-        client._connected = True
-
     fetch_event = asyncio.Event()
 
     async def slow_fetch() -> None:
         fetch_event.set()
         await asyncio.sleep(999)
 
-    real_sleep = asyncio.sleep
-
-    async def short_sleep(delay: float) -> None:
-        """Skip reconnect delays but let slow_fetch actually block."""
-        if delay < 60:
-            return
-        await real_sleep(delay)
-
-    monkeypatch.setattr(client, "async_connect", fake_connect)
     monkeypatch.setattr(client, "async_fetch_all_states", slow_fetch)
-    monkeypatch.setattr(asyncio, "sleep", short_sleep)
 
-    task = asyncio.create_task(client._reconnect_loop())
-
-    # If _reconnect_loop awaits slow_fetch, it blocks for 999s.
+    # If _async_on_lib_reconnect awaits slow_fetch, it blocks for 999s.
     # If it schedules the fetch without awaiting, it returns promptly.
     try:
-        await asyncio.wait_for(task, timeout=1.0)
+        await asyncio.wait_for(client._async_on_lib_reconnect(), timeout=1.0)
     except TimeoutError:
         pytest.fail(
-            "_reconnect_loop did not return within 1s, "
+            "_async_on_lib_reconnect did not return within 1s, "
             "likely awaiting async_fetch_all_states inline"
         )
 
-    # The fetch should have been triggered
-    assert fetch_event.is_set(), "async_fetch_all_states was never called"
+    try:
+        await asyncio.wait_for(fetch_event.wait(), timeout=1.0)
+    except TimeoutError:
+        pytest.fail("async_fetch_all_states was never called")
 
-    for t in list(client._background_tasks):
-        t.cancel()
-        with contextlib.suppress(asyncio.CancelledError):
-            await t
+    assert client.is_connected
+    await _cancel_background(client)
 
 
-async def test_split_message_not_lost(
+async def test_notify_wrap_updates_sticky_and_callbacks(
     client: BraviaQuadClient,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A JSON object split across two TCP reads is still processed."""
-    msg = '{"feature":"hdmi.passthrough","id":1,"type":"result","value":"auto"}'
-    split_at = 30
-    chunk1 = msg[:split_at].encode()
-    chunk2 = msg[split_at:].encode()
+    """Library notify bridge updates sticky cache and entity callbacks."""
+    monkeypatch.setattr(client, "async_get_input", AsyncMock())
+    seen: list[str] = []
 
-    reads = iter([chunk1, chunk2, b""])
-    reader = AsyncMock()
-    reader.read = AsyncMock(side_effect=lambda _n: next(reads))
+    def _on_power(value: object) -> None:
+        seen.append(str(value))
 
+    client.register_notification_callback("main.power", _on_power)
+    await client._on_lib_notify("main.power", "on")
+
+    assert client.power_state == "on"
+    assert seen == ["on"]
+    await _cancel_background(client)
+
+
+async def test_send_command_set_facade(client: BraviaQuadClient) -> None:
+    """async_send_command maps set dicts onto library set_feature."""
     client._connected = True
-    client._reader = reader
-    client._writer = _make_writer()
+    client._lib.set_feature = AsyncMock(return_value="ACK")
 
-    processed: list[dict] = []
-    original = client._process_incoming_message
+    response = await client.async_send_command(
+        {"type": "set", "feature": "bluetooth.mode", "value": "RX"}
+    )
 
-    async def capture(message: dict) -> None:
-        processed.append(message)
-        await original(message)
-
-    client._process_incoming_message = capture
-
-    await client._notification_loop()
-
-    assert len(processed) == 1
-    assert processed[0]["feature"] == "hdmi.passthrough"
-    assert processed[0]["value"] == "auto"
-
-
-async def test_burst_split_across_reads_no_messages_lost(
-    client: BraviaQuadClient,
-) -> None:
-    """A burst of messages split at arbitrary byte boundaries loses nothing."""
-    messages = [
-        json.dumps({"feature": f"test.{i}", "type": "notify", "value": str(i)})
-        for i in range(20)
-    ]
-    full_stream = "".join(messages)
-
-    chunk_size = 80
-    chunks = [
-        full_stream[i : i + chunk_size].encode()
-        for i in range(0, len(full_stream), chunk_size)
-    ]
-    chunks.append(b"")
-
-    reads = iter(chunks)
-    reader = AsyncMock()
-    reader.read = AsyncMock(side_effect=lambda _n: next(reads))
-
-    client._connected = True
-    client._reader = reader
-    client._writer = _make_writer()
-
-    processed: list[dict] = []
-
-    async def capture(message: dict) -> None:
-        processed.append(message)
-
-    client._process_incoming_message = capture
-
-    await client._notification_loop()
-
-    assert len(processed) == 20
-    features = {m["feature"] for m in processed}
-    for i in range(20):
-        assert f"test.{i}" in features
+    assert response == {
+        "type": "result",
+        "feature": "bluetooth.mode",
+        "value": "ACK",
+    }
+    client._lib.set_feature.assert_awaited_once_with("bluetooth.mode", "RX")

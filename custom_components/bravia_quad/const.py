@@ -56,10 +56,6 @@ MIN_BASS_LEVEL = -10
 MAX_BASS_LEVEL_NO_SUB = 2
 MIN_BASS_LEVEL_NO_SUB = 0
 
-# Command ID limits (to prevent overflow)
-CMD_ID_INITIAL = 10
-CMD_ID_MAX = 1_000_000
-
 # Features
 FEATURE_POWER = "main.power"
 FEATURE_VOLUME = "main.volumestep"

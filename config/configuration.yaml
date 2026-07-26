@@ -16,3 +16,5 @@ logger:
   logs:
     homeassistant.components.zeroconf: debug
     custom_components.bravia_quad: debug
+    # Wire TCP (CIS-IP2) logs live in the published library after the cutover.
+    sony_cisip2: debug

@@ -531,6 +531,7 @@ dev = [
     { name = "pytest-xdist" },
     { name = "requests" },
     { name = "ruff" },
+    { name = "sony-cisip2" },
     { name = "ty" },
     { name = "yamllint" },
 ]
@@ -555,6 +556,7 @@ dev = [
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "requests", specifier = ">=2.32.0" },
     { name = "ruff", specifier = ">=0.14.0" },
+    { name = "sony-cisip2", specifier = "==0.1.0a1" },
     { name = "ty", specifier = ">=0.0.21" },
     { name = "yamllint", specifier = ">=1.37.1" },
 ]
@@ -2332,6 +2334,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/48/e2/b5bbf04971d1c3e07a3e16a706ea3c1a4b711c6d8c9566e8012772d3351a/snitun-0.45.1.tar.gz", hash = "sha256:d76d48cf4190ea59e8f63892da9c18499bfc6ca796220a463c6f3b32099d661c", size = 43335, upload-time = "2025-09-25T05:24:07.89Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/98/1b/83ff83003994bc8b56483c75a710de588896c167c7c42d66d059a2eb48dc/snitun-0.45.1-py3-none-any.whl", hash = "sha256:c1fa4536320ec3126926ade775c429e20664db1bc61d8fec0e181dc393d36ab4", size = 51236, upload-time = "2025-09-25T05:24:06.412Z" },
+]
+
+[[package]]
+name = "sony-cisip2"
+version = "0.1.0a1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b9/46/921c84570690ec1a69d981184da75c827415783646dbd6dc1af3b00e97ab/sony_cisip2-0.1.0a1.tar.gz", hash = "sha256:40c3a220dfa3eb6da5568800b0f09be278b8519d33ca548a63b2c6247c81189f", size = 32621, upload-time = "2026-07-26T19:54:17.016Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/be/232ad9e740199331317d16f40a47a025d9a6f22a4353cf7497c5a66f0569/sony_cisip2-0.1.0a1-py3-none-any.whl", hash = "sha256:ada68f13a0eada05e69f7bda5eb4cd85171fba67aa5675bbba440b517920c502", size = 16383, upload-time = "2026-07-26T19:54:15.63Z" },
 ]
 
 [[package]]
