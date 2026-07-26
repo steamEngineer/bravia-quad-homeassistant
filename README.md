@@ -192,13 +192,18 @@ Automate settings (**Voice Enhancer**, **Auto Volume**, **Sound Field**, **Night
 | Development               | [docs/development.md](docs/development.md)                                               |
 
 
+## Credits
+
+- [@liudger](https://github.com/liudger) (Willem-Jan van Rootselaar) — major contributions across reconnection and entity availability, volume transitions, CI, and developer tooling
+- [@mafredri](https://github.com/mafredri) — Seeds cloud reads for settings that local gRPC does not return (see [docs/seeds-cloud-states.md](docs/seeds-cloud-states.md))
+
 ## Contributing
 
 Contributions welcome! Open a pull request against `main` and complete [`.github/PULL_REQUEST_TEMPLATE.md`](.github/PULL_REQUEST_TEMPLATE.md). See [docs/development.md](docs/development.md) for setup and testing.
 
 ## License
 
-This integration is provided as-is under the MIT License.
+This integration is provided as-is under the MIT License. Copyright holders are listed in [LICENSE](LICENSE).
 
 ## Support
 
