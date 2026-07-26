@@ -36,6 +36,7 @@ max-complexity = 25
     "FBT001",  # Allow boolean positional args in scripts
     "FBT003",  # Allow boolean positional values in CLI argparse/help
     "INP001",  # scripts/grpc are CLI modules, not packages
+    "PLR0911", # CLI command dispatch has many early returns
     "PLR0912", # Report builders branch on capability shape
     "PLR0913", # CLI/report helpers take many scrape inputs
     "PLR0915", # Allow many statements in scripts (long procedural flows)

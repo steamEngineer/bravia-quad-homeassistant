@@ -13,14 +13,22 @@ Setup chooses **gRPC** (recommended, BRAVIA Connect) or **TCP** (legacy IP contr
 
 ## CLI session keys
 
+Canonical CLI lives in
+[pybravia-connect](https://github.com/steamEngineer/pybravia-connect)
+(`tools/get_session_keys.py`). This repo keeps a thin wrapper for the scrape
+workflow.
+
 Run from repo root:
 
 ```bash
 # OAuth → write keys to a local file (never commit the output)
-uv run python scripts/grpc/get_session_keys.py -o /tmp/session_keys.json
+uv run python scripts/grpc/get_session_keys.py --login --open -o /tmp/session_keys.json
 ```
 
-The script opens a browser for Sony sign-in, lists your Bravia devices, and writes `device_id`, `session_key`, `hmac_key`, and OAuth tokens to the output file. See [`session_keys_example.json`](session_keys_example.json) for the expected shape (keys only, no live credentials).
+The wrapper uses `pybravia-connect` sync OAuth helpers, opens a browser for Sony
+sign-in, and writes `device_id`, `session_key`, `hmac_key`, and OAuth tokens to
+the output file. See [`session_keys_example.json`](session_keys_example.json)
+for the expected shape (keys only, no live credentials).
 
 ## Device capability scrape
 

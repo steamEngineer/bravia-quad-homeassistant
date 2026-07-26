@@ -14,14 +14,9 @@ from pybravia_connect import (
     AuthError,
     BraviaConnectClient,
     refresh_credentials,
+    write_credentials,
 )
 from pybravia_connect import ConnectionError as BraviaConnectionError
-
-_SCRIPTS_GRPC = Path(__file__).resolve().parent
-if str(_SCRIPTS_GRPC) not in sys.path:
-    sys.path.insert(0, str(_SCRIPTS_GRPC))
-
-from get_session_keys import write_credentials  # noqa: E402
 
 DEFAULT_KEYS_PATH = Path(__file__).resolve().parent / "session_keys.json"
 
