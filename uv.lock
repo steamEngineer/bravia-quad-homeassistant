@@ -531,6 +531,7 @@ dev = [
     { name = "pytest-xdist" },
     { name = "requests" },
     { name = "ruff" },
+    { name = "sony-cisip2" },
     { name = "ty" },
     { name = "yamllint" },
 ]
@@ -549,12 +550,13 @@ dev = [
     { name = "colorlog", specifier = ">=6.10.0" },
     { name = "grpcio-tools", specifier = ">=1.76.0" },
     { name = "prek", specifier = ">=0.3.5" },
-    { name = "pybravia-connect", specifier = "==0.1.0a8" },
+    { name = "pybravia-connect", specifier = "==0.1.0a11" },
     { name = "pytest", specifier = ">=9.0.0" },
     { name = "pytest-homeassistant-custom-component", specifier = ">=0.13.297" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
     { name = "requests", specifier = ">=2.32.0" },
     { name = "ruff", specifier = ">=0.14.0" },
+    { name = "sony-cisip2", specifier = "==0.1.0a1" },
     { name = "ty", specifier = ">=0.0.21" },
     { name = "yamllint", specifier = ">=1.37.1" },
 ]
@@ -1671,16 +1673,16 @@ wheels = [
 
 [[package]]
 name = "pybravia-connect"
-version = "0.1.0a8"
+version = "0.1.0a11"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "grpcio" },
     { name = "protobuf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/f4/99/3e5db5a7cf1814db37525fe3649eeecb9aa7eb2518f5d0cedc86494c31c2/pybravia_connect-0.1.0a8.tar.gz", hash = "sha256:8e41b29227e40c22c45a78692811b9ee62bb6a31226895ebaf170dd9116257ac", size = 43854, upload-time = "2026-07-26T00:01:19.868Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/4b/6b/c8260f73aab849de99eac46f68c2cfd3bec48fe5026e987cc1e8cc79fa8c/pybravia_connect-0.1.0a11.tar.gz", hash = "sha256:67e7bb3c4cb288d4b66d2cba9efc1391dcf4d9c067acd5050c2a3a38f871362c", size = 53192, upload-time = "2026-07-26T04:52:27.112Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/11/ad/9e6cb8f10707f45ffe1c1bd3302cf303e95676945ef361e1738b9d1ccc63/pybravia_connect-0.1.0a8-py3-none-any.whl", hash = "sha256:16dff3d4923e65f01c802858b143ee93325e0a7a0d3dbe2e099e3d8a9d6b18bf", size = 37319, upload-time = "2026-07-26T00:01:18.173Z" },
+    { url = "https://files.pythonhosted.org/packages/f9/38/215f1906a0b4eb5922a3605d61fe23d362981ccd2fd9f4b5b9ee5ab51dcb/pybravia_connect-0.1.0a11-py3-none-any.whl", hash = "sha256:6b20375289e4759e1e7d1ee7c83ab9802c97c0818668840d2a498461e8d3ff76", size = 37484, upload-time = "2026-07-26T04:52:24.281Z" },
 ]
 
 [[package]]
@@ -2352,6 +2354,15 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/48/e2/b5bbf04971d1c3e07a3e16a706ea3c1a4b711c6d8c9566e8012772d3351a/snitun-0.45.1.tar.gz", hash = "sha256:d76d48cf4190ea59e8f63892da9c18499bfc6ca796220a463c6f3b32099d661c", size = 43335, upload-time = "2025-09-25T05:24:07.89Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/98/1b/83ff83003994bc8b56483c75a710de588896c167c7c42d66d059a2eb48dc/snitun-0.45.1-py3-none-any.whl", hash = "sha256:c1fa4536320ec3126926ade775c429e20664db1bc61d8fec0e181dc393d36ab4", size = 51236, upload-time = "2025-09-25T05:24:06.412Z" },
+]
+
+[[package]]
+name = "sony-cisip2"
+version = "0.1.0a1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b9/46/921c84570690ec1a69d981184da75c827415783646dbd6dc1af3b00e97ab/sony_cisip2-0.1.0a1.tar.gz", hash = "sha256:40c3a220dfa3eb6da5568800b0f09be278b8519d33ca548a63b2c6247c81189f", size = 32621, upload-time = "2026-07-26T19:54:17.016Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/51/be/232ad9e740199331317d16f40a47a025d9a6f22a4353cf7497c5a66f0569/sony_cisip2-0.1.0a1-py3-none-any.whl", hash = "sha256:ada68f13a0eada05e69f7bda5eb4cd85171fba67aa5675bbba440b517920c502", size = 16383, upload-time = "2026-07-26T19:54:15.63Z" },
 ]
 
 [[package]]

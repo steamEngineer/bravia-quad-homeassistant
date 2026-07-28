@@ -1,19 +1,20 @@
-"""Client for communicating with Bravia Quad device."""
+"""HA TCP adapter over sony-cisip2 (sticky cache and quirks stay in Theatre)."""
 
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import json
+import inspect
 import logging
-from typing import TYPE_CHECKING, Any
+from collections.abc import Awaitable, Callable, Coroutine
+from typing import Any
+
+from sony_cisip2 import SonyCISIP2
 
 from .const import (
     AAV_OFF,
     AUTO_STANDBY_OFF,
     AUTO_UPDATE_OFF,
-    CMD_ID_INITIAL,
-    CMD_ID_MAX,
     DEFAULT_PORT,
     FEATURE_360SSM,
     FEATURE_AAV,
@@ -71,40 +72,66 @@ from .const import (
     NIGHT_MODE_OFF,
     POWER_OFF,
     POWER_ON,
-    RECONNECT_INITIAL_DELAY,
-    RECONNECT_MAX_DELAY,
     SOUND_FIELD_OFF,
     TCP_TIMEOUT,
     VOICE_ENHANCER_OFF,
     VOICE_ZOOM_OFF,
 )
 
-if TYPE_CHECKING:
-    from collections.abc import Callable
-
 _LOGGER = logging.getLogger(__name__)
 
-# Default values
 DEFAULT_BASS_LEVEL = 1  # MID
 DEFAULT_DRC = "auto"
 
+HaNotifyCallback = Callable[[Any], Awaitable[None] | None]
+HaAvailabilityCallback = Callable[[bool], None]
+
+
+class _HaSonyCISIP2(SonyCISIP2):
+    """
+    SonyCISIP2 with an HA connection-lost hook.
+
+    ponytail: library has on_reconnect but no on_connection_lost; override
+    _mark_disconnected until upstream adds a first-class hook.
+    """
+
+    def __init__(
+        self,
+        host: str,
+        port: int = DEFAULT_PORT,
+        timeout: float = TCP_TIMEOUT,
+        on_reconnect: Callable[[], Coroutine[Any, Any, None]] | None = None,
+        on_connection_lost: Callable[[], None] | None = None,
+    ) -> None:
+        """Initialize with optional HA connection-lost callback."""
+        super().__init__(host, port=port, timeout=timeout, on_reconnect=on_reconnect)
+        self._on_connection_lost = on_connection_lost
+
+    async def _mark_disconnected(self) -> None:
+        """Mark connection lost, then notify HA availability."""
+        was_connected = self._connected
+        await super()._mark_disconnected()
+        if was_connected and self._on_connection_lost is not None:
+            self._on_connection_lost()
+
 
 class BraviaQuadClient:
-    """Client for Bravia Quad TCP communication."""
+    """HA façade over SonyCISIP2: sticky cache, availability, typed helpers."""
 
     def __init__(self, host: str, name: str) -> None:
-        """Initialize the Bravia Quad client."""
+        """Initialize the Bravia Quad client adapter."""
         self.host = host
         self.port = DEFAULT_PORT
         self.name = name
-        self._reader: asyncio.StreamReader | None = None
-        self._writer: asyncio.StreamWriter | None = None
         self._connected = False
-        self._listening = False
-        self._notification_callbacks: dict[str, list[Callable]] = {}
+        self._notify_wrap_registered = False
+        self._notification_callbacks: dict[str, list[HaNotifyCallback]] = {}
+        self._availability_callbacks: set[HaAvailabilityCallback] = set()
+        self._background_tasks: set[asyncio.Task[Any]] = set()
+
         self._power_state = POWER_OFF
         self._volume = 0
-        self._input = "tv"  # Default input
+        self._input = "tv"
         self._rear_level = 0
         self._bass_level = DEFAULT_BASS_LEVEL
         self._voice_enhancer = VOICE_ENHANCER_OFF
@@ -116,12 +143,6 @@ class BraviaQuadClient:
         self._aav = AAV_OFF
         self._mute = MUTE_OFF
         self._volume_step_interval = 0
-        self._command_id_counter = CMD_ID_INITIAL
-        self._command_lock = asyncio.Lock()
-        self._pending_responses: dict[int, asyncio.Future] = {}
-        self._listener_task: asyncio.Task | None = None
-        self._background_tasks: set[asyncio.Task] = set()
-        self._availability_callbacks: set[Callable[[bool], None]] = set()
         self._serial_number: str | None = None
         self._firmware_version: str | None = None
         self._model_type: str | None = None
@@ -130,67 +151,75 @@ class BraviaQuadClient:
         self._imax_mode = IMAX_MODE_AUTO
         self._voice_zoom = VOICE_ZOOM_OFF
 
+        self._lib = _HaSonyCISIP2(
+            host,
+            port=DEFAULT_PORT,
+            timeout=float(TCP_TIMEOUT),
+            on_reconnect=self._async_on_lib_reconnect,
+            on_connection_lost=self._on_lib_connection_lost,
+        )
+
+    def _on_lib_connection_lost(self) -> None:
+        """Handle library drop: sync flag + entity unavailable."""
+        if not self._connected:
+            return
+        self._connected = False
+        _LOGGER.warning("Connection to Bravia Quad lost")
+        self._notify_availability(available=False)
+
+    async def _async_on_lib_reconnect(self) -> None:
+        """Handle library reconnect: available + fire-and-forget state fetch."""
+        self._connected = True
+        self._notify_availability(available=True)
+        task = asyncio.create_task(self.async_fetch_all_states())
+        self._background_tasks.add(task)
+        task.add_done_callback(self._background_tasks.discard)
+
+    def _ensure_notify_wrap(self) -> None:
+        """Register the sticky/notify bridge on the library once."""
+        if self._notify_wrap_registered:
+            return
+        self._lib.register_notification_callback(None, self._on_lib_notify)
+        self._notify_wrap_registered = True
+
+    async def _on_lib_notify(self, feature: str | None, value: Any) -> None:
+        """Update sticky cache and fan out to HA entity callbacks."""
+        self._update_internal_state(feature, value)
+        await self._dispatch_notification_callbacks(feature, value)
+        # Device quirk: power-on notify often omits a matching input notify.
+        if feature == FEATURE_POWER and value == POWER_ON:
+            _LOGGER.debug("Power on notification received, refreshing input state")
+            task = asyncio.create_task(self.async_get_input())
+            self._background_tasks.add(task)
+            task.add_done_callback(self._background_tasks.discard)
+
     async def async_connect(self) -> None:
         """Connect to the Bravia Quad device."""
         if self._connected:
             return
 
         try:
-            self._reader, self._writer = await asyncio.wait_for(
-                asyncio.open_connection(self.host, self.port),
-                timeout=TCP_TIMEOUT,
-            )
-            # Give the connection a moment to stabilize
-            await asyncio.sleep(0.1)
-            self._connected = True
-            _LOGGER.debug("Connected to Bravia Quad at %s:%s", self.host, self.port)
-        except OSError as err:
+            await self._lib.connect()
+        except (OSError, ConnectionError, TimeoutError) as err:
             self._connected = False
             _LOGGER.debug("Failed to connect to Bravia Quad at %s: %s", self.host, err)
             raise ConnectionError(str(err)) from err
 
+        self._connected = True
+        self._ensure_notify_wrap()
+        _LOGGER.debug("Connected to Bravia Quad at %s:%s", self.host, self.port)
+
     async def async_disconnect(self) -> None:
         """Disconnect from the Bravia Quad device."""
-        self._listening = False
-        if self._listener_task:
-            self._listener_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._listener_task
-            self._listener_task = None
-        await self._async_close_connection()
-
-        # Cancel any background tasks
         for task in self._background_tasks:
             task.cancel()
         if self._background_tasks:
             await asyncio.gather(*self._background_tasks, return_exceptions=True)
         self._background_tasks.clear()
 
-        _LOGGER.info("Disconnected from Bravia Quad")
-
-    async def _async_close_connection(self) -> None:
-        """Close the socket connection and fail pending commands."""
-        if self._writer:
-            self._writer.close()
-            with contextlib.suppress(OSError):
-                await self._writer.wait_closed()
-        self._reader = None
-        self._writer = None
+        await self._lib.disconnect()
         self._connected = False
-
-        # Fail any pending command futures
-        for future in self._pending_responses.values():
-            if not future.done():
-                future.set_exception(ConnectionError("Disconnected"))
-        self._pending_responses.clear()
-
-    async def _async_mark_disconnected(self) -> None:
-        """Mark connection as lost, clean up, and notify entities."""
-        was_connected = self._connected
-        await self._async_close_connection()
-        if was_connected:
-            _LOGGER.warning("Connection to Bravia Quad lost")
-            self._notify_availability(available=False)
+        _LOGGER.info("Disconnected from Bravia Quad")
 
     async def async_test_connection(self) -> bool:
         """Test connection by sending a power status request."""
@@ -209,65 +238,41 @@ class BraviaQuadClient:
     async def async_send_command(
         self, command: dict[str, Any]
     ) -> dict[str, Any] | None:
-        """Send a command and wait for response."""
-        if not self._connected or not self._writer or not self._reader:
+        """Send a get/set command via the library (BT pairing button façade)."""
+        if not self._connected:
             msg = "Not connected to device"
             raise ConnectionError(msg)
 
-        if not self._listener_task or self._listener_task.done():
-            await self.async_listen_for_notifications()
+        msg_type = command.get("type")
+        feature = command.get("feature")
+        if not isinstance(feature, str) or not feature:
+            return None
 
-        command_id: int | None = None
-
-        async with self._command_lock:
-            try:
-                # Assign a unique command id
-                command = dict(command)
-                command_id = self._get_next_command_id()
-                command["id"] = command_id
-
-                loop = asyncio.get_running_loop()
-                response_future: asyncio.Future[dict[str, Any]] = loop.create_future()
-                self._pending_responses[command_id] = response_future
-
-                command_json = json.dumps(command) + "\n"
-                _LOGGER.debug("Sending command: %s", command_json.strip())
-                self._writer.write(command_json.encode())
-                await self._writer.drain()
-            except OSError as err:
-                if command_id is not None:
-                    self._pending_responses.pop(command_id, None)
-                _LOGGER.exception("Error sending command")
-                raise ConnectionError(str(err)) from err
-
-            # Wait for response while holding the lock so the next command
-            # is not sent until this one completes
-            try:
-                response = await asyncio.wait_for(response_future, timeout=TCP_TIMEOUT)
-            except TimeoutError:
-                _LOGGER.warning("Timeout waiting for response to command: %s", command)
+        if msg_type == "set":
+            result = await self._lib.set_feature(feature, command.get("value"))
+            if result is None:
                 return None
-            else:
-                return response
-            finally:
-                if command_id is not None:
-                    self._pending_responses.pop(command_id, None)
+            return {"type": "result", "feature": feature, "value": result}
+
+        if msg_type == "get":
+            value = await self._lib.get_feature(feature)
+            if value is None:
+                return None
+            return {"type": "result", "feature": feature, "value": value}
+
+        return None
 
     async def _async_set_feature(self, feature: str, value: str) -> bool:
         """Set a feature value. Returns True on ACK."""
-        command = {"id": 0, "type": "set", "feature": feature, "value": value}
-        response = await self.async_send_command(command)
-        return bool(response and response.get("value") == "ACK")
+        result = await self._lib.set_feature(feature, value)
+        return result == "ACK"
 
     async def _async_get_feature(self, feature: str) -> str | None:
         """Get a feature value fresh from the device."""
-        command = {"id": 0, "type": "get", "feature": feature}
-        response = await self.async_send_command(command)
-        if response and response.get("type") == "result":
-            value = response.get("value")
-            if value and value not in ("NAK", "ERR"):
-                return str(value)
-        return None
+        value = await self._lib.get_feature(feature)
+        if value is None:
+            return None
+        return str(value)
 
     async def async_get_tcp_feature(self, feature: str) -> str | None:
         """Get a TCP control-plane feature (used by gRPC hybrid seeding)."""
@@ -700,10 +705,8 @@ class BraviaQuadClient:
         Returns True if subwoofer is detected (supports -10 to 10 range).
         Returns False if no subwoofer (only supports 0-2 select mode).
         """
-        # Get current bass level
         current_level = await self.async_get_bass_level()
 
-        # If already outside 0-2 range, definitely has subwoofer
         if (
             current_level < MIN_BASS_LEVEL_NO_SUB
             or current_level > MAX_BASS_LEVEL_NO_SUB
@@ -714,31 +717,25 @@ class BraviaQuadClient:
             )
             return True
 
-        # Try setting to -1 (invalid without subwoofer)
         test_value = -1
         if await self._async_set_feature(FEATURE_BASS_LEVEL, str(test_value)):
-            # Successfully set to -1, subwoofer is connected
             self._bass_level = test_value
             _LOGGER.info(
                 "Subwoofer detected: device accepted bass level %d", test_value
             )
-            # Revert to original value. Note: there's a brief window where
-            # user bass level changes could be overwritten, but this is
-            # acceptable given detection is rare and the window is very short.
             await self._async_set_feature(FEATURE_BASS_LEVEL, str(current_level))
             self._bass_level = current_level
             return True
 
-        # Device rejected -1, no subwoofer connected
         _LOGGER.info("No subwoofer detected: device rejected bass level %d", test_value)
         return False
 
-    def register_availability_callback(self, callback: Callable[[bool], None]) -> None:
+    def register_availability_callback(self, callback: HaAvailabilityCallback) -> None:
         """Register a callback for connection state changes."""
         self._availability_callbacks.add(callback)
 
     def unregister_availability_callback(
-        self, callback: Callable[[bool], None]
+        self, callback: HaAvailabilityCallback
     ) -> None:
         """Unregister a connection state change callback."""
         self._availability_callbacks.discard(callback)
@@ -751,14 +748,16 @@ class BraviaQuadClient:
             except Exception:
                 _LOGGER.exception("Error in availability callback")
 
-    def register_notification_callback(self, feature: str, callback: Callable) -> None:
+    def register_notification_callback(
+        self, feature: str, callback: HaNotifyCallback
+    ) -> None:
         """Register a callback for notifications."""
         if feature not in self._notification_callbacks:
             self._notification_callbacks[feature] = []
         self._notification_callbacks[feature].append(callback)
 
     def unregister_notification_callback(
-        self, feature: str, callback: Callable
+        self, feature: str, callback: HaNotifyCallback
     ) -> None:
         """Unregister a callback for notifications."""
         if feature in self._notification_callbacks:
@@ -766,102 +765,9 @@ class BraviaQuadClient:
                 self._notification_callbacks[feature].remove(callback)
 
     async def async_listen_for_notifications(self) -> None:
-        """Start the connection manager that keeps the listener alive."""
-        if self._listener_task and not self._listener_task.done():
-            return
-
+        """Ensure connected; library starts its connection manager on connect."""
         if not self._connected:
             await self.async_connect()
-
-        self._listener_task = asyncio.create_task(self._connection_manager())
-
-    async def _connection_manager(self) -> None:
-        """
-        Manage the notification loop lifecycle with auto-reconnect.
-
-        Starts the read loop, waits for it to exit (on disconnect),
-        reconnects, then starts a fresh loop. State fetch and
-        availability notification happen after the new loop is
-        already reading, so command responses are processed.
-        """
-        try:
-            while True:
-                await self._notification_loop()
-
-                delay = RECONNECT_INITIAL_DELAY
-                while True:
-                    _LOGGER.debug("Reconnecting in %ds", delay)
-                    await asyncio.sleep(delay)
-
-                    try:
-                        await self.async_connect()
-                    except (OSError, ConnectionError):
-                        delay = min(delay * 2, RECONNECT_MAX_DELAY)
-                        continue
-
-                    _LOGGER.info("Reconnected to device")
-                    break
-
-                self._notify_availability(available=True)
-                task = asyncio.create_task(self.async_fetch_all_states())
-                self._background_tasks.add(task)
-                task.add_done_callback(self._background_tasks.discard)
-        except asyncio.CancelledError:
-            _LOGGER.info("Connection manager cancelled")
-            raise
-
-    async def _notification_loop(self) -> None:
-        """
-        Read and dispatch messages from the device.
-
-        Exits on any connection error so the connection manager
-        can reconnect.
-        """
-        _LOGGER.info("Starting notification listener")
-        buffer = ""
-
-        while self._connected and self._reader:
-            try:
-                data = await asyncio.wait_for(self._reader.read(8192), timeout=1.0)
-
-                if not data:
-                    _LOGGER.warning("Connection closed by device (EOF)")
-                    break
-
-                buffer += data.decode("utf-8", errors="replace")
-                buffer = buffer.strip()
-                if buffer:
-                    messages, buffer = self._decode_json_stream(buffer)
-                    for message in messages:
-                        await self._process_incoming_message(message)
-            except TimeoutError:
-                continue
-            except OSError:
-                _LOGGER.warning("Connection error in notification listener")
-                break
-
-        await self._async_mark_disconnected()
-
-    async def _reconnect_loop(self) -> None:
-        """Attempt to reconnect with exponential backoff."""
-        delay = RECONNECT_INITIAL_DELAY
-
-        while True:
-            _LOGGER.debug("Reconnecting in %ds", delay)
-            await asyncio.sleep(delay)
-
-            try:
-                await self.async_connect()
-            except (OSError, ConnectionError):
-                delay = min(delay * 2, RECONNECT_MAX_DELAY)
-                continue
-
-            _LOGGER.info("Reconnected to device")
-            self._notify_availability(available=True)
-            task = asyncio.create_task(self.async_fetch_all_states())
-            self._background_tasks.add(task)
-            task.add_done_callback(self._background_tasks.discard)
-            return
 
     @property
     def is_connected(self) -> bool:
@@ -1040,82 +946,6 @@ class BraviaQuadClient:
             self._voice_zoom,
         )
 
-    def _get_next_command_id(self) -> int:
-        """Return a unique command id."""
-        self._command_id_counter += 1
-        if self._command_id_counter > CMD_ID_MAX:
-            self._command_id_counter = CMD_ID_INITIAL
-        return self._command_id_counter
-
-    def _decode_json_stream(self, data: str) -> tuple[list[dict[str, Any]], str]:
-        """
-        Decode JSON objects from a buffer, returning unparsed remainder.
-
-        The device sends concatenated JSON objects with no delimiter.
-        A single TCP read may split an object mid-byte. This method
-        parses all complete objects and returns any trailing fragment
-        so the caller can prepend it to the next read.
-        """
-        messages: list[dict[str, Any]] = []
-        if not data:
-            return messages, ""
-
-        decoder = json.JSONDecoder()
-        idx = 0
-        length = len(data)
-
-        while idx < length:
-            while idx < length and data[idx].isspace():
-                idx += 1
-
-            if idx >= length:
-                break
-
-            try:
-                message, end = decoder.raw_decode(data, idx)
-                messages.append(message)
-                idx = end
-            except json.JSONDecodeError:
-                return messages, data[idx:]
-
-        return messages, ""
-
-    async def _process_incoming_message(self, message: dict[str, Any]) -> None:
-        """Process a single incoming message from the device."""
-        if not message:
-            return
-
-        msg_type = message.get("type")
-        feature = message.get("feature")
-        value = message.get("value")
-
-        _LOGGER.debug(
-            "Processing message type=%s feature=%s value=%s",
-            msg_type,
-            feature,
-            value,
-        )
-
-        if msg_type == "result":
-            self._resolve_pending_response(message)
-
-        self._update_internal_state(feature, value)
-
-        # Dispatch callbacks for notifications and non-ACK results
-        if msg_type == "notify" or (
-            msg_type == "result"
-            and value is not None
-            and not (isinstance(value, str) and value.upper() == "ACK")
-        ):
-            await self._dispatch_notification_callbacks(feature, value)
-
-        # Workaround for Bravia Quad failing to send input change notification on wake
-        if msg_type == "notify" and feature == FEATURE_POWER and value == POWER_ON:
-            _LOGGER.debug("Power on notification received, refreshing input state")
-            task = asyncio.create_task(self.async_get_input())
-            self._background_tasks.add(task)
-            task.add_done_callback(self._background_tasks.discard)
-
     def _update_internal_state(self, feature: str | None, value: Any) -> None:
         """Update cached state based on feature and value."""
         if not feature:
@@ -1251,19 +1081,9 @@ class BraviaQuadClient:
 
         for callback in callbacks:
             try:
-                if asyncio.iscoroutinefunction(callback):
+                if inspect.iscoroutinefunction(callback):
                     await callback(value)
                 else:
                     callback(value)
             except (TypeError, ValueError, AttributeError):
                 _LOGGER.exception("Error in notification callback")
-
-    def _resolve_pending_response(self, message: dict[str, Any]) -> None:
-        """Resolve the future waiting for a command response."""
-        command_id = message.get("id")
-        if command_id is None:
-            return
-
-        future = self._pending_responses.get(command_id)
-        if future and not future.done():
-            future.set_result(message)

@@ -3,34 +3,21 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from homeassistant.const import STATE_UNAVAILABLE, Platform
 
 from custom_components.bravia_quad.bravia_quad_client import BraviaQuadClient
-from custom_components.bravia_quad.const import (
-    RECONNECT_INITIAL_DELAY,
-    RECONNECT_MAX_DELAY,
-)
 
 from .conftest import get_entity_id_by_unique_id_suffix
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from homeassistant.core import HomeAssistant
     from homeassistant.helpers import entity_registry as er
-
-
-def _get_availability_callback(mock_client: MagicMock) -> Callable | None:
-    """Get the last registered availability callback."""
-    callback = None
-    for call_args in mock_client.register_availability_callback.call_args_list:
-        callback = call_args[0][0]
-    return callback
 
 
 def _notify_all_availability(mock_client: MagicMock, *, available: bool) -> None:
@@ -46,62 +33,34 @@ def platforms() -> list[Platform]:
     return [Platform.BUTTON, Platform.MEDIA_PLAYER, Platform.SWITCH]
 
 
-def _setup_mock_stream(client: BraviaQuadClient) -> MagicMock:
-    """Set up mock reader/writer on client and mark connected."""
-    mock_reader = MagicMock()
-    client._reader = mock_reader
-    client._writer = MagicMock()
-    client._writer.close = MagicMock()
-    client._writer.wait_closed = AsyncMock()
-    client._connected = True
-    return mock_reader
-
-
-# --- Client unit tests ---
+# --- Adapter unit tests ---
 
 
 class TestClientReconnection:
-    """Tests for BraviaQuadClient reconnection logic."""
+    """Tests for BraviaQuadClient adapter availability / reconnect hooks."""
 
-    async def test_mark_disconnected_notifies_availability(self) -> None:
-        """Test that _async_mark_disconnected notifies availability callbacks."""
+    async def test_connection_lost_notifies_availability(self) -> None:
+        """Library connection-lost hook marks unavailable."""
         client = BraviaQuadClient("192.168.1.100", "Test")
         callback = MagicMock()
         client.register_availability_callback(callback)
 
         client._connected = True
-
-        await client._async_mark_disconnected()
+        client._on_lib_connection_lost()
 
         assert not client.is_connected
         callback.assert_called_once_with(False)
 
-    async def test_mark_disconnected_when_already_disconnected(self) -> None:
-        """Test that _async_mark_disconnected is a no-op when already disconnected."""
+    async def test_connection_lost_when_already_disconnected(self) -> None:
+        """Connection-lost hook is a no-op when already disconnected."""
         client = BraviaQuadClient("192.168.1.100", "Test")
         callback = MagicMock()
         client.register_availability_callback(callback)
 
         client._connected = False
-
-        await client._async_mark_disconnected()
+        client._on_lib_connection_lost()
 
         callback.assert_not_called()
-
-    async def test_mark_disconnected_fails_pending_commands(self) -> None:
-        """Test that pending commands are failed on disconnect."""
-        client = BraviaQuadClient("192.168.1.100", "Test")
-        client._connected = True
-
-        loop = asyncio.get_running_loop()
-        future = loop.create_future()
-        client._pending_responses[42] = future
-
-        await client._async_mark_disconnected()
-
-        assert future.done()
-        with pytest.raises(ConnectionError):
-            future.result()
 
     async def test_register_unregister_availability_callback(self) -> None:
         """Test registering and unregistering availability callbacks."""
@@ -119,68 +78,7 @@ class TestClientReconnection:
         client = BraviaQuadClient("192.168.1.100", "Test")
         callback = MagicMock()
 
-        # Should not raise
         client.unregister_availability_callback(callback)
-
-    async def test_notification_loop_exits_on_eof(self) -> None:
-        """Test that the notification loop exits on EOF."""
-        client = BraviaQuadClient("192.168.1.100", "Test")
-        availability_callback = MagicMock()
-        client.register_availability_callback(availability_callback)
-
-        mock_reader = _setup_mock_stream(client)
-        mock_reader.read = AsyncMock(return_value=b"")
-
-        await client._notification_loop()
-
-        assert not client.is_connected
-        availability_callback.assert_called_with(False)
-
-    async def test_notification_loop_exits_on_os_error(self) -> None:
-        """Test that the notification loop exits on OSError."""
-        client = BraviaQuadClient("192.168.1.100", "Test")
-        availability_callback = MagicMock()
-        client.register_availability_callback(availability_callback)
-
-        mock_reader = _setup_mock_stream(client)
-        mock_reader.read = AsyncMock(side_effect=OSError("Connection reset"))
-
-        await client._notification_loop()
-
-        assert not client.is_connected
-        availability_callback.assert_called_with(False)
-
-    async def test_reconnect_loop_exponential_backoff(
-        self, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
-        """Test that reconnect uses exponential backoff."""
-        client = BraviaQuadClient("192.168.1.100", "Test")
-
-        sleep_delays: list[float] = []
-        max_attempts = 5
-        connect_attempts = 0
-
-        async def _fake_sleep(delay: float) -> None:
-            sleep_delays.append(delay)
-
-        async def _fail_then_succeed() -> None:
-            nonlocal connect_attempts
-            connect_attempts += 1
-            if connect_attempts <= max_attempts:
-                msg = "refused"
-                raise ConnectionError(msg)
-            client._connected = True
-
-        monkeypatch.setattr(asyncio, "sleep", _fake_sleep)
-        monkeypatch.setattr(client, "async_connect", _fail_then_succeed)
-        monkeypatch.setattr(client, "async_fetch_all_states", AsyncMock())
-
-        await client._reconnect_loop()
-
-        assert sleep_delays[0] == RECONNECT_INITIAL_DELAY
-        for i in range(1, max_attempts):
-            expected = min(RECONNECT_INITIAL_DELAY * (2**i), RECONNECT_MAX_DELAY)
-            assert sleep_delays[i] == expected
 
     async def test_reconnect_fetches_state_and_notifies(
         self, monkeypatch: pytest.MonkeyPatch
@@ -192,24 +90,26 @@ class TestClientReconnection:
 
         fetch_called = asyncio.Event()
 
-        async def _succeed_connect() -> None:
-            client._connected = True
-
         async def _fake_fetch() -> None:
             fetch_called.set()
 
-        monkeypatch.setattr(asyncio, "sleep", AsyncMock())
-        monkeypatch.setattr(client, "async_connect", _succeed_connect)
         monkeypatch.setattr(client, "async_fetch_all_states", _fake_fetch)
 
-        await client._reconnect_loop()
-        # Give any scheduled work a chance to run
+        await client._async_on_lib_reconnect()
+
         try:
             await asyncio.wait_for(fetch_called.wait(), timeout=1.0)
         except TimeoutError:
             pytest.fail("State fetch was not triggered after reconnect")
 
+        assert client.is_connected
         availability_callback.assert_called_with(True)
+
+        for task in list(client._background_tasks):
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        client._background_tasks.clear()
 
 
 # --- Integration-level entity availability tests ---
