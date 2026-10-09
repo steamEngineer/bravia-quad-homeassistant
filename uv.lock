@@ -550,7 +550,7 @@ dev = [
     { name = "colorlog", specifier = ">=6.10.0" },
     { name = "grpcio-tools", specifier = ">=1.76.0" },
     { name = "prek", specifier = ">=0.3.5" },
-    { name = "pybravia-connect", specifier = "==0.1.0a11" },
+    { name = "pybravia-connect", specifier = "==0.1.0a12" },
     { name = "pytest", specifier = ">=9.0.0" },
     { name = "pytest-homeassistant-custom-component", specifier = ">=0.13.297" },
     { name = "pytest-xdist", specifier = ">=3.8.0" },
@@ -1749,16 +1749,16 @@ wheels = [
 
 [[package]]
 name = "pybravia-connect"
-version = "0.1.0a11"
+version = "0.1.0a12"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "aiohttp" },
     { name = "grpcio" },
     { name = "protobuf" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4b/6b/c8260f73aab849de99eac46f68c2cfd3bec48fe5026e987cc1e8cc79fa8c/pybravia_connect-0.1.0a11.tar.gz", hash = "sha256:67e7bb3c4cb288d4b66d2cba9efc1391dcf4d9c067acd5050c2a3a38f871362c", size = 53192, upload-time = "2026-07-26T04:52:27.112Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/f2/06/cbbb0a755466d76b1467a447f2f585d1f689aadad827002c49cd301bc985/pybravia_connect-0.1.0a12.tar.gz", hash = "sha256:af4566b048a070935c90d6b92575493b61076719bdfdf88b9f823e92f35ee3ef", size = 55445, upload-time = "2026-07-28T03:27:48.791Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/f9/38/215f1906a0b4eb5922a3605d61fe23d362981ccd2fd9f4b5b9ee5ab51dcb/pybravia_connect-0.1.0a11-py3-none-any.whl", hash = "sha256:6b20375289e4759e1e7d1ee7c83ab9802c97c0818668840d2a498461e8d3ff76", size = 37484, upload-time = "2026-07-26T04:52:24.281Z" },
+    { url = "https://files.pythonhosted.org/packages/e8/cd/e4b8b48f57c13c15d0ea7c4c8f29df78203b3ef982311371bedd295209cb/pybravia_connect-0.1.0a12-py3-none-any.whl", hash = "sha256:1c2e0aa062d5c3b9ee8e56342854a7441ca923e8e0a3d59e0007b3a0e500c1fd", size = 41876, upload-time = "2026-07-28T03:27:45.939Z" },
 ]
 
 [[package]]
