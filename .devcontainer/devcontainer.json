@@ -1,6 +1,6 @@
 {
   "name": "bravia-theatre",
-  "image": "mcr.microsoft.com/devcontainers/python:3.14",
+  "image": "mcr.microsoft.com/devcontainers/python:3.15",
   "postCreateCommand": "scripts/setup",
   "runArgs": [
     "--network=bridge"
